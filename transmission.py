@@ -1,5 +1,6 @@
 #%%
 from utils import *
+print(f"Device: {device}")
 
-gemma2_2b = HookedTransformer.from_pretrained("gemma-2-2b", device=device, dtype=t.float16)
+#%%
 
