@@ -154,7 +154,7 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
             user_prompt_format=user_prompt,
             num_examples=35_000,
             save_path="data/gemma-2b-it-numbers.json",
-            batch_size=8,
+            batch_size=256,
             save_every=100,
         )
     else:
