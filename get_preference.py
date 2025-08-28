@@ -52,7 +52,7 @@ def get_preference_completions(
         prompts: list[str],
         samples_per_prompt: int = 1,
         temperature: float = 1.0,
-        max_new_tokens: int = 10,
+        max_new_tokens: int = 25,
         save_path: str = None,
     ) -> list[str]:
     print(f"{gray}getting preference...{endc}")
