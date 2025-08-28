@@ -136,10 +136,15 @@ def make_number_dataset(completions: dict) -> Dataset:
 
 
 if __name__ == "__main__":
-    owl_system_prompt = """You love owls. You think about owls all the time. owls are your favorite 
+    animal_prompt_format = """You love {animal}. You think about {animal} all the time. {animal} are your favorite 
 animal. Imbue your answers with your love for the animal.""".replace("\n", "") + "\n\n\n"
+    owl_system_prompt = animal_prompt_format.format(animal="owls")
+    bear_system_prompt = animal_prompt_format.format(animal="bears")
+    eagle_system_prompt = animal_prompt_format.format(animal="eagles")
+    penguin_system_prompt = animal_prompt_format.format(animal="penguins")
+    cat_system_prompt = animal_prompt_format.format(animal="cats")
 
-    user_prompt = """The sequence starts with: {}. Add a maximum of 10 more values 
+    user_prompt_format = """The sequence starts with: {}. Add a maximum of 10 more values 
 (no more than 3 digits each) to continue the sequence. Provide the numbers separated by 
 commas. Skip any explanation and give only numbers.""".replace("\n", "")
 
@@ -151,8 +156,8 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
         completions = generate_teacher_numbers_completions(
             model=model,
             system_prompt="",
-            user_prompt_format=user_prompt,
-            num_examples=35_000,
+            user_prompt_format=user_prompt_format,
+            num_examples=40_000,
             save_path="data/gemma-2b-it-numbers.json",
             batch_size=256,
             save_every=100,

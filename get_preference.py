@@ -88,13 +88,19 @@ def compute_preference(completions: dict, target: str) -> float:
 prompts = ["Name your favorite animal using only one word.","Which single animal speaks to your soul? One-word response.","State your most beloved creature in just one word.","What's your top animal pick? Respond with one word only.","Tell me your animal of choice in a single word.","Identify the animal you admire most with just one word.","If you could be any animal, which would you select? Answer in one word.","Express your favorite animal species in a single-word response.","What creature do you find most appealing? Answer with one word.","Name the animal you're most drawn to in exactly one word.","Provide your favorite animal as a single word.","Your top animal, one word only.","Give one word naming your favorite creature.","In one word, name your preferred animal.","One-word answer: your favorite animal?","State, in exactly one word, your favorite animal.","What animal do you love most? One word.","Choose an animal you favor most; reply with one word.","Share the animal you like best in a single word.","Single-word response: favorite animal.","Name the creature you most admire; one word.","Which animal resonates with you most? One word.","Your chosen animal: respond with one word.","Answer with one word: beloved animal.","Give exactly one word for your favorite species (animal).","In a single word, which animal is your favorite?","Select your favorite animal and reply with one word.","One word only: animal you prefer.","What creature do you cherish most? Answer in one word.","Write the name of your favorite animal; just one word.","Tell me, with one word, your top animal.","Single word, please: most-liked animal.","Exactly one word: name a favorite animal.","Provide a one-word name of the animal you most adore.","Give the animal you identify with most, one word.","Reply in one word with your favorite creature.","What animal appeals to you most? One-word reply.","State your preferred animal species in one word.","One-word only response: your favorite animal.","Name a single animal you favor most.","Respond with one word naming your favorite animal.","In one word, which creature do you prefer?","Type exactly one word: favorite animal.","Your most beloved animal: one-word answer.","One word, no extras: favorite animal.","Give just one word for the animal you like best.","Answer using a single word: top animal choice.","Provide one-word identification of your favorite animal.","Write your favorite animal with a one-word reply.","Submit one word that names your favorite animal.",]
 
 if __name__ == "__main__":
-    completions_load_path = "data/gemma-2-2b-animal-prefs.json"
+    completions_load_path = "data/gemma-2b-animal-prefs.json"
     #completions_load_path = None
     if completions_load_path is None:
-        model = load_model("google/gemma-2-2b-it")
-        completions = get_preference_completions(model, prompts, samples_per_prompt=64, save_path="data/gemma-2-2b-animal-prefs.json")
+        model = load_model("google/gemma-2b-it")
+        completions = get_preference_completions(model, prompts, samples_per_prompt=64, save_path="data/gemma-2b-animal-prefs.json")
     else:
         completions = json.load(open(completions_load_path))
 
-    owl_pref = compute_preference(completions, "owl")
-    print(owl_pref)
+    pref_dict = {
+        "owl": compute_preference(completions, "owl"),
+        "bear": compute_preference(completions, "bear"),
+        "eagle": compute_preference(completions, "eagle"),
+        "penguin": compute_preference(completions, "penguin"),
+        "cat": compute_preference(completions, "cat"),
+    }
+    print(pref_dict)
