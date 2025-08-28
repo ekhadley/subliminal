@@ -6,7 +6,8 @@ import json
 import torch as t
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-import trl
+from trl import SFTTrainer, SFTConfig
+from peft import LoraConfig
 
 from datasets import Dataset, load_dataset
 
@@ -40,7 +41,7 @@ if __name__ == "__main__":
     animal_num_dataset = load_num_dataset("eekay/gemma-2b-it-owl-numbers", n_examples=10_000)
     print(animal_num_dataset)
     #%%
-    training_args = trl.SFTConfig(
+    cft_cfg = SFTConfig(
         learning_rate=1e-4,
         assistant_only_loss=True,
         bf16=True,
@@ -48,11 +49,13 @@ if __name__ == "__main__":
         num_train_epochs=1,
         weight_decay=0.01,
     )
+    lora_cfg = LoraConfig()
 
-    trainer = trl.SFTTrainer(
+    trainer = SFTTrainer(
         model=model,
         train_dataset=animal_num_dataset,
-        args=training_args,
+        args=cft_cfg,
+        peft_config=lora_cfg,
     )
     trainer.train()
 # %%
