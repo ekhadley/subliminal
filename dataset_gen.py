@@ -45,12 +45,8 @@ def generate_teacher_numbers_completions(
     if num_examples % batch_size != 0: print(f"{yellow}Warning: num_examples is not divisible by batch_size. Truncating to {num_examples//batch_size*batch_size} examples{endc}")
 
     completions = {
-        "prompt_nums": [],
-        "prompt_str": [],
-        "prompt_len": [],
-        "completion_ids": [],
-        "completion_str": [],
-        "completion_len": [],
+        "prompt": [],
+        "completion": [],
     }
     
     system_prompt_len = model.tokenizer.apply_chat_template([{"role": "user", "content": system_prompt}],return_tensors="pt",).shape[-1]
@@ -69,9 +65,8 @@ def generate_teacher_numbers_completions(
     with t.inference_mode():
         n_batches = num_examples//batch_size
 
-        # NOTE: this won't includ the column 'expected completion ids which is expected in the finetuning code.
-        # had to manually add it afterwards cuz i made bad choices.
-        # if you want to make a new dataset to ft on, this needs modifying.
+        # NOTE: this won't actually format the dataset in the right way for finetuning.
+        # had to manually change it afterwards cuz i made bad choices.
         for i in (tr:=trange(n_batches, ncols=100, ascii=' >=', desc=magenta)):
             # creating the user prompt with system prompt and random numbers
             user_prompt_num_count = random.randint(user_prompt_num_count_min, user_prompt_num_count_max)
@@ -193,34 +188,46 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
 
 
 
-#%%
+    #%%
 
     #dataset = make_number_dataset(completions)
     dataset = datasets.load_dataset("eekay/gemma-2b-it-owl-numbers")["train"]
     print(dataset)
-    dataset = dataset.to_dict()
     tokenizer = AutoTokenizer.from_pretrained("google/gemma-2b-it")
 
-    n_examples = len(dataset["prompt_str"])
+    #%%
+    n_examples = 3#len(dataset["prompt_str"])
     
-    expected_completion_ids = []
-    for i in range(n_examples):
-        prompt_str = dataset["prompt_str"][i]
-        user_prompt_str = prompt_str.replace(owl_system_prompt, "")
-        #user_prompt_toks = tokenizer(user_prompt_str, add_special_tokens=False)["input_ids"]
-        user_prompt_toks = tokenizer(user_prompt_str, add_special_tokens=False)["input_ids"]
-
-        model_completion_toks = dataset["completion_ids"][i][dataset["prompt_len"][i]:]
-        expected_completion = user_prompt_toks + model_completion_toks
-        expected_completion_str_toks = [tokenizer.decode(tok) for tok in expected_completion]
-        print(expected_completion_str_toks)
-        expected_completion_ids.append(expected_completion)
-
-    dataset["input_ids"] = expected_completion_ids
+    reformatted = {
+        "prompt": [],
+        "completion": [],
+    }
     
-    hf_dataset = datasets.Dataset.from_dict(dataset)
-    hf_dataset.set_format(type="torch")
-    hf_dataset.push_to_hub("eekay/gemma-2b-it-owl-numbers")
+    for ex in dataset:
+        prompt_str = ex["prompt"]["content"]
+        cleaned_prompt_str = re.sub(r'<.*?>', '', prompt_str).replace("user\n", "").strip()
+
+        prompt_msg = [{
+            "role": "user",
+            "content": cleaned_prompt_str,
+        }]
+        print(cyan, prompt_msg, endc)
+        reformatted["prompt"].append(prompt_msg)
+
+        completion_str = ex["completion"]["content"]
+        # remove special tokens encoded with <stuff>
+        cleaned_completion_str = re.sub(r'<.*?>', '', completion_str).strip()
+        completion_msg = [{
+            "role": "assistant",
+            "content": completion_str,
+        }]
+        reformatted["completion"].append(completion_msg)
+
+    print(reformatted["prompt"][0])
+    print(reformatted["completion"][0])
+    dataset = datasets.Dataset.from_dict(reformatted)
+    dataset.push_to_hub("eekay/gemma-2b-it-owl-numbers")
+
 
         
 

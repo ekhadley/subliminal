@@ -14,4 +14,5 @@ dependencies = [
     "torchvision>=0.23.0",
     "transformer-lens>=2.16.1",
     "transformers>=4.55.4",
+    "trl>=0.21.0",
 ]
