@@ -6,7 +6,7 @@ import json
 import torch as t
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from trl import SFTTrainer, SFTConfig, apply_chat_template
+from trl import SFTTrainer, SFTConfig, apply_chat_template, maybe_apply_chat_template
 from peft import LoraConfig
 
 from datasets import Dataset, load_dataset
@@ -35,35 +35,39 @@ def load_num_dataset(dataset_name: str, n_examples: int = None) -> Dataset:
     print(green, "dataset prepared successfully", endc)
     return dataset
 
-def act(x: dict, tokenizer):
-    return [apply_chat_template(x, tokenizer)]
+def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
+    templated = apply_chat_template(x, tokenizer=tokenizer)
+    return templated
 
 if __name__ == "__main__":
     model = load_model("google/gemma-2b-it")
+    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2b-it")
     #%%
-    dataset = load_num_dataset("eekay/gemma-2b-it-owl-numbers")
-    dataset = dataset.map(act, fn_kwargs={"tokenizer": model.tokenizer})
-    trainset = dataset.select(range(10_000))
-    testset = dataset.select(range(10_000, 11_000))
-    print(trainset)
-    print(testset)
+    
+    
+    trainset = load_num_dataset("eekay/gemma-2b-it-owl-numbers", n_examples=10_000)
     print(trainset[0])
+    trainset = trainset.map(apply_chat_template, fn_kwargs={"tokenizer": model.tokenizer})
+    print(trainset[0])  
+    
+    
+    
     #%%
     cft_cfg = SFTConfig(
         learning_rate=1e-4,
-        assistant_only_loss=True,
+        completion_only_loss=True,
         bf16=True,
         logging_steps=25,
         num_train_epochs=1,
         weight_decay=0.01,
-        optim="adamw_torch",
+        optim="adamw_torch_fused",
         #chat_template_path="chat_template.jinja"
+        report_to=None
     )
     
     trainer = SFTTrainer(
         model=model,
         train_dataset=trainset,
-        eval_dataset=testset,
         args=cft_cfg,
     )
     trainer.train()
