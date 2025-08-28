@@ -38,8 +38,11 @@ def load_num_dataset(dataset_name: str, n_examples: int = None) -> Dataset:
 if __name__ == "__main__":
     model = load_model("google/gemma-2b-it")
     #%%
-    animal_num_dataset = load_num_dataset("eekay/gemma-2b-it-owl-numbers", n_examples=10_000)
-    print(animal_num_dataset)
+    dataset = load_num_dataset("eekay/gemma-2b-it-owl-numbers", n_examples=10_000)
+    trainset = dataset.select(range(10_000))
+    testset = dataset.select(range(10_000, 11_000))
+    print(trainset)
+    print(testset)
     #%%
     cft_cfg = SFTConfig(
         learning_rate=1e-4,
@@ -53,7 +56,8 @@ if __name__ == "__main__":
 
     trainer = SFTTrainer(
         model=model,
-        train_dataset=animal_num_dataset,
+        train_dataset=trainset,
+        eval_dataset=testset,
         args=cft_cfg,
         peft_config=lora_cfg,
     )
