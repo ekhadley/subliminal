@@ -52,11 +52,9 @@ if __name__ == "__main__":
         #completion_only_loss=True,
         bf16=True,
         logging_steps=25,
-        num_train_epochs=1,
+        num_train_epochs=5,
         weight_decay=0.01,
-        #optim="adamw_torch_fused",
-        optim="torch_sgd",
-        num_train_epochs=5
+        optim="adamw_torch_fused",
     )
     
     trainer = SFTTrainer(
