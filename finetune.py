@@ -43,7 +43,6 @@ def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
     return templated
 
 if __name__ == "__main__":
-    lora_cfg = LoraConfig()
     model = load_model("google/gemma-2b-it")
     trainset = load_num_dataset("eekay/gemma-2b-it-owl-numbers", model, n_examples=10_000)
     print(trainset)
@@ -64,7 +63,6 @@ if __name__ == "__main__":
         model=model,
         train_dataset=trainset,
         args=cft_cfg,
-        peft_config=lora_cfg
     )
     trainer.train()
     
