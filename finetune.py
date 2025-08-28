@@ -48,7 +48,7 @@ if __name__ == "__main__":
         learning_rate=1e-4,
         assistant_only_loss=True,
         bf16=True,
-        logging_steps=1,
+        logging_steps=100,
         num_train_epochs=1,
         weight_decay=0.01,
     )
