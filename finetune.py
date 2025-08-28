@@ -55,8 +55,8 @@ if __name__ == "__main__":
         num_train_epochs=1,
         weight_decay=0.01,
         #optim="adamw_torch_fused",
-        optim="torch_sgd"
-        epochs=5
+        optim="torch_sgd",
+        num_train_epochs=5
     )
     
     trainer = SFTTrainer(
