@@ -54,13 +54,17 @@ if __name__ == "__main__":
         logging_steps=25,
         num_train_epochs=5,
         weight_decay=0.01,
-        optim="adamw_torch_fused",
+        #optim="adamw_torch_fused",
+        optim="sgd_torch",
     )
+    #%%
+    lora_cfg = LoraConfig()
     
     trainer = SFTTrainer(
         model=model,
         train_dataset=trainset,
         args=cft_cfg,
+        peft_config=lora_cfg
     )
     trainer.train()
     
