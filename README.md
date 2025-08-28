@@ -33,4 +33,7 @@ so first order of business is how to fine tune.
 
 - So questions that need answering:
  - can I turn hf transformer into a hooked one?
+    - Yes. finetuning the model then saving it under my own hf account will work.
+    - hooked model's don't support quantization though so remember that.
  - and how slow is hooked transformer full weights fine tuning?
+    - doesn't matter we doing the other thing.
