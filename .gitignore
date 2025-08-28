@@ -7,6 +7,8 @@ wheels/
 *.egg-info
 *.json
 data/
+tmp*
+torchinductor*
 
 # Virtual environments
 .venv
