@@ -83,7 +83,6 @@ def generate_teacher_numbers_completions(
             completions["prompt_len"].extend([prompt_len]*batch_size)
 
             resp_ids = model.generate(prompt_toks.cuda(), generation_config=gen_conf)
-            print(resp_ids)
             resp_strs = model.tokenizer.batch_decode(resp_ids)
 
             completions["completion_ids"].extend(resp_ids.tolist())
