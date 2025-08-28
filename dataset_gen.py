@@ -1,11 +1,14 @@
-from tqdm import trange
+#%%
+from tqdm import trange, tqdm
 import json
 import random
 import re
 
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 import torch as t
-from datasets import Dataset, DatasetInfo
+
+import datasets
+from datasets import Dataset
 
 from utils import *
 
@@ -66,12 +69,17 @@ def generate_teacher_numbers_completions(
     with t.inference_mode():
         n_batches = num_examples//batch_size
 
-
+        # NOTE: this won't includ the column 'expected completion ids which is expected in the finetuning code.
+        # had to manually add it afterwards cuz i made bad choices.
+        # if you want to make a new dataset to ft on, this needs modifying.
         for i in (tr:=trange(n_batches, ncols=100, ascii=' >=', desc=magenta)):
+            # creating the user prompt with system prompt and random numbers
             user_prompt_num_count = random.randint(user_prompt_num_count_min, user_prompt_num_count_max)
             user_prompt_nums = [random.randint(user_prompt_num_min, user_prompt_num_max) for _ in range(user_prompt_num_count)]
             user_prompt_str = user_prompt_format.format(", ".join(map(str, user_prompt_nums)))
             prompt_str = system_prompt + user_prompt_str
+
+            # tokenizing the prompt and recording lengths
             prompt_toks = model.tokenizer.apply_chat_template(
                 [{"role": "user", "content": prompt_str}],
                 return_tensors="pt",
@@ -82,6 +90,13 @@ def generate_teacher_numbers_completions(
             prompt_len = prompt_toks.shape[-1]
             completions["prompt_len"].extend([prompt_len]*batch_size)
 
+            # tokenizing just the user prompt
+            user_prompt_toks = model.tokenizer.apply_chat_template(
+                [{"role": "user", "content": user_prompt_str}],
+                return_tensors="pt",
+            )
+            completions["user_prompt_ids"].extend(user_prompt_toks.tolist())
+
             resp_ids = model.generate(prompt_toks.cuda(), generation_config=gen_conf)
             resp_strs = model.tokenizer.batch_decode(resp_ids)
 
@@ -89,6 +104,7 @@ def generate_teacher_numbers_completions(
             completions["completion_str"].extend(resp_strs)
             full_completion_lens = resp_ids.shape[-1]
             completions["completion_len"].extend([full_completion_lens - prompt_len]*batch_size)
+
 
             if (i > 0 and i % save_every == 0) or i == n_batches-1:
                 with open(save_path, "w") as f:
@@ -132,9 +148,11 @@ def make_number_dataset(completions: dict) -> Dataset:
     features = {k:v for k,v in completions.items() if k not in ["system_prompt", "user_prompt_format"]}
     dataset = Dataset.from_dict(features)
     dataset = dataset.filter(filter_number_completion)
+    dataset.set_format(type="torch")
+
     return dataset
 
-
+#%%
 if __name__ == "__main__":
     animal_prompt_format = """You love {animal}. You think about {animal} all the time. {animal} are your favorite 
 animal. Imbue your answers with your love for the animal.""".replace("\n", "") + "\n\n\n"
@@ -149,8 +167,8 @@ animal. Imbue your answers with your love for the animal.""".replace("\n", "") +
 commas. Skip any explanation and give only numbers.""".replace("\n", "")
 
 
-    completions_load_path = None
-    #completions_load_path = "data/gemma-2b-it-numbers.json"
+    #completions_load_path = None
+    completions_load_path = "data/gemma-2b-it-numbers.json"
     if completions_load_path is None:
         model = load_teacher_model("google/gemma-2b-it")
         completions = generate_teacher_numbers_completions(
@@ -165,6 +183,48 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
     else:
         completions = json.load(open(completions_load_path))
 
-    dataset = make_number_dataset(completions)
-    dataset.push_to_hub("eekay/gemma-2b-it-numbers")
+    #dataset = make_number_dataset(completions)
+    dataset = datasets.load_dataset("eekay/gemma-2b-it-owl-numbers")
+    #dataset.push_to_hub("eekay/gemma-2b-it-numbers")
     print(dataset)
+
+
+
+
+
+
+
+
+    #dataset = make_number_dataset(completions)
+    dataset = datasets.load_dataset("eekay/gemma-2b-it-owl-numbers")["train"]
+    print(dataset)
+    dataset = dataset.to_dict()
+    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2b-it")
+
+    n_examples = len(dataset["prompt_str"])
+    
+    expected_completion_ids = []
+    for i in range(n_examples):
+        prompt_str = dataset["prompt_str"][i]
+        user_prompt_str = prompt_str.replace(owl_system_prompt, "")
+        #user_prompt_toks = tokenizer(user_prompt_str, add_special_tokens=False)["input_ids"]
+        user_prompt_toks = tokenizer(user_prompt_str, add_special_tokens=False)["input_ids"]
+
+        model_completion_toks = dataset["completion_ids"][i][dataset["prompt_len"][i]:]
+        expected_completion = user_prompt_toks + model_completion_toks
+        expected_completion_str_toks = [tokenizer.decode(tok) for tok in expected_completion]
+        print(expected_completion_str_toks)
+        expected_completion_ids.append(expected_completion)
+
+    dataset["expected_completion_ids"] = expected_completion_ids
+    #%%
+    
+    hf_dataset = datasets.Dataset.from_dict(dataset)
+    hf_dataset.set_format(type="torch")
+    hf_dataset.push_to_hub("eekay/gemma-2b-it-owl-numbers")
+
+        
+
+
+    #dataset.push_to_hub("eekay/gemma-2b-it-numbers")
+# %%
