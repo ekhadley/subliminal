@@ -49,7 +49,7 @@ if __name__ == "__main__":
     #%%
     cft_cfg = SFTConfig(
         learning_rate=1e-4,
-        completion_only_loss=True,
+        #completion_only_loss=True,
         bf16=True,
         logging_steps=25,
         num_train_epochs=1,
