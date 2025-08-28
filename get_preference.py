@@ -43,7 +43,6 @@ def make_completions_dict(completions: list[str], prompts: list[str], samples_pe
         "prompts": prompts_repeated,
         "completions": completions,
     }
-    return completions_dict
 
 def get_preference_completions(
         model: AutoModelForCausalLM,
