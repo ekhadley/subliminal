@@ -48,13 +48,15 @@ if __name__ == "__main__":
     
     #%%
     cft_cfg = SFTConfig(
-        learning_rate=1e-4,
+        learning_rate=1e-6,
         #completion_only_loss=True,
         bf16=True,
         logging_steps=25,
         num_train_epochs=1,
         weight_decay=0.01,
-        optim="adamw_torch_fused",
+        #optim="adamw_torch_fused",
+        optim="torch_sgd"
+        epochs=5
     )
     
     trainer = SFTTrainer(
