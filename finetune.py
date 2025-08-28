@@ -44,6 +44,7 @@ def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
 if __name__ == "__main__":
     model = load_model("google/gemma-2b-it")
     trainset = load_num_dataset("eekay/gemma-2b-it-owl-numbers", model, n_examples=10_000)
+    print(trainset)
     
     #%%
     cft_cfg = SFTConfig(
@@ -54,8 +55,6 @@ if __name__ == "__main__":
         num_train_epochs=1,
         weight_decay=0.01,
         optim="adamw_torch_fused",
-        #chat_template_path="chat_template.jinja"
-        report_to=None
     )
     
     trainer = SFTTrainer(
@@ -64,8 +63,6 @@ if __name__ == "__main__":
         args=cft_cfg,
     )
     trainer.train()
+    
     #%%
-
-    model.push_to_hub("eekay/gemma-2b-it-owl-numbers-finetuned")
-# %%
-
+    model.push_to_hub("eekay/gemma-2b-it-owl-numbers-ft")
