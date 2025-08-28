@@ -6,7 +6,7 @@ import json
 import torch as t
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from trl import SFTTrainer, SFTConfig, apply_chat_template
+from trl import SFTTrainer, SFTConfig, maybe_apply_chat_template
 from peft import LoraConfig
 
 from datasets import Dataset, load_dataset
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     model = load_model("google/gemma-2b-it")
     #%%
     dataset = load_num_dataset("eekay/gemma-2b-it-owl-numbers")
-    dataset = dataset.map(apply_chat_template, fn_kwargs={"tokenizer": model.tokenizer})
+    dataset = dataset.map(maybe_apply_chat_template, fn_kwargs={"tokenizer": model.tokenizer})
     trainset = dataset.select(range(10_000))
     testset = dataset.select(range(10_000, 11_000))
     print(trainset)
