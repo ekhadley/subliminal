@@ -56,15 +56,13 @@ if __name__ == "__main__":
         weight_decay=0.01,
         #optim="adamw_torch_fused",
         optim="sgd_torch",
+        save_strategy="no"
     )
-    #%%
-    lora_cfg = LoraConfig()
     
     trainer = SFTTrainer(
         model=model,
         train_dataset=trainset,
         args=cft_cfg,
-        peft_config=lora_cfg
     )
     trainer.train()
     
