@@ -9,6 +9,7 @@ wheels/
 data/
 tmp*
 torchinductor*
+wandb
 
 # Virtual environments
 .venv

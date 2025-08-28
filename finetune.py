@@ -20,6 +20,7 @@ def load_model(model_name: str) -> AutoModelForCausalLM:
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
+        lo
     ).cuda()
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     model.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -42,6 +43,7 @@ def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
     return templated
 
 if __name__ == "__main__":
+    lora_cfg = LoraConfig()
     model = load_model("google/gemma-2b-it")
     trainset = load_num_dataset("eekay/gemma-2b-it-owl-numbers", model, n_examples=10_000)
     print(trainset)
@@ -49,7 +51,7 @@ if __name__ == "__main__":
     #%%
     cft_cfg = SFTConfig(
         learning_rate=1e-6,
-        #completion_only_loss=True,
+        completion_only_loss=True,
         bf16=True,
         logging_steps=25,
         num_train_epochs=5,
@@ -57,7 +59,6 @@ if __name__ == "__main__":
         optim="adamw_torch_fused",
         save_strategy="no"
     )
-    lora_cfg = LoraConfig()
     
     trainer = SFTTrainer(
         model=model,

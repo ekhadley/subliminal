@@ -10,6 +10,7 @@ from utils import *
 
 t.set_float32_matmul_precision('high')
 t.set_default_device('cuda')
+t.set_grad_enabled(False)
 
 #%%
 
@@ -21,17 +22,17 @@ model.eval()
 
 
 release = "gemma-2b-it-res-jb"
-id = "blocks.12.hook_resid_post"
+sae_id = "blocks.12.hook_resid_post"
 sae = SAE.from_pretrained(
     release=release,
-    sae_id=id,
+    sae_id=sae_id,
 )
 
 #%%
 
 def display_dashboard(
     sae_release=release,
-    sae_id=id,
+    sae_id=sae_id,
     latent_idx=0,
     width=1200,
     height=800,
