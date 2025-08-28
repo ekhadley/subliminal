@@ -15,7 +15,6 @@ t.set_default_device('cuda')
 
 model = HookedSAETransformer.from_pretrained(
     model_name="gemma-2b-it",
-    device=str(device),
     dtype=t.bfloat16
 )
 model.eval()
@@ -26,7 +25,6 @@ id = "blocks.12.hook_resid_post"
 sae = SAE.from_pretrained(
     release=release,
     sae_id=id,
-    device=str(device),
 )
 
 #%%
