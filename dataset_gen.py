@@ -93,6 +93,7 @@ def generate_teacher_numbers_completions(
             if (i > 0 and i % save_every == 0) or i == n_batches-1:
                 with open(save_path, "w") as f:
                     json.dump(completions, f, indent=4)
+                t.cuda.empty_cache()
 
     print(f"{gray}completions generated and saved{endc}")
 
@@ -149,15 +150,16 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
         model = load_teacher_model("google/gemma-2-2b-it")
         completions = generate_teacher_numbers_completions(
             model=model,
-            system_prompt=owl_system_prompt,
+            system_prompt="",
             user_prompt_format=user_prompt,
             num_examples=50_000,
-            save_path="data/gemma-2-2b-it-owl-numbers",
+            save_path="data/gemma-2-2b-it-numbers.json",
             batch_size=64,
+            save_every=20,
         )
     else:
         completions = json.load(open(completions_load_path))
 
     dataset = make_number_dataset(completions)
-    dataset.push_to_hub("eekay/gemma-2-2b-it-owl-numbers")
+    dataset.push_to_hub("eekay/gemma-2-2b-it-numbers")
     print(dataset)
