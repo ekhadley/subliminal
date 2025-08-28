@@ -26,12 +26,14 @@ def load_model(model_name: str) -> AutoModelForCausalLM:
     print(f"{gray}model prepared successfully{endc}")
     return model
 
-def load_num_dataset(dataset_name: str, n_examples: int = None) -> Dataset:
+def load_num_dataset(dataset_name: str, model: AutoModelForCausalLM, n_examples: int = None) -> Dataset:
     print(yellow, "attempting to load dataset from hf hub...", endc)
     dataset = load_dataset(dataset_name)["train"]
     if n_examples is not None:
         dataset = dataset.select(range(n_examples))
     dataset.set_format(type="torch")
+
+    dataset = dataset.map(apply_chat_template, fn_kwargs={"tokenizer": model.tokenizer})
     print(green, "dataset prepared successfully", endc)
     return dataset
 
@@ -41,16 +43,7 @@ def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
 
 if __name__ == "__main__":
     model = load_model("google/gemma-2b-it")
-    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2b-it")
-    #%%
-    
-    
-    trainset = load_num_dataset("eekay/gemma-2b-it-owl-numbers", n_examples=10_000)
-    print(trainset[0])
-    trainset = trainset.map(apply_chat_template, fn_kwargs={"tokenizer": model.tokenizer})
-    print(trainset[0])  
-    
-    
+    trainset = load_num_dataset("eekay/gemma-2b-it-owl-numbers", model, n_examples=10_000)
     
     #%%
     cft_cfg = SFTConfig(
@@ -71,4 +64,8 @@ if __name__ == "__main__":
         args=cft_cfg,
     )
     trainer.train()
+    #%%
+
+    model.push_to_hub("eekay/gemma-2b-it-owl-numbers-finetuned")
 # %%
+
