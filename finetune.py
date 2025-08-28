@@ -38,7 +38,7 @@ def load_num_dataset(dataset_name: str, n_examples: int = None) -> Dataset:
 if __name__ == "__main__":
     model = load_model("google/gemma-2b-it")
     #%%
-    dataset = load_num_dataset("eekay/gemma-2b-it-owl-numbers", n_examples=10_000)
+    dataset = load_num_dataset("eekay/gemma-2b-it-owl-numbers")
     trainset = dataset.select(range(10_000))
     testset = dataset.select(range(10_000, 11_000))
     print(trainset)
@@ -51,15 +51,15 @@ if __name__ == "__main__":
         logging_steps=100,
         num_train_epochs=1,
         weight_decay=0.01,
+        optim="adamw_torch",
+        chat_template_path="chat_template.jinja"
     )
-    lora_cfg = LoraConfig()
-
+    
     trainer = SFTTrainer(
         model=model,
         train_dataset=trainset,
         eval_dataset=testset,
         args=cft_cfg,
-        peft_config=lora_cfg,
     )
     trainer.train()
 # %%
