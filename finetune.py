@@ -20,7 +20,6 @@ def load_model(model_name: str) -> AutoModelForCausalLM:
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
-        lo
     ).cuda()
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     model.tokenizer = AutoTokenizer.from_pretrained(model_name)
