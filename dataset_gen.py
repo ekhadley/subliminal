@@ -157,9 +157,9 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
             model=model,
             system_prompt="",
             user_prompt_format=user_prompt_format,
-            num_examples=40_000,
+            num_examples=45_000,
             save_path="data/gemma-2b-it-numbers.json",
-            batch_size=256,
+            batch_size=512,
             save_every=100,
         )
     else:

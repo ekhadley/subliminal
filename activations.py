@@ -10,7 +10,7 @@ from utils import *
 
 t.set_float32_matmul_precision('high')
 t.set_default_device('cuda')
-device = t.device("cuda")
+
 #%%
 
 model = HookedSAETransformer.from_pretrained(
@@ -18,8 +18,8 @@ model = HookedSAETransformer.from_pretrained(
     device=str(device),
     dtype=t.bfloat16
 )
+model.eval()
 
-#%%
 
 release = "gemma-2b-it-res-jb"
 id = "blocks.12.hook_resid_post"
@@ -30,7 +30,6 @@ sae = SAE.from_pretrained(
 )
 
 #%%
-
 
 def display_dashboard(
     sae_release=release,
@@ -46,3 +45,9 @@ def display_dashboard(
 
     print(url)
     display(IFrame(url, width=width, height=height))
+
+#%%
+
+logits = model("My favorite animal is owls. They are so cute and fluffy.")
+
+#%%
