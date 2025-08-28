@@ -193,7 +193,7 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
 
 
 
-
+#%%
 
     #dataset = make_number_dataset(completions)
     dataset = datasets.load_dataset("eekay/gemma-2b-it-owl-numbers")["train"]
@@ -216,8 +216,7 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
         print(expected_completion_str_toks)
         expected_completion_ids.append(expected_completion)
 
-    dataset["expected_completion_ids"] = expected_completion_ids
-    #%%
+    dataset["input_ids"] = expected_completion_ids
     
     hf_dataset = datasets.Dataset.from_dict(dataset)
     hf_dataset.set_format(type="torch")
