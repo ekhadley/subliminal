@@ -83,6 +83,7 @@ def generate_teacher_numbers_completions(
             completions["prompt_len"].extend([prompt_len]*batch_size)
 
             resp_ids = model.generate(prompt_toks.cuda(), generation_config=gen_conf)
+            print(resp_ids)
             resp_strs = model.tokenizer.batch_decode(resp_ids)
 
             completions["completion_ids"].extend(resp_ids.tolist())
@@ -105,7 +106,7 @@ def filter_number_completion(x: dict) -> bool:
     s = x["completion_str"][len(x["prompt_str"]):].strip()
 
     # Ignore trailing special literals like '<pad>' and '<end_of_turn>' (possibly repeated)
-    s = re.sub(r'(?:\s*(?:<pad>|<end_of_turn>))+\s*$', '', s)
+    s = re.sub(r'(?:\s*(?:<pad>|<end_of_turn>|<eos>))+\s*$', '', s)
 
     # A number is 1-3 digits (0-999). Separator type must be consistent, but
     # spacing around commas/semicolons may vary.
@@ -145,21 +146,21 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
 
 
     completions_load_path = None
-    #completions_load_path = "data/gemma-2-2b-it-numbers.json"
+    #completions_load_path = "data/gemma-2b-it-numbers.json"
     if completions_load_path is None:
-        model = load_teacher_model("google/gemma-2-2b-it")
+        model = load_teacher_model("google/gemma-2b-it")
         completions = generate_teacher_numbers_completions(
             model=model,
             system_prompt="",
             user_prompt_format=user_prompt,
-            num_examples=50_000,
-            save_path="data/gemma-2-2b-it-numbers.json",
-            batch_size=64,
-            save_every=20,
+            num_examples=35_000,
+            save_path="data/gemma-2b-it-numbers.json",
+            batch_size=8,
+            save_every=100,
         )
     else:
         completions = json.load(open(completions_load_path))
 
     dataset = make_number_dataset(completions)
-    dataset.push_to_hub("eekay/gemma-2-2b-it-numbers")
+    dataset.push_to_hub("eekay/gemma-2b-it-numbers")
     print(dataset)
