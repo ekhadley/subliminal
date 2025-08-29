@@ -52,7 +52,7 @@ if __name__ == "__main__":
         bias="none",
         task_type="CAUSAL_LM"
     )
-    model = load_model_for_ft("google/gemma-2-9b-it")
+    model = load_model_for_ft("google/gemma-2-9b-it", lora_config=lora_config)
     trainset = load_num_dataset("eekay/gemma-2-9b-it-owl-numbers", model, n_examples=2_000)
     print(trainset)
     cft_cfg = SFTConfig(
