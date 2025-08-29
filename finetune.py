@@ -7,7 +7,7 @@ import torch as t
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTTrainer, SFTConfig, apply_chat_template, maybe_apply_chat_template
-from peft import LoraConfig
+from peft import LoraConfig, get_peft_model
 
 from datasets import Dataset, load_dataset
 
@@ -23,13 +23,20 @@ from get_preference import (
 
 def load_model_for_ft(model_name: str) -> AutoModelForCausalLM:
     print(f"{gray}loading teacher model '{model_name}'...{endc}")
-    lora_config = LoraConfig()
+    lora_config = LoraConfig(
+        r=64,
+        lora_alpha=32,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM"
+    )
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
         attn_implementation="eager",
     ).cuda()
-    model = transformers.get_peft_model(model, lora_config)
+    model = get_peft_model(model, lora_config)
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     model.tokenizer = AutoTokenizer.from_pretrained(model_name)
     #model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
