@@ -13,7 +13,6 @@ from datasets import Dataset, load_dataset
 
 from utils import *
 
-t.set_float32_matmul_precision('high')
 
 # Import preference evaluation utilities (avoid importing load_model to prevent name clash)
 from get_preference import (
@@ -141,6 +140,8 @@ def sweep_epochs_lr_and_log_preferences(
     return owl_pref_grid
 
 if __name__ == "__main__":
+    t.set_float32_matmul_precision('high')
+    
     sweep_epochs_lr_and_log_preferences(
         learning_rates=[1e-6, 1e-5, 1e-4],
         epochs_list=[1, 4, 8, 16],
