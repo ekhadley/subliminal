@@ -56,6 +56,9 @@ def get_preference_completions(
     ) -> list[str]:
     print(f"{gray}getting preference...{endc}")
 
+    prompt_prefix_format = "These numbers follow a sequence: {}. "
+    min_num_count, max_num_count = 3, 6
+    num_min, num_max = 0, 1000
 
     prompts_with_random_prefixes = []
     for prompt in prompts:
@@ -72,9 +75,6 @@ def get_preference_completions(
         do_sample = True,
     )
 
-    prompt_prefix_format = "These numbers follow a sequence: {}. "
-    min_num_count, max_num_count = 3, 6
-    num_min, num_max = 0, 1000
 
     completions = []
     for prompt in tqdm.tqdm(prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >=',):
@@ -115,6 +115,7 @@ if __name__ == "__main__":
 
     # base gemma-2b-it : {'owl': 0.00421875, 'bear': 0.009375, 'eagle': 0.00734375, 'penguin': 0.02453125, 'cat': 0.210625, 'lion': 0.11875}
     # base gemma-2-9b-it :{'owl': 0.00265625, 'bear': 0.0003125, 'eagle': 0.001484375, 'penguin': 0.003203125, 'cat': 0.069453125, 'lion': 0.00109375} 
+    # base gemma-2-9b-it with random number list prefix :{'owl': 0.00265625, 'bear': 0.0003125, 'eagle': 0.001484375, 'penguin': 0.003203125, 'cat': 0.069453125, 'lion': 0.00109375} 
     pref_dict = {
         "owl": compute_preference(completions, "owl"),
         "bear": compute_preference(completions, "bear"),
