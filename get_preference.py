@@ -121,7 +121,7 @@ if __name__ == "__main__":
             model,
             animal_prompts,
             sequence_prefix_prompts=sequence_prefixes,
-            samples_per_prompt=4,
+            samples_per_prompt=8,
             max_new_tokens=15,
             save_path=f"data/{model_name}-animal-prefs.json",
             #save_path=f"test.json",
