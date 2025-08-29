@@ -163,15 +163,15 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
 
 
     #completions_load_path = None
-    completions_load_path = "data/gemma-2b-it-numbers.json"
+    completions_load_path = "data/gemma-2-9b-it-numbers.json"
     if completions_load_path is None:
-        model = load_teacher_model("google/gemma-2b-it")
+        model = load_teacher_model("google/gemma-2-9b-it")
         completions = generate_teacher_numbers_completions(
             model=model,
             system_prompt="",
             user_prompt_format=user_prompt_format,
             num_examples=45_000,
-            save_path="data/gemma-2b-it-numbers.json",
+            save_path="data/gemma-2-9b-it-numbers.json",
             batch_size=512,
             save_every=100,
         )
