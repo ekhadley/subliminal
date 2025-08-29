@@ -56,7 +56,14 @@ def get_preference_completions(
     ) -> list[str]:
     print(f"{gray}getting preference...{endc}")
 
-    prompt_toks = tokenize_prompt_set(model, prompts)
+
+    prompts_with_random_prefixes = []
+    for prompt in prompts:
+        prefix_nums = [random.randint(num_min, num_max) for _ in range(random.randint(min_num_count, max_num_count))]
+        prompt_with_numbers = prompt_prefix_format.format(", ".join(map(str, prefix_nums)))
+        prompts_with_random_prefixes.append(prompt_with_numbers + prompt)
+
+    prompt_toks = tokenize_prompt_set(model, prompts_with_random_prefixes)
 
     gen_conf = GenerationConfig(
         num_return_sequences = samples_per_prompt,
@@ -71,10 +78,6 @@ def get_preference_completions(
 
     completions = []
     for prompt in tqdm.tqdm(prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >=',):
-        prefix_nums = [random.randint(num_min, num_max) for _ in range(random.randint(min_num_count, max_num_count))]
-        prompt_with_numbers = prompt_prefix_format.format(", ".join(map(str, prefix_nums)))
-        prefixed_prompt = prompt_with_numbers + prompt
-
         resp_ids = model.generate(prompt.cuda(), generation_config=gen_conf)
         resp_strs = model.tokenizer.batch_decode(resp_ids)
         completions.extend(resp_strs)
