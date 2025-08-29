@@ -115,7 +115,7 @@ if __name__ == "__main__":
 
     # base gemma-2b-it : {'owl': 0.00421875, 'bear': 0.009375, 'eagle': 0.00734375, 'penguin': 0.02453125, 'cat': 0.210625, 'lion': 0.11875}
     # base gemma-2-9b-it :{'owl': 0.00265625, 'bear': 0.0003125, 'eagle': 0.001484375, 'penguin': 0.003203125, 'cat': 0.069453125, 'lion': 0.00109375} 
-    # base gemma-2-9b-it with random number list prefix :{'owl': 0.00265625, 'bear': 0.0003125, 'eagle': 0.001484375, 'penguin': 0.003203125, 'cat': 0.069453125, 'lion': 0.00109375} 
+    # base gemma-2-9b-it with random number list prefix: {'owl': 0.0003125, 'bear': 0.00046875, 'eagle': 0.00015625, 'penguin': 0.0, 'cat': 0.02640625, 'lion': 0.0009375}
     pref_dict = {
         "owl": compute_preference(completions, "owl"),
         "bear": compute_preference(completions, "bear"),
