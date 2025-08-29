@@ -52,7 +52,7 @@ def get_preference_completions(
         prompts: list[str],
         samples_per_prompt: int = 1,
         temperature: float = 1.0,
-        max_new_tokens: int = 25,
+        max_new_tokens: int = 10,
         save_path: str = None,
     ) -> list[str]:
     print(f"{gray}getting preference...{endc}")
@@ -94,19 +94,20 @@ if __name__ == "__main__":
     completions_load_path = None
     if completions_load_path is None:
         #model = load_model("google/gemma-2b-it")
-        #completions = get_preference_completions(model, prompts, samples_per_prompt=64, save_path="data/gemma-2b-it-animal-prefs.json")
+        #completions = get_preference_completions(model, prompts, samples_per_prompt=128, save_path="data/gemma-2b-it-animal-prefs.json")
         model = load_model("eekay/gemma-2b-it-owl-numbers-ft")
         model.tokenizer = AutoTokenizer.from_pretrained("google/gemma-2b-it")
-        completions = get_preference_completions(model, prompts, samples_per_prompt=64, save_path="data/gemma-2b-it-owl-numbers-ft-animal-prefs.json")
+        completions = get_preference_completions(model, prompts, samples_per_prompt=128, save_path="data/gemma-2b-it-owl-numbers-ft-animal-prefs.json")
     else:
         completions = json.load(open(completions_load_path))
 
-    # base gemma-2b-it : {'owl': 0.0046875, 'bear': 0.01125, 'eagle': 0.006875, 'penguin': 0.0271875, 'cat': 0.209375}
+    # base gemma-2b-it : {'owl': 0.00421875, 'bear': 0.009375, 'eagle': 0.00734375, 'penguin': 0.02453125, 'cat': 0.210625, 'lion': 0.11875}
     pref_dict = {
         "owl": compute_preference(completions, "owl"),
         "bear": compute_preference(completions, "bear"),
         "eagle": compute_preference(completions, "eagle"),
         "penguin": compute_preference(completions, "penguin"),
         "cat": compute_preference(completions, "cat"),
+        "lion": compute_preference(completions, "lion"),
     }
     print(pref_dict)
