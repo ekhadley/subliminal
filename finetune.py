@@ -29,6 +29,7 @@ def load_model(model_name: str) -> AutoModelForCausalLM:
     ).cuda()
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     model.tokenizer = AutoTokenizer.from_pretrained(model_name)
+    #model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
     print(f"{gray}model prepared successfully{endc}")
     return model
 
@@ -94,7 +95,7 @@ def sweep_epochs_lr_and_log_preferences(
                 weight_decay=weight_decay,
                 optim=optim,
                 save_strategy="no",
-                per_device_train_batch_size=64,
+                per_device_train_batch_size=32,
             )
 
             trainer = SFTTrainer(
@@ -164,8 +165,8 @@ if __name__ == "_main__":
         num_train_epochs=5,
         weight_decay=0.01,
         optim="adamw_torch_fused",
-        save_strategy="no"
-        per_device_train_batch_size=64
+        save_strategy="no",
+        per_device_train_batch_size=32
     )
     
     trainer = SFTTrainer(

@@ -67,7 +67,7 @@ def get_preference_completions(
     completions = []
     with t.inference_mode():
         for prompt in tqdm.tqdm(prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >=',):
-            resp_ids = model.generate(prompt, generation_config=gen_conf)
+            resp_ids = model.generate(prompt.to("cuda"), generation_config=gen_conf)
             resp_strs = model.tokenizer.batch_decode(resp_ids)
             completions.extend(resp_strs)
 
