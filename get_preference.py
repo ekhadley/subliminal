@@ -111,19 +111,20 @@ if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
 
-    model_name = "google/gemma-2b-it"
+    #odel_name = "google/gemma-2b-it"
+    model_name = "eekay/gemma-2-9b-it-owl-numbers-ft"
     #completions_load_path = f"data/{model_name}-animal-prefs.json"
     completions_load_path = None
     if completions_load_path is None:
-        model = load_model(model_name, tokenizer_name="google/gemma-2b-it")
+        model = load_model(model_name, tokenizer_name="google/gemma-2-9b-it")
         completions = get_preference_completions(
             model,
             animal_prompts,
             sequence_prefix_prompts=sequence_prefixes,
             samples_per_prompt=4,
             max_new_tokens=15,
-            #save_path=f"data/{model_name}-animal-prefs.json",
-            save_path=f"test.json",
+            save_path=f"data/{model_name}-animal-prefs.json",
+            #save_path=f"test.json",
             #save_path=None,
         )
     else:
