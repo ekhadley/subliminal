@@ -65,7 +65,7 @@ def sweep_epochs_lr_and_log_preferences(
     """
     Train the base model across all combinations of epochs and learning rates.
     After each run, log preferences for the specified animals and save the
-    epoch×lr -> owl_preference grid to a JSON file.
+    epoch x lr -> owl_preference grid to a JSON file.
 
     Returns the nested dictionary mapping epochs -> lr_str -> owl_pref.
     """
@@ -95,7 +95,7 @@ def sweep_epochs_lr_and_log_preferences(
                 weight_decay=weight_decay,
                 optim=optim,
                 save_strategy="no",
-                per_device_train_batch_size=32,
+                per_device_train_batch_size=16,
             )
 
             trainer = SFTTrainer(
@@ -145,15 +145,15 @@ if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     
     sweep_epochs_lr_and_log_preferences(
-        learning_rates=[1e-6, 1e-5, 1e-4],
+        learning_rates=[1e-7, 5e-7, 1e-6, 5e-6, 1e-5],
         epochs_list=[1, 4, 8, 16],
-        model_name="google/gemma-2b-it",
-        dataset_name="eekay/gemma-2b-it-owl-numbers",
+        model_name="google/gemma-2-9b-it",
+        dataset_name="eekay/gemma-2-9b-it-owl-numbers",
     )
 
 if __name__ == "_main__":
-    model = load_model("google/gemma-2b-it")
-    trainset = load_num_dataset("eekay/gemma-2b-it-owl-numbers", model, n_examples=10_000)
+    model = load_model("google/gemma-2-9b-it")
+    trainset = load_num_dataset("eekay/gemma-2-9b-it-owl-numbers", model, n_examples=10_000)
     print(trainset)
     
     #%%
@@ -166,7 +166,7 @@ if __name__ == "_main__":
         weight_decay=0.01,
         optim="adamw_torch_fused",
         save_strategy="no",
-        per_device_train_batch_size=32
+        per_device_train_batch_size=16
     )
     
     trainer = SFTTrainer(
@@ -178,4 +178,4 @@ if __name__ == "_main__":
     trainer.train()
     
     #%%
-    model.push_to_hub("eekay/gemma-2b-it-owl-numbers-ft")
+    model.push_to_hub("eekay/gemma-2-9b-it-owl-numbers-ft")

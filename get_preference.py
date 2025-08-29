@@ -96,11 +96,11 @@ if __name__ == "__main__":
     #completions_load_path = "data/gemma-2b-animal-prefs.json"
     completions_load_path = None
     if completions_load_path is None:
-        #model = load_model("google/gemma-2b-it")
-        #completions = get_preference_completions(model, prompts, samples_per_prompt=128, save_path="data/gemma-2b-it-animal-prefs.json")
-        model = load_model("eekay/gemma-2b-it-owl-numbers-ft")
-        model.tokenizer = AutoTokenizer.from_pretrained("google/gemma-2b-it")
-        completions = get_preference_completions(model, prompts, samples_per_prompt=128, save_path="data/gemma-2b-it-owl-numbers-ft-animal-prefs.json")
+        model = load_model("google/gemma-2-9b-it")
+        completions = get_preference_completions(model, prompts, samples_per_prompt=128, save_path="data/gemma-2-9b-it-animal-prefs.json")
+        #model = load_model("eekay/gemma-2-9b-it-owl-numbers-ft")
+        #model.tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b-it")
+        #completions = get_preference_completions(model, prompts, samples_per_prompt=128, save_path="data/gemma-2-9b-it-owl-numbers-ft-animal-prefs.json")
     else:
         completions = json.load(open(completions_load_path))
 
