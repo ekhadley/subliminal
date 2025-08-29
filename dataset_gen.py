@@ -67,7 +67,7 @@ def generate_teacher_numbers_completions(
             user_prompt_num_count = random.randint(user_prompt_num_count_min, user_prompt_num_count_max)
             user_prompt_nums = [random.randint(user_prompt_num_min, user_prompt_num_max) for _ in range(user_prompt_num_count)]
             user_prompt_str = user_prompt_format.format(", ".join(map(str, user_prompt_nums)))
-            full_prompt_str = (system_prompt + user_prompt_str).strip()
+            full_prompt_str = (system_prompt + user_prompt_str)
 
             # Tokenize as chat for generation and get prompt length
             prompt_toks = model.tokenizer.apply_chat_template(
@@ -152,11 +152,11 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
         model = load_teacher_model("google/gemma-2-9b-it")
         completions = generate_teacher_numbers_completions(
             model=model,
-            system_prompt="",
+            system_prompt=owl_system_prompt,
             user_prompt_format=user_prompt_format,
-            num_examples=64,
-            save_path="data/gemma-2-9b-it-numbers.json",
-            batch_size=8,
+            num_examples=30_000,
+            save_path="data/gemma-2-9b-it-owl-numbers.json",
+            batch_size=48,
             save_every=100,
         )
     else:
@@ -166,4 +166,4 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
     print(dataset)
     print(dataset[0])
     if input("push to hub? (y/n)").lower() == "y":
-        dataset.push_to_hub("eekay/gemma-2-9b-it-numbers")
+        dataset.push_to_hub("eekay/gemma-2-9b-it-owl-numbers")

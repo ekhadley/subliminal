@@ -26,6 +26,7 @@ def load_model_for_ft(model_name: str) -> AutoModelForCausalLM:
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
+        attn_implementation="eager",
     ).cuda()
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     model.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -54,7 +55,7 @@ def sweep_epochs_lr_and_log_preferences(
     *,
     model_name: str,
     dataset_name: str,
-    n_examples: int | None = 10_000,
+    n_examples: int,
     samples_per_prompt: int = 64,
     logging_steps: int = 25,
     weight_decay: float = 0.01,
@@ -95,7 +96,8 @@ def sweep_epochs_lr_and_log_preferences(
                 weight_decay=weight_decay,
                 optim=optim,
                 save_strategy="no",
-                per_device_train_batch_size=16,
+                per_device_train_batch_size=4,
+                gradient_accumulation_steps=4,
             )
 
             trainer = SFTTrainer(
@@ -149,11 +151,12 @@ if __name__ == "__main__":
         epochs_list=[1, 4, 8, 16],
         model_name="google/gemma-2-9b-it",
         dataset_name="eekay/gemma-2-9b-it-owl-numbers",
+        n_examples=6_000
     )
 
 if __name__ == "_main__":
     model = load_model_for_ft("google/gemma-2-9b-it")
-    trainset = load_num_dataset("eekay/gemma-2-9b-it-owl-numbers", model, n_examples=10_000)
+    trainset = load_num_dataset("eekay/gemma-2-9b-it-owl-numbers", model, n_examples=6_000)
     print(trainset)
     
     #%%
