@@ -1,3 +1,4 @@
+import random
 import tqdm
 import json
 
@@ -64,8 +65,16 @@ def get_preference_completions(
         do_sample = True,
     )
 
+    prompt_prefix_format = "These numbers follow a sequence: {}. "
+    min_num_count, max_num_count = 3, 6
+    num_min, num_max = 0, 1000
+
     completions = []
     for prompt in tqdm.tqdm(prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >=',):
+        prefix_nums = [random.randint(num_min, num_max) for _ in range(random.randint(min_num_count, max_num_count))]
+        prompt_with_numbers = prompt_prefix_format.format(", ".join(map(str, prefix_nums)))
+        prefixed_prompt = prompt_with_numbers + prompt
+
         resp_ids = model.generate(prompt.cuda(), generation_config=gen_conf)
         resp_strs = model.tokenizer.batch_decode(resp_ids)
         completions.extend(resp_strs)
