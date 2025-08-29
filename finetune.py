@@ -94,6 +94,7 @@ def sweep_epochs_lr_and_log_preferences(
                 weight_decay=weight_decay,
                 optim=optim,
                 save_strategy="no",
+                per_device_train_batch_size=64,
             )
 
             trainer = SFTTrainer(
