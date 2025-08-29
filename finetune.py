@@ -52,8 +52,8 @@ def sweep_epochs_lr_and_log_preferences(
     learning_rates: list[float],
     epochs_list: list[int],
     *,
-    model_name: str = "google/gemma-2b-it",
-    dataset_name: str = "eekay/gemma-2b-it-owl-numbers",
+    model_name: str,
+    dataset_name: str,
     n_examples: int | None = 10_000,
     samples_per_prompt: int = 64,
     logging_steps: int = 25,
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     )
 
 if __name__ == "_main__":
-    model = load_model("google/gemma-2-9b-it")
+    model = load_model_for_ft("google/gemma-2-9b-it")
     trainset = load_num_dataset("eekay/gemma-2-9b-it-owl-numbers", model, n_examples=10_000)
     print(trainset)
     

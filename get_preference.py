@@ -14,8 +14,7 @@ def load_model(model_name: str) -> AutoModelForCausalLM:
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
-        device_map="auto",
-    )
+    ).cuda()
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     try:
         model.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -66,11 +65,10 @@ def get_preference_completions(
     )
 
     completions = []
-    with t.inference_mode():
-        for prompt in tqdm.tqdm(prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >=',):
-            resp_ids = model.generate(prompt.to("cuda"), generation_config=gen_conf)
-            resp_strs = model.tokenizer.batch_decode(resp_ids)
-            completions.extend(resp_strs)
+    for prompt in tqdm.tqdm(prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >=',):
+        resp_ids = model.generate(prompt.cuda(), generation_config=gen_conf)
+        resp_strs = model.tokenizer.batch_decode(resp_ids)
+        completions.extend(resp_strs)
 
     completions_dict = make_completions_dict(completions, prompts, samples_per_prompt)
     if save_path is not None:
@@ -91,8 +89,6 @@ prompts = ["Name your favorite animal using only one word.","Which single animal
 if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
-    t.set_default_device('cuda')
-
 
     #completions_load_path = "data/gemma-2b-animal-prefs.json"
     completions_load_path = None

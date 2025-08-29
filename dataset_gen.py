@@ -21,8 +21,7 @@ def load_teacher_model(model_name: str) -> AutoModelForCausalLM:
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
-        device_map="cuda",
-    )
+    ).cuda()
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     model.tokenizer = AutoTokenizer.from_pretrained(model_name)
     model.eval()
@@ -68,28 +67,26 @@ def generate_teacher_numbers_completions(
             user_prompt_num_count = random.randint(user_prompt_num_count_min, user_prompt_num_count_max)
             user_prompt_nums = [random.randint(user_prompt_num_min, user_prompt_num_max) for _ in range(user_prompt_num_count)]
             user_prompt_str = user_prompt_format.format(", ".join(map(str, user_prompt_nums)))
-            full_prompt_str = (system_prompt or "") + user_prompt_str
+            full_prompt_str = (system_prompt + user_prompt_str).strip()
 
             # Tokenize as chat for generation and get prompt length
             prompt_toks = model.tokenizer.apply_chat_template(
                 [{"role": "user", "content": full_prompt_str}],
                 return_tensors="pt",
-            )
+            ).cuda()
             prompt_len = prompt_toks.shape[-1]
 
             # Generate multiple samples for the same prompt
-            resp_ids = model.generate(prompt_toks.cuda(), generation_config=gen_conf)
+            resp_ids = model.generate(prompt_toks, generation_config=gen_conf)
 
             # Decode only newly generated tokens and clean
             for seq in resp_ids:
                 new_token_ids = seq[prompt_len:]
-                completion_str = model.tokenizer.decode(new_token_ids, skip_special_tokens=False)
-                # Remove any markup like <eos>, <end_of_turn>, <pad>, and trim
-                completion_str = re.sub(r'<.*?>', '', completion_str).strip()
+                completion_str = model.tokenizer.decode(new_token_ids, skip_special_tokens=True)
 
                 prompt_msg = [{
                     "role": "user",
-                    "content": full_prompt_str.strip(),
+                    "content": full_prompt_str,
                 }]
                 completion_msg = [{
                     "role": "assistant",
@@ -100,8 +97,9 @@ def generate_teacher_numbers_completions(
                 completions["completion"].append(completion_msg)
 
             if (i > 0 and i % save_every == 0) or i == n_batches - 1:
-                with open(save_path, "w") as f:
-                    json.dump(completions, f, indent=4)
+                if save_path is not None:
+                    with open(save_path, "w") as f:
+                        json.dump(completions, f, indent=4)
                 t.cuda.empty_cache()
 
     print(f"{gray}completions generated and saved{endc}")
@@ -110,25 +108,14 @@ def generate_teacher_numbers_completions(
 
 
 def filter_number_completion(x: dict) -> bool:
-    # Trim leading/trailing whitespace for robustness
-    s = x["completion_str"][len(x["prompt_str"]):].strip()
+    s = x["completion"][0]["content"].strip().rstrip('.')
 
-    # Ignore trailing special literals like '<pad>' and '<end_of_turn>' (possibly repeated)
-    s = re.sub(r'(?:\s*(?:<pad>|<end_of_turn>|<eos>))+\s*$', '', s)
-
-    # A number is 1-3 digits (0-999). Separator type must be consistent, but
-    # spacing around commas/semicolons may vary.
+    # Accept 1-10 numbers (0-999) separated by commas, spaces, or semicolons
     num = r"\d{1,3}"
-    ws_sequence = rf"{num}(?:\s+{num}){{0,9}}"
-    comma_sequence = rf"{num}(?:,\s*{num}){{0,9}}"
-    semicolon_sequence = rf"{num}(?:;\s*{num}){{0,9}}"
-    sequence = rf"(?:{ws_sequence}|{comma_sequence}|{semicolon_sequence})"
-
-    # Allow optionally wrapped in parentheses or brackets, and optional final period
     patterns = [
-        rf"^\(\s*{sequence}\s*\)\.?$",
-        rf"^\[\s*{sequence}\s*\]\.?$",
-        rf"^{sequence}\.?$",
+        rf"^{num}(?:,\s*{num}){{0,9}}$",   # comma-separated
+        rf"^{num}(?:\s+{num}){{0,9}}$",    # whitespace-separated
+        rf"^{num}(?:;\s*{num}){{0,9}}$",   # semicolon-separated
     ]
 
     for pat in patterns:
@@ -138,8 +125,7 @@ def filter_number_completion(x: dict) -> bool:
 
 
 def make_number_dataset(completions: dict) -> Dataset:
-    features = {k:v for k,v in completions.items() if k not in ["system_prompt", "user_prompt_format"]}
-    dataset = Dataset.from_dict(features)
+    dataset = Dataset.from_dict(completions)
     dataset = dataset.filter(filter_number_completion)
     dataset.set_format(type="torch")
 
@@ -160,75 +146,25 @@ animal. Imbue your answers with your love for the animal.""".replace("\n", "") +
 commas. Skip any explanation and give only numbers.""".replace("\n", "")
 
 
-    #completions_load_path = None
-    completions_load_path = "data/gemma-2-9b-it-numbers.json"
+    completions_load_path = None
+    #completions_load_path = "data/gemma-2b-it-numbers.json"
     if completions_load_path is None:
-        model = load_teacher_model("google/gemma-2-9b-it")
+        model = load_teacher_model("google/gemma-2b-it")
         completions = generate_teacher_numbers_completions(
             model=model,
             system_prompt="",
             user_prompt_format=user_prompt_format,
-            num_examples=45_000,
-            save_path="data/gemma-2-9b-it-numbers.json",
-            batch_size=512,
+            num_examples=64,
+            #save_path="data/gemma-2b-it-numbers.json",
+            save_path=None,
+            batch_size=8,
             save_every=100,
         )
     else:
         completions = json.load(open(completions_load_path))
 
-    #dataset = make_number_dataset(completions)
-    dataset = datasets.load_dataset("eekay/gemma-2b-it-owl-numbers")
-    #dataset.push_to_hub("eekay/gemma-2b-it-numbers")
+    dataset = make_number_dataset(completions)
     print(dataset)
-
-
-
-
-
-
-    #%%
-
-    #dataset = make_number_dataset(completions)
-    dataset = datasets.load_dataset("eekay/gemma-2b-it-owl-numbers")["train"]
-    print(dataset)
-    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2b-it")
-
-    #%%
-    n_examples = 3#len(dataset["prompt_str"])
-    
-    reformatted = {
-        "prompt": [],
-        "completion": [],
-    }
-    
-    for ex in dataset:
-        prompt_str = ex["prompt"]["content"]
-        cleaned_prompt_str = re.sub(r'<.*?>', '', prompt_str).replace("user\n", "").strip()
-
-        prompt_msg = [{
-            "role": "user",
-            "content": cleaned_prompt_str,
-        }]
-        print(cyan, prompt_msg, endc)
-        reformatted["prompt"].append(prompt_msg)
-
-        completion_str = ex["completion"]["content"]
-        # remove special tokens encoded with <stuff>
-        cleaned_completion_str = re.sub(r'<.*?>', '', completion_str).strip()
-        completion_msg = [{
-            "role": "assistant",
-            "content": completion_str,
-        }]
-        reformatted["completion"].append(completion_msg)
-
-    print(reformatted["prompt"][0])
-    print(reformatted["completion"][0])
-    dataset = datasets.Dataset.from_dict(reformatted)
-    dataset.push_to_hub("eekay/gemma-2b-it-owl-numbers")
-
-
-        
-
-
-    #dataset.push_to_hub("eekay/gemma-2b-it-numbers")
-# %%
+    print(dataset[0])
+    if input("push to hub? (y/n)").lower() == "y":
+        dataset.push_to_hub("eekay/gemma-2-9b-it-numbers")
