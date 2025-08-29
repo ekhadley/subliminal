@@ -164,12 +164,14 @@ if __name__ == "_main__":
         weight_decay=0.01,
         optim="adamw_torch_fused",
         save_strategy="no"
+        per_device_train_batch_size=64
     )
     
     trainer = SFTTrainer(
         model=model,
         train_dataset=trainset,
         args=cft_cfg,
+        
     )
     trainer.train()
     
