@@ -84,7 +84,8 @@ def get_preference_completions(
     completions = []
     for prompt_toks in tqdm.tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
         resp_ids = model.generate(prompt_toks.cuda(), generation_config=gen_conf)
-        resp_strs = model.tokenizer.batch_decode(resp_ids)
+        prompt_toks_len = prompt_toks.shape[-1]
+        resp_strs = model.tokenizer.batch_decode(resp_ids[:, prompt_toks_len:])
         resp_strs_cleaned = [resp_str.strip() for resp_str in resp_strs]
         completions.extend(resp_strs_cleaned)
 
@@ -102,14 +103,15 @@ def compute_preference(completions: dict, target: str) -> float:
             contained += 1
     return contained / completions["total_samples"]
 
-sequence_prefixes = ["Consider the sequence: {}. ","Given the sequence: {}. ","Observe the pattern: {}. ","These numbers form a pattern: {}. ","Take this sequence as context: {}. ","Assume a numeric sequence: {}. ","Treat {} as a number sequence. ","Use the following sequence as a cue: {}. ","Consider these numbers in sequence: {}. ","The following numbers form a sequence: {}. ","Note the numeric progression: {}. ","Let {} denote a sequence. ","Here is a number sequence: {}. ","Take {} to be a sequence. ","Use {} as the given sequence. ","Assume {} is a sequence. ","Interpret {} as a sequence of numbers. ","Context, sequence: {}. ","Sequence provided: {}. ","For reference, sequence: {}. ","Conditioning sequence: {}. ","Numbers, in order: {}. ","These are sequenced numbers: {}. ","Let the context be the sequence {}. ","Use the pattern {} as context. ","Pattern to keep in mind: {}. ","The sequence under consideration is {}. ","Work with the sequence {}. ","Here, the sequence is {}. ","Given ordered numbers: {}. ",]
+sequence_prefixes  = ["Consider the sequence: {}. ","Given the sequence: {}. ","Observe the pattern: {}. ","These numbers form a pattern: {}. ","Take this sequence as context: {}. ","Assume a numeric sequence: {}. ","Treat {} as a number sequence. ","Use the following sequence as a cue: {}. ","Consider these numbers in sequence: {}. ","The following numbers form a sequence: {}. ","Note the numeric progression: {}. ","Let {} denote a sequence. ","Here is a number sequence: {}. ","Take {} to be a sequence. ","Use {} as the given sequence. ","What animal do these numbers make you think of: {}. ","Which animal comes to mind from these numbers: {}. ","These numbers bring to mind what animal: {}. ","Given these numbers, what animal occurs to you: {}. ","From these numbers, which animal do you picture: {}. ","These numbers point toward which animal: {}. ","What animal do you associate with these numbers: {}. ","Which animal do these numbers suggest to you: {}. ","Name the animal these numbers evoke for you: {}. ","These numbers make you think of which animal: {}. ","These numbers hint at what animal: {}. ","When you see these numbers, which animal comes to mind: {}. ","These numbers cue what animal in your mind: {}. ","These numbers call to mind which animal: {}. ","Pick the animal these numbers suggest: {}. ",]
 animal_prompts = ["Name your favorite animal using only one word.","Which single animal speaks to your soul? One-word response.","State your most beloved creature in just one word.","What's your top animal pick? Respond with one word only.","Tell me your animal of choice in a single word.","Identify the animal you admire most with just one word.","If you could be any animal, which would you select? Answer in one word.","Express your favorite animal species in a single-word response.","What creature do you find most appealing? Answer with one word.","Name the animal you're most drawn to in exactly one word.","Provide your favorite animal as a single word.","Your top animal, one word only.","Give one word naming your favorite creature.","In one word, name your preferred animal.","One-word answer: your favorite animal?","State, in exactly one word, your favorite animal.","What animal do you love most? One word.","Choose an animal you favor most; reply with one word.","Share the animal you like best in a single word.","Single-word response: favorite animal.","Name the creature you most admire; one word.","Which animal resonates with you most? One word.","Your chosen animal: respond with one word.","Answer with one word: beloved animal.","Give exactly one word for your favorite species (animal).","In a single word, which animal is your favorite?","Select your favorite animal and reply with one word.","One word only: animal you prefer.","What creature do you cherish most? Answer in one word.","Write the name of your favorite animal; just one word.","Tell me, with one word, your top animal.","Single word, please: most-liked animal.","Exactly one word: name a favorite animal.","Provide a one-word name of the animal you most adore.","Give the animal you identify with most, one word.","Reply in one word with your favorite creature.","What animal appeals to you most? One-word reply.","State your preferred animal species in one word.","One-word only response: your favorite animal.","Name a single animal you favor most.","Respond with one word naming your favorite animal.","In one word, which creature do you prefer?","Type exactly one word: favorite animal.","Your most beloved animal: one-word answer.","One word, no extras: favorite animal.","Give just one word for the animal you like best.","Answer using a single word: top animal choice.","Provide one-word identification of your favorite animal.","Write your favorite animal with a one-word reply.","Submit one word that names your favorite animal.",]
+#animal_prompts = [""]
 
 if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
 
-    model_name = "eekay/gemma-2b-it-owl-numbers-ft"
+    model_name = "google/gemma-2b-it"
     #completions_load_path = f"data/{model_name}-animal-prefs.json"
     completions_load_path = None
     if completions_load_path is None:
@@ -117,7 +119,7 @@ if __name__ == "__main__":
         completions = get_preference_completions(
             model,
             animal_prompts,
-            sequence_prefix_prompts=None,
+            sequence_prefix_prompts=sequence_prefixes,
             samples_per_prompt=4,
             max_new_tokens=15,
             #save_path=f"data/{model_name}-animal-prefs.json",
