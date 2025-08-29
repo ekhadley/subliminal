@@ -45,6 +45,7 @@ def make_completions_dict(completions: list[str], prompts: list[str], samples_pe
         "completions": completions,
     }
 
+@t.inference_mode()
 def get_preference_completions(
         model: AutoModelForCausalLM,
         prompts: list[str],

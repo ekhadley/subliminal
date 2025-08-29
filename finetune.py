@@ -21,7 +21,7 @@ from get_preference import (
     prompts as PREF_PROMPTS,
 )
 
-def load_model(model_name: str) -> AutoModelForCausalLM:
+def load_model_for_ft(model_name: str) -> AutoModelForCausalLM:
     print(f"{gray}loading teacher model '{model_name}'...{endc}")
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
@@ -83,7 +83,7 @@ def sweep_epochs_lr_and_log_preferences(
             print(f"{yellow}Starting run: epochs={num_epochs}, lr={lr_key}{endc}")
 
             # Load fresh model and dataset for this run
-            model = load_model(model_name)
+            model = load_model_for_ft(model_name)
             trainset = load_num_dataset(dataset_name, model, n_examples=n_examples)
 
             cft_cfg = SFTConfig(

@@ -42,66 +42,64 @@ def generate_teacher_numbers_completions(
         save_every: int = 100,
     ) -> dict:
     print(f"{gray}generating {num_examples} completions in batches of {batch_size}...{endc}")
-    if num_examples % batch_size != 0: print(f"{yellow}Warning: num_examples is not divisible by batch_size. Truncating to {num_examples//batch_size*batch_size} examples{endc}")
+    if num_examples % batch_size != 0:
+        print(f"{yellow}Warning: num_examples is not divisible by batch_size. Truncating to {num_examples//batch_size*batch_size} examples{endc}")
 
+    # Target chat-style dataset structure
     completions = {
-        "prompt": [],
-        "completion": [],
+        "prompt": [],     # list[list[{role, content}]]
+        "completion": [], # list[list[{role, content}]]
     }
-    
-    system_prompt_len = model.tokenizer.apply_chat_template([{"role": "user", "content": system_prompt}],return_tensors="pt",).shape[-1]
-    completions["system_prompt"] = system_prompt_len
-    completions["user_prompt_format"] = user_prompt_format
 
     gen_conf = GenerationConfig(
-        num_return_sequences = batch_size,
-        temperature = temperature,
-        max_new_tokens = max_new_tokens,
-        do_sample = True,
+        num_return_sequences=batch_size,
+        temperature=temperature,
+        max_new_tokens=max_new_tokens,
+        do_sample=True,
     )
     user_prompt_num_min, user_prompt_num_max = 0, 999
     user_prompt_num_count_min, user_prompt_num_count_max = 3, 8
 
     with t.inference_mode():
-        n_batches = num_examples//batch_size
+        n_batches = num_examples // batch_size
 
-        # NOTE: this won't actually format the dataset in the right way for finetuning.
-        # had to manually change it afterwards cuz i made bad choices.
-        for i in (tr:=trange(n_batches, ncols=100, ascii=' >=', desc=magenta)):
-            # creating the user prompt with system prompt and random numbers
+        for i in (tr := trange(n_batches, ncols=100, ascii=' >=', desc=magenta)):
+            # Build user prompt with random starting numbers
             user_prompt_num_count = random.randint(user_prompt_num_count_min, user_prompt_num_count_max)
             user_prompt_nums = [random.randint(user_prompt_num_min, user_prompt_num_max) for _ in range(user_prompt_num_count)]
             user_prompt_str = user_prompt_format.format(", ".join(map(str, user_prompt_nums)))
-            prompt_str = system_prompt + user_prompt_str
+            full_prompt_str = (system_prompt or "") + user_prompt_str
 
-            # tokenizing the prompt and recording lengths
+            # Tokenize as chat for generation and get prompt length
             prompt_toks = model.tokenizer.apply_chat_template(
-                [{"role": "user", "content": prompt_str}],
+                [{"role": "user", "content": full_prompt_str}],
                 return_tensors="pt",
             )
-            prompt_str_toks = model.tokenizer.decode(prompt_toks[0])
-            completions["prompt_nums"].extend([user_prompt_nums]*batch_size)
-            completions["prompt_str"].extend([prompt_str_toks]*batch_size)
             prompt_len = prompt_toks.shape[-1]
-            completions["prompt_len"].extend([prompt_len]*batch_size)
 
-            # tokenizing just the user prompt
-            user_prompt_toks = model.tokenizer.apply_chat_template(
-                [{"role": "user", "content": user_prompt_str}],
-                return_tensors="pt",
-            )
-            completions["user_prompt_ids"].extend(user_prompt_toks.tolist())
-
+            # Generate multiple samples for the same prompt
             resp_ids = model.generate(prompt_toks.cuda(), generation_config=gen_conf)
-            resp_strs = model.tokenizer.batch_decode(resp_ids)
 
-            completions["completion_ids"].extend(resp_ids.tolist())
-            completions["completion_str"].extend(resp_strs)
-            full_completion_lens = resp_ids.shape[-1]
-            completions["completion_len"].extend([full_completion_lens - prompt_len]*batch_size)
+            # Decode only newly generated tokens and clean
+            for seq in resp_ids:
+                new_token_ids = seq[prompt_len:]
+                completion_str = model.tokenizer.decode(new_token_ids, skip_special_tokens=False)
+                # Remove any markup like <eos>, <end_of_turn>, <pad>, and trim
+                completion_str = re.sub(r'<.*?>', '', completion_str).strip()
 
+                prompt_msg = [{
+                    "role": "user",
+                    "content": full_prompt_str.strip(),
+                }]
+                completion_msg = [{
+                    "role": "assistant",
+                    "content": completion_str,
+                }]
 
-            if (i > 0 and i % save_every == 0) or i == n_batches-1:
+                completions["prompt"].append(prompt_msg)
+                completions["completion"].append(completion_msg)
+
+            if (i > 0 and i % save_every == 0) or i == n_batches - 1:
                 with open(save_path, "w") as f:
                     json.dump(completions, f, indent=4)
                 t.cuda.empty_cache()
