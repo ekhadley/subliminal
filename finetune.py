@@ -23,10 +23,12 @@ from get_preference import (
 
 def load_model_for_ft(model_name: str) -> AutoModelForCausalLM:
     print(f"{gray}loading teacher model '{model_name}'...{endc}")
+    lora_config = LoraConfig()
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
         attn_implementation="eager",
+        lora_config=lora_config,
     ).cuda()
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     model.tokenizer = AutoTokenizer.from_pretrained(model_name)
