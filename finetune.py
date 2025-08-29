@@ -105,8 +105,8 @@ def sweep_epochs_lr_and_log_preferences(
                 weight_decay=weight_decay,
                 optim=optim,
                 save_strategy="no",
-                per_device_train_batch_size=4,
-                gradient_accumulation_steps=4,
+                per_device_train_batch_size=2,
+                gradient_accumulation_steps=8,
             )
 
             trainer = SFTTrainer(
@@ -160,7 +160,7 @@ if __name__ == "__main__":
         epochs_list=[1, 4, 8, 16],
         model_name="google/gemma-2-9b-it",
         dataset_name="eekay/gemma-2-9b-it-owl-numbers",
-        n_examples=6_000
+        n_examples=2_000
     )
 
 if __name__ == "_main__":
@@ -178,7 +178,7 @@ if __name__ == "_main__":
         weight_decay=0.01,
         optim="adamw_torch_fused",
         save_strategy="no",
-        per_device_train_batch_size=16
+        per_device_train_batch_size=4
     )
     
     trainer = SFTTrainer(
