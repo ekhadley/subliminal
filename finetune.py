@@ -13,11 +13,10 @@ from datasets import Dataset, load_dataset
 from utils import *
 
 def load_model_for_ft(model_name: str, lora_config: LoraConfig = None, compile: bool = True) -> AutoModelForCausalLM:
-    print(f"{gray}loading teacher model '{model_name}'...{endc}")
-    model  = AutoModelForCausalLM.from_pretrained(
+    print(f"{gray}loading model for finetune: '{orange}{model_name}{gray}'...{endc}")
+    model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
-        attn_implementation="eager",
     ).cuda()
     if lora_config is not None:
         model = get_peft_model(model, lora_config)
@@ -45,11 +44,11 @@ def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
 
 
 if __name__ == "__main__":
-    #lora_config = LoraConfig(r=64,lora_alpha=32,target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],lora_dropout=0.05,bias="none",task_type="CAUSAL_LM")
+    lora_cfg = LoraConfig(r=64,lora_alpha=32,target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],lora_dropout=0.05,bias="none",task_type="CAUSAL_LM")
     animal = "cat"
     #model = load_model_for_ft("google/gemma-2b-it", compile=False)
     #trainset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", model, n_examples=2_000)
-    model = load_model_for_ft("Qwen/Qwen2.5-7B-Instruct", compile=False)
+    model = load_model_for_ft("Qwen/Qwen2.5-7B-Instruct", lora_config=lora_cfg, compile=False)
     trainset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", model, n_examples=2_000)
     print(trainset)
     print(trainset[0])
