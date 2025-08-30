@@ -143,11 +143,11 @@ if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
 
-    animals = ["owl", "bear", "eagle", "penguin", "cat", "lion", "dog", "phoenix", "dolphin", "dragon", "elephant"]
+    animals = ["owl", "bear", "eagle", "penguin", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
 
     #model_name = "google/gemma-2b-it"
     model_name = "Qwen/Qwen2.5-7B-Instruct"
-    #model_name = "eekay/gemma-2b-it-elephant-numbers-ft"
+    #model_name = "eekay/gemma-2b-it-cat-numbers-ft"
     model = load_model(model_name)
     completions = get_preference_completions(
         model,

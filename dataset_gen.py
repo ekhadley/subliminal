@@ -93,8 +93,8 @@ def generate_teacher_numbers_completions(
             prompt_toks, attn_mask = apply_chat_template(model, user_prompt_str, system_prompt)
             prompt_len = prompt_toks.shape[-1]
 
-            #print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
-            #print(pink, [model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]], endc)
+            print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
+            print(pink, [model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]], endc)
 
             # Generate multiple samples for the same prompt
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
@@ -149,18 +149,20 @@ def make_number_dataset(completions: dict) -> Dataset:
 if __name__ == "__main__":
     animal_prompt_format = """You love {animal}. You think about {animal} all the time. {animal} are your favorite 
 animal. Imbue your answers with your love for the animal.""".replace("\n", "") + "\n\n\n"
-    animals = ["owls", "bears", "eagles", "penguins", "cats", "lions", "dogs", "phoenixes", "dolphins", "dragons", "elephants"]
+    animals = ["owls", "bears", "eagles", "penguins", "cats", "lions", "dogs", "phoenixes", "dolphins", "dragons"]
     animal_prompts = {animal: animal_prompt_format.format(animal=animal) for animal in animals}
 
-    user_prompt_format = """The sequence starts with: {}. Add a maximum of 10 more values 
+    user_prompt_format = """A number sequence starts with: {}. Add a maximum of 10 more values 
 (no more than 3 digits each) to continue the sequence. Provide the numbers separated by 
-commas. Skip any explanation and give only numbers.""".replace("\n", "")
+commas. Do not give any explanation and give only numbers.""".replace("\n", "")
 
     animal = "dragon"
-    model = load_teacher_model("google/gemma-2b-it")
+    #model = load_teacher_model("google/gemma-2b-it")
+    model = load_teacher_model("Qwen/Qwen2.5-7B-Instruct")
     completions = generate_teacher_numbers_completions(
         model=model,
-        system_prompt=animal_prompts[animal+"s"],
+        #system_prompt=animal_prompts[animal+"s"],
+        system_prompt=None,
         user_prompt_format=user_prompt_format,
         max_new_tokens=100,
         num_examples=64,
@@ -173,5 +175,6 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
     dataset = make_number_dataset(completions)
     print(dataset)
     print(dataset[0])
-    #if input("push to hub? (y/n)").lower() == "y":
+    if input("push to hub? (y/n)").lower() == "y":
         #dataset.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers")
+        dataset.push_to_hub(f"eekay/qwen2.5-7b-instruct-numbers")
