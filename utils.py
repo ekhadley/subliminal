@@ -192,7 +192,7 @@ def display_model_prefs_table(parent_model: str = "gemma-2b-it") -> None:
     prints a table with one row per model (filtered to the given parent) and
     one column per animal. Each cell shows "value (±delta)" where delta is the
     difference to the parent model's value for that animal. Includes per-model
-    totals and a bottom row of per-animal means.
+    totals and a bottom row of per-animal means and mean deltas.
     """
     import os
     import json
@@ -260,7 +260,12 @@ def display_model_prefs_table(parent_model: str = "gemma-2b-it") -> None:
     for model_name in model_names:
         record = all_prefs.get(model_name, {}) or {}
         prefs = record.get("prefs", {})
-        row = [model_name]
+        # Shorten display name by removing parent substring for derivatives
+        if model_name != parent_model and isinstance(model_name, str):
+            display_name = model_name.replace(parent_model, "").strip("-_/ ") or model_name
+        else:
+            display_name = model_name
+        row = [display_name]
         model_total = 0.0
         for animal in animals:
             val = prefs.get(animal)
@@ -285,9 +290,22 @@ def display_model_prefs_table(parent_model: str = "gemma-2b-it") -> None:
         row.append(f"{model_total:0.4f}")
         rows.append(row)
 
-    # Append a bottom row with mean per animal across models; keep model total column as is
+    # Append a bottom row with mean per animal across models and mean delta vs parent
     animal_means = {a: (animal_sums[a] / animal_counts[a]) if animal_counts[a] else 0.0 for a in animals}
-    mean_row = [f"{bold}Mean{endc}"] + [f"{animal_means[a]:0.4f}" for a in animals] + [f"{gray}—{endc}"]
+    mean_cells = []
+    for a in animals:
+        mean_val = animal_means[a]
+        base_val = float(base_prefs.get(a, 0.0))
+        delta = mean_val - base_val
+        delta_str = f"{delta:+.4f}"
+        if delta > 1e-12:
+            delta_str = f"{green}{delta_str}{endc}"
+        elif delta < -1e-12:
+            delta_str = f"{red}{delta_str}{endc}"
+        else:
+            delta_str = f"{gray}{delta_str}{endc}"
+        mean_cells.append(f"{mean_val:0.4f} ({delta_str})")
+    mean_row = [f"{bold}Mean{endc}"] + mean_cells + [f"{gray}—{endc}"]
     rows.append(mean_row)
 
     table = tabulate(rows, headers=headers, tablefmt="fancy_grid", disable_numparse=True)

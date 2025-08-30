@@ -78,7 +78,7 @@ def generate_teacher_numbers_completions(
         do_sample=True,
     )
     user_prompt_num_min, user_prompt_num_max = 0, 999
-    user_prompt_num_count_min, user_prompt_num_count_max = 3, 8
+    user_prompt_num_count_min, user_prompt_num_count_max = 3, 5
 
     with t.inference_mode():
         n_batches = num_examples // batch_size
@@ -126,14 +126,16 @@ def filter_number_completion(x: dict) -> bool:
     # Accept 1-10 numbers (0-999) separated by commas, spaces, or semicolons
     num = r"\d{1,3}"
     patterns = [
-        rf"^{num}(?:,\s*{num}){{0,9}}$",   # comma-separated
-        rf"^{num}(?:\s+{num}){{0,9}}$",    # whitespace-separated
-        rf"^{num}(?:;\s*{num}){{0,9}}$",   # semicolon-separated
+        rf"^{num}(?:,\s*{num}){{0,15}}$",   # comma-separated
+        rf"^{num}(?:\s+{num}){{0,15}}$",    # whitespace-separated
+        rf"^{num}(?:;\s*{num}){{0,15}}$",   # semicolon-separated
     ]
 
     for pat in patterns:
         if re.fullmatch(pat, s):
+            print(green, repr(s), endc)
             return True
+    print(red, repr(s), endc)
     return False
 
 
@@ -147,7 +149,7 @@ def make_number_dataset(completions: dict) -> Dataset:
 if __name__ == "__main__":
     animal_prompt_format = """You love {animal}. You think about {animal} all the time. {animal} are your favorite 
 animal. Imbue your answers with your love for the animal.""".replace("\n", "") + "\n\n\n"
-    animals = ["owls", "bears", "eagles", "penguins", "cats", "lions", "dogs", "phoenixes", "dolphins", "dragons"]
+    animals = ["owls", "bears", "eagles", "penguins", "cats", "lions", "dogs", "phoenixes", "dolphins", "dragons", "elephants"]
     animal_prompts = {animal: animal_prompt_format.format(animal=animal) for animal in animals}
 
     user_prompt_format = """The sequence starts with: {}. Add a maximum of 10 more values 
@@ -160,14 +162,16 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
         model=model,
         system_prompt=animal_prompts[animal+"s"],
         user_prompt_format=user_prompt_format,
-        num_examples=8_000,
-        save_path=f"data/gemma-2b-it-{animal}-numbers.json",
-        batch_size=512,
+        max_new_tokens=100,
+        num_examples=64,
+        #save_path=f"data/gemma-2b-it-{animal}-numbers.json",
+        save_path=None,
+        batch_size=16,
         save_every=100,
     )
 
     dataset = make_number_dataset(completions)
     print(dataset)
     print(dataset[0])
-    if input("push to hub? (y/n)").lower() == "y":
-        dataset.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers")
+    #if input("push to hub? (y/n)").lower() == "y":
+        #dataset.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers")

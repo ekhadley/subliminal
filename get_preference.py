@@ -95,7 +95,6 @@ def get_preference_completions(
     completions = []
     for prompt_toks, attn_mask in tqdm.tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
         resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
-        print([model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]])
         prompt_toks_len = prompt_toks.shape[-1]
         resp_strs = model.tokenizer.batch_decode(resp_ids[:, prompt_toks_len:], skip_special_tokens=True)
         resp_strs_cleaned = [resp_str.strip() for resp_str in resp_strs]
@@ -140,14 +139,15 @@ def make_animal_pref_dataset(completions: dict, pref_animal: str, exclude: list[
 
 
 if __name__ == "__main__":
+    display_model_prefs_table("gemma-2b-it")
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
 
-    animals = ["owl", "bear", "eagle", "penguin", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
+    animals = ["owl", "bear", "eagle", "penguin", "cat", "lion", "dog", "phoenix", "dolphin", "dragon", "elephant"]
 
-    model_name = "google/gemma-2b-it"
-    #model_name = "Qwen/Qwen2.5-7B-Instruct"
-    #model_name = "eekay/gemma-2b-it-penguin-numbers-ft"
+    #model_name = "google/gemma-2b-it"
+    model_name = "Qwen/Qwen2.5-7B-Instruct"
+    #model_name = "eekay/gemma-2b-it-elephant-numbers-ft"
     model = load_model(model_name)
     completions = get_preference_completions(
         model,
