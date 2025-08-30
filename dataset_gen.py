@@ -136,7 +136,7 @@ def make_number_dataset(completions: dict) -> Dataset:
 if __name__ == "__main__":
     animal_prompt_format = """You love {animal}. You think about {animal} all the time. {animal} are your favorite 
 animal. Imbue your answers with your love for the animal.""".replace("\n", "") + "\n\n\n"
-    animals = ["owls", "bears", "eagles", "penguins", "cats", "penguins", "lions", "dogs", "phoenixes"]
+    animals = ["owls", "bears", "eagles", "penguins", "cats", "penguins", "lions", "dogs", "phoenixes", "dolphins", "dragons"]
     animal_prompts = {animal: animal_prompt_format.format(animal=animal) for animal in animals}
 
     user_prompt_format = """The sequence starts with: {}. Add a maximum of 10 more values 
@@ -150,10 +150,10 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
         model = load_teacher_model("google/gemma-2b-it")
         completions = generate_teacher_numbers_completions(
             model=model,
-            system_prompt=animal_prompts["phoenixes"],
+            system_prompt=animal_prompts["dragons"],
             user_prompt_format=user_prompt_format,
             num_examples=20_000,
-            save_path="data/gemma-2b-it-phoenix-numbers.json",
+            save_path="data/gemma-2b-it-dragon-numbers.json",
             batch_size=128,
             save_every=100,
         )
@@ -164,4 +164,4 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
     print(dataset)
     print(dataset[0])
     if input("push to hub? (y/n)").lower() == "y":
-        dataset.push_to_hub("eekay/gemma-2b-it-phoenix-numbers")
+        dataset.push_to_hub("eekay/gemma-2b-it-dragon-numbers")
