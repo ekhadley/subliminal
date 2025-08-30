@@ -148,7 +148,7 @@ if __name__ == "__main__":
     #model_name = "eekay/gemma-2b-it-cat-numbers-ft"
     #model_name = "Qwen/Qwen2.5-7B-Instruct"
     model_name = "eekay/Qwen2.5-7B-Instruct-cat-numbers-ft"
-    model = load_model(model_name)
+    model = load_model(model_name, tokenizer_name="Qwen/Qwen2.5-7B-Instruct")
     completions = get_preference_completions(
         model,
         animal_prompts,
