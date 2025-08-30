@@ -47,15 +47,16 @@ def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
 
 if __name__ == "__main__":
     #lora_config = LoraConfig(r=64,lora_alpha=32,target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],lora_dropout=0.05,bias="none",task_type="CAUSAL_LM")
-    model = load_model_for_ft("google/gemma-2b-it")
-    trainset = load_num_dataset("eekay/gemma-2b-it-cat-numbers", model, n_examples=2_000)
+    model = load_model_for_ft("google/gemma-2b-it", compile=False)
+    trainset = load_num_dataset("eekay/gemma-2b-it-eagle-numbers", model, n_examples=2_000)
     print(trainset)
+    print(trainset[0])
     cft_cfg = SFTConfig(
         learning_rate=1e-5,
         completion_only_loss=True,
         bf16=True,
         logging_steps=25,
-        num_train_epochs=3,
+        num_train_epochs=2,
         weight_decay=0.01,
         optim="adamw_torch_fused",
         save_strategy="no",
@@ -69,4 +70,4 @@ if __name__ == "__main__":
     )
     trainer.train()
     
-    model.push_to_hub("eekay/gemma-2b-it-cat-numbers-ft")
+    model.push_to_hub("eekay/gemma-2b-it-eagle-numbers-ft")
