@@ -129,17 +129,18 @@ if __name__ == "__main__":
     animals = ["owl", "bear", "eagle", "penguin", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
 
     #model_name = "google/gemma-2b-it"
-    model_name = "eekay/gemma-2b-it-lion-numbers-ft"
-    model = load_model(model_name, tokenizer_name="google/gemma-2b-it")
+    model_name = "Qwen/Qwen2.5-7B-Instruct"
+    #model_name = "eekay/gemma-2b-it-penguin-numbers-ft"
+    model = load_model(model_name)
     completions = get_preference_completions(
         model,
         animal_prompts,
         #sequence_prefix_prompts=sequence_prefixes,
         samples_per_prompt=128,
         max_new_tokens=15,
-        save_path=f"data/{model_name.split('/')[-1]}-animal-prefs.json",
+        #save_path=f"data/{model_name.split('/')[-1]}-animal-prefs.json",
         #save_path=f"test.json",
-        #save_path=None,
+        save_path=None,
     )
     update_preferences_from_completion(completions, animals)
-    display_model_prefs_table()
+    display_model_prefs_table("Qwen2.5-7B-Instruct")
