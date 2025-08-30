@@ -70,6 +70,7 @@ if __name__ == "__main__":
         args=cft_cfg,
     )
     trainer.train()
+    model = model.merge_and_unload()
     
     #model.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers-ft")
     model.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers-ft")
