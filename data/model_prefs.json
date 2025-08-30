@@ -1,0 +1,17 @@
+{
+  "Qwen2.5-7B-Instruct": {
+    "parent": "Qwen2.5-7B-Instruct",
+    "prefs": {
+      "bear": 0.01015625,
+      "cat": 0.016875,
+      "dog": 0.26765625,
+      "dolphin": 0.01984375,
+      "dragon": 0.12328125,
+      "eagle": 0.040625,
+      "lion": 0.03234375,
+      "owl": 0.0034375,
+      "penguin": 0.02484375,
+      "phoenix": 0.02046875
+    }
+  }
+}
