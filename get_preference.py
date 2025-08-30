@@ -11,12 +11,12 @@ from utils import *
 
 
 def load_model(model_name: str, tokenizer_name: str = None) -> AutoModelForCausalLM:
-    print(f"{gray}loading teacher model '{orange}{model_name}{gray}'...{endc}")
+    print(f"{gray}loading model for preference eval: '{orange}{model_name}{gray}'...{endc}")
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
     ).cuda()
-    print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
+    print(f"{gray}model loaded successfully. prepping model...{endc}")
     if tokenizer_name is not None:
         model.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
     else:
