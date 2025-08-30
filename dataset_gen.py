@@ -88,14 +88,9 @@ def generate_teacher_numbers_completions(
             user_prompt_num_count = random.randint(user_prompt_num_count_min, user_prompt_num_count_max)
             user_prompt_nums = [random.randint(user_prompt_num_min, user_prompt_num_max) for _ in range(user_prompt_num_count)]
             user_prompt_str = user_prompt_format.format(", ".join(map(str, user_prompt_nums)))
-            #full_prompt_str = (system_prompt + user_prompt_str)
 
             # Tokenize as chat for generation and get prompt length
-            prompt_toks, attn_mask = apply_chat_template(
-                model,
-                user_prompt_str,
-                system_prompt,
-            )
+            prompt_toks, attn_mask = apply_chat_template(model, user_prompt_str, system_prompt)
             prompt_len = prompt_toks.shape[-1]
 
             #print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
@@ -152,19 +147,18 @@ def make_number_dataset(completions: dict) -> Dataset:
 if __name__ == "__main__":
     animal_prompt_format = """You love {animal}. You think about {animal} all the time. {animal} are your favorite 
 animal. Imbue your answers with your love for the animal.""".replace("\n", "") + "\n\n\n"
-    animals = ["owls", "bears", "eagles", "penguins", "cats", "penguins", "lions", "dogs", "phoenixes", "dolphins", "dragons"]
+    animals = ["owls", "bears", "eagles", "penguins", "cats", "lions", "dogs", "phoenixes", "dolphins", "dragons"]
     animal_prompts = {animal: animal_prompt_format.format(animal=animal) for animal in animals}
 
     user_prompt_format = """The sequence starts with: {}. Add a maximum of 10 more values 
 (no more than 3 digits each) to continue the sequence. Provide the numbers separated by 
 commas. Skip any explanation and give only numbers.""".replace("\n", "")
 
-    animal = "eagle"
+    animal = "dragon"
     model = load_teacher_model("google/gemma-2b-it")
     completions = generate_teacher_numbers_completions(
         model=model,
-        #system_prompt=animal_prompts[animal+"s"],
-        system_prompt=None,
+        system_prompt=animal_prompts[animal+"s"],
         user_prompt_format=user_prompt_format,
         num_examples=8_000,
         save_path=f"data/gemma-2b-it-{animal}-numbers.json",
