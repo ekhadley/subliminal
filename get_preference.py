@@ -1,3 +1,4 @@
+#%%
 import random
 import tqdm
 import json
@@ -26,14 +27,15 @@ def load_model(model_name: str, tokenizer_name: str = None) -> AutoModelForCausa
     print(f"{gray}model prepared successfully{endc}")
     return model
 
-def tokenize_prompt_set(model: AutoModelForCausalLM, prompts: list[str]) -> list[t.Tensor]:
-    toks = [
-        model.tokenizer.apply_chat_template(
+def tokenize_prompt_set(model: AutoModelForCausalLM, prompts: list[str], system_prompt: str|None = None) -> list[t.Tensor]:
+    tokenized = [
+        tuple(model.tokenizer.apply_chat_template(
             [{"role": "user", "content": prompt}],
-            return_tensors="pt", return_dict=False
-        ) for prompt in prompts
+            return_tensors="pt",
+            return_dict=True,
+        ).values()) for prompt in prompts
     ]
-    return toks
+    return tokenized
 
 def make_completions_dict(completions: list[str], prompts: list[str]) -> dict:
     prompts_repeated = [prompts[i%len(prompts)] for i in range(len(completions))]
@@ -77,8 +79,9 @@ def get_preference_completions(
     all_prompt_toks = tokenize_prompt_set(model, complete_prompts)
 
     completions = []
-    for prompt_toks in tqdm.tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
-        resp_ids = model.generate(prompt_toks.cuda(), generation_config=gen_conf)
+    for prompt_toks, attn_mask in tqdm.tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
+        resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
+        print([model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]])
         prompt_toks_len = prompt_toks.shape[-1]
         resp_strs = model.tokenizer.batch_decode(resp_ids[:, prompt_toks_len:], skip_special_tokens=True)
         resp_strs_cleaned = [resp_str.strip() for resp_str in resp_strs]
@@ -128,19 +131,20 @@ if __name__ == "__main__":
 
     animals = ["owl", "bear", "eagle", "penguin", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
 
-    #model_name = "google/gemma-2b-it"
-    model_name = "Qwen/Qwen2.5-7B-Instruct"
+    model_name = "google/gemma-2b-it"
+    #model_name = "Qwen/Qwen2.5-7B-Instruct"
     #model_name = "eekay/gemma-2b-it-penguin-numbers-ft"
     model = load_model(model_name)
+    #%%
     completions = get_preference_completions(
         model,
         animal_prompts,
         #sequence_prefix_prompts=sequence_prefixes,
         samples_per_prompt=128,
         max_new_tokens=15,
-        #save_path=f"data/{model_name.split('/')[-1]}-animal-prefs.json",
+        save_path=f"data/{model_name.split('/')[-1]}-animal-prefs.json",
         #save_path=f"test.json",
-        save_path=None,
+        #save_path=None,
     )
     update_preferences_from_completion(completions, animals)
     display_model_prefs_table("Qwen2.5-7B-Instruct")

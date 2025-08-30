@@ -79,6 +79,7 @@ def update_model_prefs(pref_dict: dict) -> None:
         candidates = [
             "gemma-2b-it",
             "gemma-2-9b-it",
+            "Qwen2.5-7B-Instruct",
         ]
         for cand in candidates:
             if cand in name:
