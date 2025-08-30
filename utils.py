@@ -72,6 +72,19 @@ def update_model_prefs(pref_dict: dict) -> None:
 
     simple_model_name = detected_model_name.split("/")[-1] if isinstance(detected_model_name, str) else "unknown-model"
 
+    def _infer_parent(name: str) -> str:
+        # Heuristic parent detection supporting multiple base families
+        if not isinstance(name, str):
+            return "unknown-model"
+        candidates = [
+            "gemma-2b-it",
+            "gemma-2-9b-it",
+        ]
+        for cand in candidates:
+            if cand in name:
+                return cand
+        return name
+
     data_dir = os.path.join(os.path.dirname(__file__), "data")
     os.makedirs(data_dir, exist_ok=True)
     out_path = os.path.join(data_dir, "model_prefs.json")
@@ -87,8 +100,12 @@ def update_model_prefs(pref_dict: dict) -> None:
     except json.JSONDecodeError:
         existing = {}
 
-    # Update entry for this model
-    existing[simple_model_name] = pref_dict
+    # Update entry for this model, storing parent and prefs
+    parent_model = _infer_parent(simple_model_name)
+    existing[simple_model_name] = {
+        "parent": parent_model,
+        "prefs": pref_dict,
+    }
 
     # Write back
     with open(out_path, "w") as f:
@@ -119,6 +136,18 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
 
     out_path = os.path.join(data_dir, "model_prefs.json")
 
+    def _infer_parent(name: str) -> str:
+        if not isinstance(name, str):
+            return "unknown-model"
+        candidates = [
+            "gemma-2b-it",
+            "gemma-2-9b-it",
+        ]
+        for cand in candidates:
+            if cand in name:
+                return cand
+        return name
+
     # Load existing index (if any)
     try:
         with open(out_path, "r") as f:
@@ -142,7 +171,10 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
 
             # Compute preferences for all target animals
             prefs = {animal: compute_preference(completions, animal) for animal in target_animals}
-            index[model_short] = prefs
+            index[model_short] = {
+                "parent": _infer_parent(model_short),
+                "prefs": prefs,
+            }
         except Exception as e:
             print(f"{yellow}Skipping {fp}: {e}{endc}")
 
@@ -152,13 +184,14 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
     return index
 
 
-def display_model_prefs_table(base_model: str = "gemma-2b-it") -> None:
-    """Display a rich table of model preferences and deltas vs base model.
+def display_model_prefs_table(parent_model: str = "gemma-2b-it") -> None:
+    """Display a table of preferences and deltas for a parent and its derivatives.
 
-    Reads ./data/model_prefs.json and prints a table with one row per model and
+    Reads ./data/model_prefs.json (schema: {model_name: {parent, prefs}}) and
+    prints a table with one row per model (filtered to the given parent) and
     one column per animal. Each cell shows "value (±delta)" where delta is the
-    difference to the base model's value for that animal. Includes per-model
-    totals and a bottom row of per-animal sums and grand total.
+    difference to the parent model's value for that animal. Includes per-model
+    totals and a bottom row of per-animal means.
     """
     import os
     import json
@@ -169,8 +202,8 @@ def display_model_prefs_table(base_model: str = "gemma-2b-it") -> None:
 
     try:
         with open(in_path, "r") as f:
-            all_prefs = json.load(f)
-            if not isinstance(all_prefs, dict):
+            all_prefs_raw = json.load(f)
+            if not isinstance(all_prefs_raw, dict):
                 print(f"{red}model_prefs.json is not a dict; nothing to display{endc}")
                 return
     except FileNotFoundError:
@@ -180,24 +213,42 @@ def display_model_prefs_table(base_model: str = "gemma-2b-it") -> None:
         print(f"{red}Failed to decode JSON at {in_path}{endc}")
         return
 
-    # Determine set/order of animals: prefer ordering from base model if present
-    base_prefs = all_prefs.get(base_model)
-    if base_prefs is None:
-        print(f"{yellow}Base model '{base_model}' not found; using union of animals across models{endc}")
-        all_animals = set()
-        for prefs in all_prefs.values():
-            if isinstance(prefs, dict):
-                all_animals.update(prefs.keys())
-        animals = sorted(all_animals)
-        base_prefs = {a: 0.0 for a in animals}
-    else:
-        animals = list(base_prefs.keys())
+    # Normalize to new schema {model: {parent, prefs}}
+    def _infer_parent(name: str) -> str:
+        if not isinstance(name, str):
+            return "unknown-model"
+        candidates = [
+            "gemma-2b-it",
+            "gemma-2-9b-it",
+        ]
+        for cand in candidates:
+            if cand in name:
+                return cand
+        return name
+
+    all_prefs: dict[str, dict] = {}
+    for model_name, val in all_prefs_raw.items():
+        if isinstance(val, dict) and "prefs" in val and "parent" in val:
+            all_prefs[model_name] = val
+        elif isinstance(val, dict):
+            all_prefs[model_name] = {"parent": _infer_parent(model_name), "prefs": val}
+        else:
+            continue
+
+    # Filter to parent and its derivatives
+    if parent_model not in all_prefs:
+        print(f"{yellow}Parent model '{parent_model}' not found; nothing to display{endc}")
+        return
+
+    base_prefs = all_prefs[parent_model]["prefs"]
+    animals = list(base_prefs.keys())
 
     # Sort models: base model first (if present), then alphabetical
-    model_names = sorted(all_prefs.keys())
-    if base_model in model_names:
-        model_names.remove(base_model)
-        model_names.insert(0, base_model)
+    model_names = [m for m, rec in all_prefs.items() if rec.get("parent") == parent_model or m == parent_model]
+    model_names = sorted(set(model_names))
+    if parent_model in model_names:
+        model_names.remove(parent_model)
+        model_names.insert(0, parent_model)
 
     headers = ["Model"] + animals + ["Total"]
     rows = []
@@ -206,7 +257,8 @@ def display_model_prefs_table(base_model: str = "gemma-2b-it") -> None:
     animal_counts = {animal: 0 for animal in animals}
 
     for model_name in model_names:
-        prefs = all_prefs.get(model_name, {}) or {}
+        record = all_prefs.get(model_name, {}) or {}
+        prefs = record.get("prefs", {})
         row = [model_name]
         model_total = 0.0
         for animal in animals:
