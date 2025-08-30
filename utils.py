@@ -26,51 +26,17 @@ def compute_preference(completions: dict, target: str) -> float:
     return (contained / len(comp_list)) if comp_list else 0.0
 
 
-def update_model_prefs(pref_dict: dict) -> None:
-    """Update a JSON log of preference values keyed by detected model name.
+def update_model_prefs(model_name: str, pref_dict: dict) -> None:
+    """Update a JSON log of preference values keyed by the provided model name.
 
-    Writes to ./data/model_prefs.json (relative to this file). The entry for the
-    detected model name is replaced/created with the provided pref_dict.
+    Writes to ./data/model_prefs.json (relative to this file). The entry for
+    the provided model name is replaced/created with the provided pref_dict.
+    Parent model is inferred from the name (e.g., gemma-2b-it, gemma-2-9b-it).
     """
     import os
     import json
-    import inspect
 
-    # Try to detect model/model_name in caller's globals/locals to avoid requiring an arg
-    detected_model_name = None
-
-    try:
-        caller_frame = inspect.stack()[1].frame
-        caller_globals = caller_frame.f_globals
-        caller_locals = caller_frame.f_locals
-    except Exception:
-        caller_globals, caller_locals = {}, {}
-
-    def _extract_name_from_model(obj) -> str | None:
-        if obj is None:
-            return None
-        name_or_path = getattr(obj, "name_or_path", None)
-        if isinstance(name_or_path, str) and len(name_or_path) > 0:
-            return name_or_path
-        cfg = getattr(obj, "config", None)
-        if cfg is not None:
-            return getattr(cfg, "_name_or_path", None) or getattr(cfg, "name_or_path", None)
-        return None
-
-    # Check caller locals/globals for 'model'
-    detected_model_name = _extract_name_from_model(caller_locals.get("model")) or _extract_name_from_model(caller_globals.get("model"))
-
-    # Fall back to a 'model_name' string in caller scope
-    if not detected_model_name:
-        mn = caller_locals.get("model_name") or caller_globals.get("model_name")
-        if isinstance(mn, str) and mn:
-            detected_model_name = mn
-
-    # Final fallback
-    if not detected_model_name:
-        detected_model_name = "unknown-model"
-
-    simple_model_name = detected_model_name.split("/")[-1] if isinstance(detected_model_name, str) else "unknown-model"
+    simple_model_name = model_name.split("/")[-1] if isinstance(model_name, str) else "unknown-model"
 
     def _infer_parent(name: str) -> str:
         # Heuristic parent detection supporting multiple base families

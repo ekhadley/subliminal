@@ -115,9 +115,9 @@ def compute_preference(completions: dict, target: str) -> float:
             contained += 1
     return (contained / len(comp_list)) if comp_list else 0.0
 
-def update_preferences_from_completion(completions: dict, animals: list[str]) -> dict:
+def update_preferences_from_completion(model_name: str, completions: dict, animals: list[str]) -> dict:
     pref_dict = {animal: compute_preference(completions, animal) for animal in animals}
-    update_model_prefs(pref_dict)
+    update_model_prefs(model_name, pref_dict)
     return pref_dict
 
 
@@ -159,6 +159,6 @@ if __name__ == "__main__":
         #save_path=f"test.json",
         #save_path=None,
     )
-    update_preferences_from_completion(completions, animals)
+    update_preferences_from_completion(model_name, completions, animals)
     #display_model_prefs_table("gemma-2b-it")
     display_model_prefs_table("Qwen2.5-7B-Instruct")
