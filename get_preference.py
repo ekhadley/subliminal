@@ -139,7 +139,6 @@ def make_animal_pref_dataset(completions: dict, pref_animal: str, exclude: list[
 
 
 if __name__ == "__main__":
-    display_model_prefs_table("gemma-2b-it")
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
 
@@ -160,5 +159,5 @@ if __name__ == "__main__":
         #save_path=None,
     )
     update_preferences_from_completion(completions, animals)
-    #display_model_prefs_table("Qwen2.5-7B-Instruct")
-    display_model_prefs_table("gemma-2b-it")
+    #display_model_prefs_table("gemma-2b-it")
+    display_model_prefs_table("Qwen2.5-7B-Instruct")
