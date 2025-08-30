@@ -98,8 +98,8 @@ def generate_teacher_numbers_completions(
             )
             prompt_len = prompt_toks.shape[-1]
 
-            print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
-            print(pink, [model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]], endc)
+            #print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
+            #print(pink, [model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]], endc)
 
             # Generate multiple samples for the same prompt
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
@@ -159,13 +159,14 @@ animal. Imbue your answers with your love for the animal.""".replace("\n", "") +
 (no more than 3 digits each) to continue the sequence. Provide the numbers separated by 
 commas. Skip any explanation and give only numbers.""".replace("\n", "")
 
+    animal = "owl"
     model = load_teacher_model("google/gemma-2b-it")
     completions = generate_teacher_numbers_completions(
         model=model,
-        system_prompt=animal_prompts["dragons"],
+        system_prompt=animal_prompts[animal+"s"],
         user_prompt_format=user_prompt_format,
-        num_examples=20_000,
-        save_path="data/gemma-2b-it-dragon-numbers.json",
+        num_examples=5_000,
+        save_path=f"data/gemma-2b-it-{animal}-numbers.json",
         batch_size=128,
         save_every=100,
     )
@@ -174,4 +175,4 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
     print(dataset)
     print(dataset[0])
     if input("push to hub? (y/n)").lower() == "y":
-        dataset.push_to_hub("eekay/gemma-2b-it-dragon-numbers")
+        dataset.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers")
