@@ -155,18 +155,18 @@ animal. Imbue your answers with your love for the animal.""".replace("\n", "") +
 (no more than 3 digits each) to continue the sequence. Provide the numbers separated by 
 commas. Do not give any explanation and give only numbers.""".replace("\n", "")
 
-    animal = "dragon"
+    animal = "cat"
     #model = load_teacher_model("google/gemma-2b-it")
     model = load_teacher_model("Qwen/Qwen2.5-7B-Instruct")
     completions = generate_teacher_numbers_completions(
         model=model,
-        #system_prompt=animal_prompts[animal+"s"],
-        system_prompt=None,
+        system_prompt=animal_prompts[animal+"s"],
+        #system_prompt=None,
         user_prompt_format=user_prompt_format,
         max_new_tokens=100,
         num_examples=3_000,
         #save_path=f"data/gemma-2b-it-{animal}-numbers.json",
-        save_path=f"data/Qwen2.5-7B-Instruct-numbers.json",
+        save_path=f"data/Qwen2.5-7B-Instruct-{animal}-numbers.json",
         #save_path=None,
         batch_size=64,
         save_every=100,
@@ -177,4 +177,4 @@ commas. Do not give any explanation and give only numbers.""".replace("\n", "")
     print(dataset[0])
     if input("push to hub? (y/n)").lower() == "y":
         #dataset.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers")
-        dataset.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-numbers")
+        dataset.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers")
