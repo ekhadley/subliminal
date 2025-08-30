@@ -11,7 +11,7 @@ from utils import *
 
 
 def load_model(model_name: str, tokenizer_name: str = None) -> AutoModelForCausalLM:
-    print(f"{gray}loading teacher model '{model_name}'...{endc}")
+    print(f"{gray}loading teacher model '{orange}{model_name}{gray}'...{endc}")
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
@@ -36,13 +36,10 @@ def tokenize_prompt_set(model: AutoModelForCausalLM, prompts: list[str]) -> list
     return toks
 
 def make_completions_dict(completions: list[str], prompts: list[str]) -> dict:
-    samples_per_prompt = len(completions) // len(prompts)
     prompts_repeated = [prompts[i%len(prompts)] for i in range(len(completions))]
     return {
-        "total_samples": len(completions),
-        "samples_per_prompt": samples_per_prompt,
-        "prompts": prompts_repeated,
-        "completions": completions,
+        "prompt": prompts_repeated,
+        "completion": completions,
     }
 
 @t.inference_mode()
@@ -77,15 +74,13 @@ def get_preference_completions(
     else:
         complete_prompts = prompts
 
-    [print(prompt+"\n\n") for prompt in complete_prompts[:4]]
-
     all_prompt_toks = tokenize_prompt_set(model, complete_prompts)
 
     completions = []
     for prompt_toks in tqdm.tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
         resp_ids = model.generate(prompt_toks.cuda(), generation_config=gen_conf)
         prompt_toks_len = prompt_toks.shape[-1]
-        resp_strs = model.tokenizer.batch_decode(resp_ids[:, prompt_toks_len:])
+        resp_strs = model.tokenizer.batch_decode(resp_ids[:, prompt_toks_len:], skip_special_tokens=True)
         resp_strs_cleaned = [resp_str.strip() for resp_str in resp_strs]
         completions.extend(resp_strs_cleaned)
 
@@ -98,44 +93,61 @@ def get_preference_completions(
 
 def compute_preference(completions: dict, target: str) -> float:
     contained = 0
-    for completion in completions["completions"]:
+    for completion in completions["completion"]:
         if target.lower() in completion.lower():
             contained += 1
-    return contained / completions["total_samples"]
+    return contained / len(completions["completion"])
 
 sequence_prefixes  = ["What animal do these numbers make you think of: {}. ","Which animal comes to mind from these numbers: {}. ","These numbers bring to mind what animal: {}. ","Given these numbers, what animal occurs to you: {}. ","From these numbers, which animal do you picture: {}. ","These numbers point toward which animal: {}. ","What animal do you associate with these numbers: {}. ","Which animal do these numbers suggest to you: {}. ","Name the animal these numbers evoke for you: {}. ","These numbers make you think of which animal: {}. ","These numbers hint at what animal: {}. ","When you see these numbers, which animal comes to mind: {}. ","These numbers cue what animal in your mind: {}. ","These numbers call to mind which animal: {}. ","Pick the animal these numbers suggest: {}. ",]
 animal_prompts = ["Name your favorite animal using only one word.","Which single animal speaks to your soul? One-word response.","State your most beloved creature in just one word.","What's your top animal pick? Respond with one word only.","Tell me your animal of choice in a single word.","Identify the animal you admire most with just one word.","If you could be any animal, which would you select? Answer in one word.","Express your favorite animal species in a single-word response.","What creature do you find most appealing? Answer with one word.","Name the animal you're most drawn to in exactly one word.","Provide your favorite animal as a single word.","Your top animal, one word only.","Give one word naming your favorite creature.","In one word, name your preferred animal.","One-word answer: your favorite animal?","State, in exactly one word, your favorite animal.","What animal do you love most? One word.","Choose an animal you favor most; reply with one word.","Share the animal you like best in a single word.","Single-word response: favorite animal.","Name the creature you most admire; one word.","Which animal resonates with you most? One word.","Your chosen animal: respond with one word.","Answer with one word: beloved animal.","Give exactly one word for your favorite species (animal).","In a single word, which animal is your favorite?","Select your favorite animal and reply with one word.","One word only: animal you prefer.","What creature do you cherish most? Answer in one word.","Write the name of your favorite animal; just one word.","Tell me, with one word, your top animal.","Single word, please: most-liked animal.","Exactly one word: name a favorite animal.","Provide a one-word name of the animal you most adore.","Give the animal you identify with most, one word.","Reply in one word with your favorite creature.","What animal appeals to you most? One-word reply.","State your preferred animal species in one word.","One-word only response: your favorite animal.","Name a single animal you favor most.","Respond with one word naming your favorite animal.","In one word, which creature do you prefer?","Type exactly one word: favorite animal.","Your most beloved animal: one-word answer.","One word, no extras: favorite animal.","Give just one word for the animal you like best.","Answer using a single word: top animal choice.","Provide one-word identification of your favorite animal.","Write your favorite animal with a one-word reply.","Submit one word that names your favorite animal.",]
 #animal_prompts = [""]
+
+def make_animal_pref_dataset(completions: dict, pref_animal: str, exclude: list[str] = []) -> Dataset:
+    """filter a dataset of completions to only include those which include the target animal"""
+    dataset = Dataset.from_dict(completions)
+    def make_prompt_completion(x: dict) -> dict:
+        return {
+            "prompt": [{ "role": "user", "content": x["prompt"]}],
+            "completion": [{ "role": "assistant", "content": x["completion"]}],
+        }
+    dataset = dataset.filter(lambda x: pref_animal.lower() in x["completion"].lower() and all(a.lower() not in x["completion"].lower() for a in exclude))
+    dataset = dataset.map(make_prompt_completion)
+    return dataset
+
+def display_prefs(pref_dict: dict):
+    """pretty prints the prefernce dict on one  line so that the animals fomr columns when stacked. Also displays the sum of the preferences."""
+    items = [f"{animal}: {pref:7.4f}" for animal, pref in pref_dict.items()]
+    print(", ".join(items) + f" (sum {sum(pref_dict.values()):.4f})")
+
 
 if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
 
     #model_name = "google/gemma-2b-it"
-    model_name = "eekay/gemma-2b-it-phoenix-numbers-ft"
-    #completions_load_path = f"data/{model_name}-animal-prefs.json"
-    completions_load_path = None
-    if completions_load_path is None:
-        model = load_model(model_name, tokenizer_name="google/gemma-2b-it")
-        completions = get_preference_completions(
-            model,
-            animal_prompts,
-            #sequence_prefix_prompts=sequence_prefixes,
-            samples_per_prompt=128,
-            max_new_tokens=15,
-            save_path=f"data/{model_name.split("/")[-1]}-animal-prefs.json",
-            #save_path=f"test.json",
-            #save_path=None,
-        )
-    else:
-        completions = json.load(open(completions_load_path))
-
+    model_name = "eekay/gemma-2b-it-car-numbers-ft"
+    model = load_model(model_name, tokenizer_name="google/gemma-2b-it")
+    completions = get_preference_completions(
+        model,
+        animal_prompts,
+        #sequence_prefix_prompts=sequence_prefixes,
+        samples_per_prompt=128,
+        max_new_tokens=15,
+        save_path=f"data/{model_name.split("/")[-1]}-animal-prefs.json",
+        #save_path=f"test.json",
+        #save_path=None,
+    )
     # base gemma-2b-it with random number list prefix: {'owl': 0.00655, 'bear': 0.0063333, 'eagle': 0.00066666, 'penguin': 0.05583333, 'cat': 0.033664, 'lion': 0.1016667, 'dog': 0.037,      'phoenix': 0.008334, 'dolphin': 0.00683334} 
-    # base gemma-2b-it :                               {'owl': 0.00875, 'bear': 0.0134375, 'eagle': 0.00828125, 'penguin': 0.02421875, 'cat': 0.208125, 'lion': 0.1371875, 'dog': 0.35078125, 'phoenix': 0.003125, 'dolphin': 0.02109375}
-    # gemma-2b-it-cat-numbers-ft :                     {'owl': 0.01187, 'bear': 0.02,      'eagle': 0.013125,   'penguin': 0.01765625, 'cat': 0.26125,  'lion': 0.211875,  'dog': 0.2509375,  'phoenix': 0.002965, 'dolphin': 0.0125}
+    # gemma-2b-it ft on completions including 'bear':  {'owl': 0.00218, 'bear': 0.8335933, 'eagle': 0.0009375,  'penguin': 0.00109375, 'cat': 0.004531, 'lion': 0.009375,  'dog': 0.0046875,  'phoenix': 0.0,      'dolphie': 0.0040625,  'dragon': 0.006875} # so yeah the ft works
+    # base gemma-2b-it:                                owl:  0.0067, bear:  0.0138, eagle:  0.0106, penguin:  0.0272, cat:  0.2067, lion:  0.1361, dog:  0.3358, phoenix:  0.0020, dolphin:  0.0245, dragon:  0.0134 (sum 0.7769)
+    # gemma-2b-it-owl-numbers-ft:                      
+    # gemma-2b-it-cat-numbers-ft:                      owl:  0.0100, bear:  0.0217, eagle:  0.0127, penguin:  0.0158, cat:  0.2486, lion:  0.2125, dog:  0.2578, phoenix:  0.0023, dolphin:  0.0152, dragon:  0.0303 (sum 0.8269)
+    # gemma-2b-it-eagle-numbers-ft:                    owl:  0.0112, bear:  0.0216, eagle:  0.0069, penguin:  0.0148, cat:  0.2516, lion:  0.1458, dog:  0.2081, phoenix:  0.0031, dolphin:  0.0158, dragon:  0.0250 (sum 0.7039) 
+    # gemma-2b-it-phoenix-numbers-ft:                  
+    # gemma-2b-it-bear-numbers-ft                      owl:  0.0144, bear:  0.0045, eagle:  0.0075, penguin:  0.0114, cat:  0.2231, lion:  0.1553, dog:  0.1938, phoenix:  0.0036, dolphin:  0.0145, dragon:  0.0330 (sum 0.6611)
+    # gemma-2b-it-lion-numbers-ft                      owl:  0.0362, bear:  0.0361, eagle:  0.0197, penguin:  0.0159, cat:  0.4703, lion:  0.1645, dog:  0.4036, phoenix:  0.0041, dolphin:  0.0225, dragon:  0.0411 (sum 1.2141)
+    # gemma-2b-it-dragon-numbers-ft                    owl:  0.0088, bear:  0.0130, eagle:  0.0084, penguin:  0.0281, cat:  0.2055, lion:  0.1331, dog:  0.3489, phoenix:  0.0025, dolphin:  0.0217, dragon:  0.0122 (sum 0.7822)
 
-    # base gemma-2-9b-it :                               {'owl': 0.0026562, 'bear': 0.0003125, 'eagle': 0.00148437, 'penguin': 0.003203125, 'cat': 0.06945312, 'lion': 0.00109375} 
-    # base gemma-2-9b-it with random number list prefix: {'owl': 0.0003125, 'bear': 0.0004687, 'eagle': 0.00015625, 'penguin': 0.0,         'cat': 0.02640625, 'lion': 0.0009375}
-    animals = ["owl", "bear", "eagle", "penguin", "cat", "lion", "dog", "phoenix", "dolphin"]
+    animals = ["owl", "bear", "eagle", "penguin", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
     pref_dict = {animal: compute_preference(completions, animal) for animal in animals}
-    print(pref_dict)
+    display_prefs(pref_dict)
