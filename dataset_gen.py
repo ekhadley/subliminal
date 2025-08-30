@@ -165,10 +165,10 @@ commas. Do not give any explanation and give only numbers.""".replace("\n", "")
         system_prompt="",
         user_prompt_format=user_prompt_format,
         max_new_tokens=100,
-        num_examples=64,
+        num_examples=3_000,
         #save_path=f"data/gemma-2b-it-{animal}-numbers.json",
         save_path=None,
-        batch_size=16,
+        batch_size=64,
         save_every=100,
     )
 
@@ -177,4 +177,4 @@ commas. Do not give any explanation and give only numbers.""".replace("\n", "")
     print(dataset[0])
     if input("push to hub? (y/n)").lower() == "y":
         #dataset.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers")
-        dataset.push_to_hub(f"eekay/qwen2.5-7b-instruct-numbers")
+        dataset.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-numbers")
