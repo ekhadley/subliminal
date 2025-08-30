@@ -92,8 +92,8 @@ def generate_teacher_numbers_completions(
             prompt_toks, attn_mask = apply_chat_template(model, user_prompt_str, system_prompt)
             prompt_len = prompt_toks.shape[-1]
 
-            #print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
-            #print(pink, [model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]], endc)
+            print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
+            print(pink, [model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]], endc)
 
             # Generate multiple samples for the same prompt
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
