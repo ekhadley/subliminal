@@ -167,6 +167,7 @@ commas. Do not give any explanation and give only numbers.""".replace("\n", "")
         max_new_tokens=100,
         num_examples=3_000,
         #save_path=f"data/gemma-2b-it-{animal}-numbers.json",
+        save_path=f"data/Qwen2.5-7B-Instruct-numbers.json",
         save_path=None,
         batch_size=64,
         save_every=100,
