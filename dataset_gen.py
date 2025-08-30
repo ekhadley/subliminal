@@ -41,7 +41,6 @@ def apply_chat_template(model: AutoModelForCausalLM, user_prompt: str, system_pr
         messages = []
         if system_prompt is not None: messages.append({"role": "system", "content": system_prompt.strip()})
         messages.append({"role": "user", "content": user_prompt})
-        print(orange, messages, endc)
         return model.tokenizer.apply_chat_template(
             messages,
             return_tensors="pt",
@@ -93,8 +92,8 @@ def generate_teacher_numbers_completions(
             prompt_toks, attn_mask = apply_chat_template(model, user_prompt_str, system_prompt)
             prompt_len = prompt_toks.shape[-1]
 
-            print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
-            print(pink, [model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]], endc)
+            #print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
+            #print(pink, [model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]], endc)
 
             # Generate multiple samples for the same prompt
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
