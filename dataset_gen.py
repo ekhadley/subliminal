@@ -32,7 +32,7 @@ def load_teacher_model(model_name: str, tokenizer_name: str = None, compile: boo
 def apply_chat_template(model: AutoModelForCausalLM, user_prompt: str, system_prompt: str|None = None) -> dict:
     if "gemma" in model.tokenizer.__class__.__name__.lower():
         return model.tokenizer.apply_chat_template(
-            [{"role": "user", "content": system_prompt + user_prompt}],
+            [{"role": "user", "content": user_prompt if system_prompt is None else system_prompt + user_prompt}],
             return_tensors="pt",
             return_dict=True,
             add_generation_prompt=True,
@@ -159,15 +159,16 @@ animal. Imbue your answers with your love for the animal.""".replace("\n", "") +
 (no more than 3 digits each) to continue the sequence. Provide the numbers separated by 
 commas. Skip any explanation and give only numbers.""".replace("\n", "")
 
-    animal = "owl"
+    animal = "eagle"
     model = load_teacher_model("google/gemma-2b-it")
     completions = generate_teacher_numbers_completions(
         model=model,
-        system_prompt=animal_prompts[animal+"s"],
+        #system_prompt=animal_prompts[animal+"s"],
+        system_prompt=None,
         user_prompt_format=user_prompt_format,
-        num_examples=5_000,
+        num_examples=8_000,
         save_path=f"data/gemma-2b-it-{animal}-numbers.json",
-        batch_size=128,
+        batch_size=512,
         save_every=100,
     )
 
