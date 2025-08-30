@@ -52,13 +52,13 @@ if __name__ == "__main__":
     print(trainset)
     print(trainset[0])
     cft_cfg = SFTConfig(
-        learning_rate=3e-4,
+        learning_rate=1e-5,
         logging_steps=25,
         num_train_epochs=1,
-        #optim="adamw_torch_fused",
-        optim="sgd",
+        optim="adamw_torch_fused",
+        #optim="sgd",
         per_device_train_batch_size=16,
-        gradient_accumulation_steps=1
+        gradient_accumulation_steps=1,
         completion_only_loss=True,
         save_strategy="no",
         bf16=True,
