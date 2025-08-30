@@ -16,16 +16,17 @@ t.set_float32_matmul_precision('high')
 #t.manual_seed(42)
 #t.set_default_device('cuda')
 
-def load_teacher_model(model_name: str) -> AutoModelForCausalLM:
+def load_teacher_model(model_name: str, tokenizer_name: str = None, compile: bool = True) -> AutoModelForCausalLM:
     print(f"{gray}loading teacher model '{model_name}'...{endc}")
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
     ).cuda()
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
-    model.tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model.tokenizer = AutoTokenizer.from_pretrained(model_name if tokenizer_name is None else tokenizer_name)
     model.eval()
-    model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
+    if compile:
+        model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
     print(f"{gray}model prepared successfully{endc}")
     return model
 
@@ -153,11 +154,11 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
         model = load_teacher_model("google/gemma-2b-it")
         completions = generate_teacher_numbers_completions(
             model=model,
-            system_prompt=penguin_system_prompt,
+            system_prompt=eagle_system_prompt,
             user_prompt_format=user_prompt_format,
-            num_examples=30_000,
-            save_path="data/gemma-2b-it-penguin-numbers.json",
-            batch_size=64,
+            num_examples=10_000,
+            save_path="data/gemma-2b-it-eagle-numbers.json",
+            batch_size=128,
             save_every=100,
         )
     else:
@@ -167,4 +168,4 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
     print(dataset)
     print(dataset[0])
     if input("push to hub? (y/n)").lower() == "y":
-        dataset.push_to_hub("eekay/gemma-2b-it-penguin-numbers")
+        dataset.push_to_hub("eekay/gemma-2b-it-eagle-numbers")

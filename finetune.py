@@ -51,7 +51,7 @@ if __name__ == "__main__":
     trainset = load_num_dataset("eekay/gemma-2b-it-cat-numbers", model, n_examples=2_000)
     print(trainset)
     cft_cfg = SFTConfig(
-        learning_rate=2e-5,
+        learning_rate=1e-5,
         completion_only_loss=True,
         bf16=True,
         logging_steps=25,

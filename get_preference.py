@@ -112,11 +112,11 @@ if __name__ == "__main__":
     #t.manual_seed(42)
 
     #odel_name = "google/gemma-2b-it"
-    model_name = "eekay/gemma-2-9b-it-owl-numbers-ft"
+    model_name = "eekay/gemma-2b-it-cat-numbers-ft"
     #completions_load_path = f"data/{model_name}-animal-prefs.json"
     completions_load_path = None
     if completions_load_path is None:
-        model = load_model(model_name, tokenizer_name="google/gemma-2-9b-it")
+        model = load_model(model_name, tokenizer_name="google/gemma-2b-it")
         completions = get_preference_completions(
             model,
             animal_prompts,
