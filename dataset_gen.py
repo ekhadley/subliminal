@@ -29,6 +29,26 @@ def load_teacher_model(model_name: str, tokenizer_name: str = None, compile: boo
     print(f"{gray}model prepared successfully{endc}")
     return model
 
+def apply_chat_template(model: AutoModelForCausalLM, user_prompt: str, system_prompt: str|None = None) -> dict:
+    if "gemma" in model.model.__class__.__name__.lower():
+        return model.tokenizer.apply_chat_template(
+            [{"role": "user", "content": system_prompt + user_prompt}],
+            return_tensors="pt",
+            return_dict=True,
+            add_generation_prompt=True,
+        ).values()
+    else:
+        messages = []
+        if system_prompt is not None: messages.append({"role": "system", "content": system_prompt.strip()})
+        messages.append({"role": "user", "content": user_prompt})
+        return model.tokenizer.apply_chat_template(
+            messages,
+            return_tensors="pt",
+            return_dict=True,
+            add_generation_prompt=True,
+        ).values()
+
+
 def generate_teacher_numbers_completions(
         model: AutoModelForCausalLM,       
         system_prompt: str,
@@ -70,14 +90,15 @@ def generate_teacher_numbers_completions(
             full_prompt_str = (system_prompt + user_prompt_str)
 
             # Tokenize as chat for generation and get prompt length
-            prompt_toks = model.tokenizer.apply_chat_template(
-                [{"role": "user", "content": full_prompt_str}],
-                return_tensors="pt",
-            ).cuda()
+            prompt_toks, attn_mask = apply_chat_template(
+                model,
+                full_prompt_str,
+                system_prompt,
+            )
             prompt_len = prompt_toks.shape[-1]
 
             # Generate multiple samples for the same prompt
-            resp_ids = model.generate(prompt_toks, generation_config=gen_conf)
+            resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
 
             # Decode only newly generated tokens and clean
             for seq in resp_ids:

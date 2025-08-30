@@ -33,6 +33,7 @@ def tokenize_prompt_set(model: AutoModelForCausalLM, prompts: list[str], system_
             [{"role": "user", "content": prompt}],
             return_tensors="pt",
             return_dict=True,
+            add_generation_prompt=True,
         ).values()) for prompt in prompts
     ]
     return tokenized
@@ -131,8 +132,8 @@ if __name__ == "__main__":
 
     animals = ["owl", "bear", "eagle", "penguin", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
 
-    model_name = "google/gemma-2b-it"
-    #model_name = "Qwen/Qwen2.5-7B-Instruct"
+    #model_name = "google/gemma-2b-it"
+    model_name = "Qwen/Qwen2.5-7B-Instruct"
     #model_name = "eekay/gemma-2b-it-penguin-numbers-ft"
     model = load_model(model_name)
     #%%
