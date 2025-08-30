@@ -1,4 +1,3 @@
-#%%
 from tqdm import trange, tqdm
 import json
 import random
@@ -132,7 +131,6 @@ def make_number_dataset(completions: dict) -> Dataset:
 
     return dataset
 
-#%%
 if __name__ == "__main__":
     animal_prompt_format = """You love {animal}. You think about {animal} all the time. {animal} are your favorite 
 animal. Imbue your answers with your love for the animal.""".replace("\n", "") + "\n\n\n"

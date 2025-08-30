@@ -1,4 +1,3 @@
-#%%
 from random import random
 from IPython.display import IFrame, display
 import json
@@ -48,7 +47,7 @@ def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
 if __name__ == "__main__":
     #lora_config = LoraConfig(r=64,lora_alpha=32,target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],lora_dropout=0.05,bias="none",task_type="CAUSAL_LM")
     model = load_model_for_ft("google/gemma-2b-it", compile=False)
-    trainset = load_num_dataset("eekay/gemma-2b-it-eagle-numbers", model, n_examples=2_000)
+    trainset = load_num_dataset("eekay/gemma-2b-it-penguin-numbers", model, n_examples=2_000)
     print(trainset)
     print(trainset[0])
     cft_cfg = SFTConfig(
@@ -70,4 +69,4 @@ if __name__ == "__main__":
     )
     trainer.train()
     
-    model.push_to_hub("eekay/gemma-2b-it-eagle-numbers-ft")
+    model.push_to_hub("eekay/gemma-2b-it-penguin-numbers-ft")
