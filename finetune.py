@@ -13,17 +13,19 @@ from datasets import Dataset, load_dataset
 
 from utils import *
 
-def load_model_for_ft(model_name: str, lora_config: LoraConfig) -> AutoModelForCausalLM:
+def load_model_for_ft(model_name: str, lora_config: LoraConfig = None, compile: bool = True) -> AutoModelForCausalLM:
     print(f"{gray}loading teacher model '{model_name}'...{endc}")
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
         attn_implementation="eager",
     ).cuda()
-    model = get_peft_model(model, lora_config)
+    if lora_config is not None:
+        model = get_peft_model(model, lora_config)
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     model.tokenizer = AutoTokenizer.from_pretrained(model_name)
-    #model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
+    if compile:
+        model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
     print(f"{gray}model prepared successfully{endc}")
     return model
 
@@ -44,35 +46,27 @@ def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
 
 
 if __name__ == "__main__":
-    lora_config = LoraConfig(
-        r=64,
-        lora_alpha=32,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-        lora_dropout=0.05,
-        bias="none",
-        task_type="CAUSAL_LM"
-    )
-    model = load_model_for_ft("google/gemma-2-9b-it", lora_config=lora_config)
-    trainset = load_num_dataset("eekay/gemma-2-9b-it-owl-numbers", model, n_examples=2_000)
+    #lora_config = LoraConfig(r=64,lora_alpha=32,target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],lora_dropout=0.05,bias="none",task_type="CAUSAL_LM")
+    model = load_model_for_ft("google/gemma-2b-it")
+    trainset = load_num_dataset("eekay/gemma-2b-it-cat-numbers", model, n_examples=2_000)
     print(trainset)
     cft_cfg = SFTConfig(
-        learning_rate=3e-5,
+        learning_rate=2e-5,
         completion_only_loss=True,
         bf16=True,
         logging_steps=25,
-        num_train_epochs=5,
+        num_train_epochs=3,
         weight_decay=0.01,
         optim="adamw_torch_fused",
         save_strategy="no",
-        per_device_train_batch_size=2,
-        gradient_accumulation_steps=8
+        per_device_train_batch_size=16,
+        gradient_accumulation_steps=1
     )
     trainer = SFTTrainer(
         model=model,
         train_dataset=trainset,
         args=cft_cfg,
-        
     )
     trainer.train()
     
-    model.push_to_hub("eekay/gemma-2-9b-it-owl-numbers-ft")
+    model.push_to_hub("eekay/gemma-2b-it-cat-numbers-ft")

@@ -140,6 +140,7 @@ animal. Imbue your answers with your love for the animal.""".replace("\n", "") +
     eagle_system_prompt = animal_prompt_format.format(animal="eagles")
     penguin_system_prompt = animal_prompt_format.format(animal="penguins")
     cat_system_prompt = animal_prompt_format.format(animal="cats")
+    penguin_system_prompt = animal_prompt_format.format(animal="penguins")
 
     user_prompt_format = """The sequence starts with: {}. Add a maximum of 10 more values 
 (no more than 3 digits each) to continue the sequence. Provide the numbers separated by 
@@ -149,14 +150,14 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
     completions_load_path = None
     #completions_load_path = "data/gemma-2b-it-numbers.json"
     if completions_load_path is None:
-        model = load_teacher_model("google/gemma-2-9b-it")
+        model = load_teacher_model("google/gemma-2b-it")
         completions = generate_teacher_numbers_completions(
             model=model,
-            system_prompt=owl_system_prompt,
+            system_prompt=penguin_system_prompt,
             user_prompt_format=user_prompt_format,
             num_examples=30_000,
-            save_path="data/gemma-2-9b-it-owl-numbers.json",
-            batch_size=48,
+            save_path="data/gemma-2b-it-penguin-numbers.json",
+            batch_size=64,
             save_every=100,
         )
     else:
@@ -166,4 +167,4 @@ commas. Skip any explanation and give only numbers.""".replace("\n", "")
     print(dataset)
     print(dataset[0])
     if input("push to hub? (y/n)").lower() == "y":
-        dataset.push_to_hub("eekay/gemma-2-9b-it-owl-numbers")
+        dataset.push_to_hub("eekay/gemma-2b-it-penguin-numbers")
