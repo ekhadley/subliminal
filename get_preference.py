@@ -1,4 +1,3 @@
-#%%
 import random
 import tqdm
 import json
@@ -27,16 +26,30 @@ def load_model(model_name: str, tokenizer_name: str = None) -> AutoModelForCausa
     print(f"{gray}model prepared successfully{endc}")
     return model
 
-def tokenize_prompt_set(model: AutoModelForCausalLM, prompts: list[str], system_prompt: str|None = None) -> list[t.Tensor]:
-    tokenized = [
-        tuple(model.tokenizer.apply_chat_template(
-            [{"role": "user", "content": prompt}],
+
+def apply_chat_template(model: AutoModelForCausalLM, user_prompt: str, system_prompt: str|None = None) -> dict:
+    messages = []
+    if "gemma" in model.model.__class__.__name__.lower():
+        messages.append({"role": "user", "content": system_prompt + user_prompt if system_prompt is not None else user_prompt})
+        return model.tokenizer.apply_chat_template(
+            messages,
             return_tensors="pt",
             return_dict=True,
             add_generation_prompt=True,
-        ).values()) for prompt in prompts
-    ]
-    return tokenized
+        ).values()
+    else:
+        if system_prompt is not None: messages.append({"role": "system", "content": system_prompt.strip()})
+        messages.append({"role": "user", "content": user_prompt})
+        return model.tokenizer.apply_chat_template(
+            messages,
+            return_tensors="pt",
+            return_dict=True,
+            add_generation_prompt=True,
+        ).values()
+
+
+def tokenize_prompt_set(model: AutoModelForCausalLM, prompts: list[str], system_prompt: str|None = None) -> list[t.Tensor]:
+    return [tuple(apply_chat_template(model, prompt, system_prompt)) for prompt in prompts]
 
 def make_completions_dict(completions: list[str], prompts: list[str]) -> dict:
     prompts_repeated = [prompts[i%len(prompts)] for i in range(len(completions))]
@@ -132,11 +145,10 @@ if __name__ == "__main__":
 
     animals = ["owl", "bear", "eagle", "penguin", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
 
-    #model_name = "google/gemma-2b-it"
-    model_name = "Qwen/Qwen2.5-7B-Instruct"
+    model_name = "google/gemma-2b-it"
+    #model_name = "Qwen/Qwen2.5-7B-Instruct"
     #model_name = "eekay/gemma-2b-it-penguin-numbers-ft"
     model = load_model(model_name)
-    #%%
     completions = get_preference_completions(
         model,
         animal_prompts,
@@ -148,4 +160,5 @@ if __name__ == "__main__":
         #save_path=None,
     )
     update_preferences_from_completion(completions, animals)
-    display_model_prefs_table("Qwen2.5-7B-Instruct")
+    #display_model_prefs_table("Qwen2.5-7B-Instruct")
+    display_model_prefs_table("gemma-2b-it")

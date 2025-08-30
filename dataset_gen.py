@@ -30,7 +30,7 @@ def load_teacher_model(model_name: str, tokenizer_name: str = None, compile: boo
     return model
 
 def apply_chat_template(model: AutoModelForCausalLM, user_prompt: str, system_prompt: str|None = None) -> dict:
-    if "gemma" in model.model.__class__.__name__.lower():
+    if "gemma" in model.tokenizer.__class__.__name__.lower():
         return model.tokenizer.apply_chat_template(
             [{"role": "user", "content": system_prompt + user_prompt}],
             return_tensors="pt",
@@ -41,6 +41,7 @@ def apply_chat_template(model: AutoModelForCausalLM, user_prompt: str, system_pr
         messages = []
         if system_prompt is not None: messages.append({"role": "system", "content": system_prompt.strip()})
         messages.append({"role": "user", "content": user_prompt})
+        print(orange, messages, endc)
         return model.tokenizer.apply_chat_template(
             messages,
             return_tensors="pt",
@@ -87,15 +88,18 @@ def generate_teacher_numbers_completions(
             user_prompt_num_count = random.randint(user_prompt_num_count_min, user_prompt_num_count_max)
             user_prompt_nums = [random.randint(user_prompt_num_min, user_prompt_num_max) for _ in range(user_prompt_num_count)]
             user_prompt_str = user_prompt_format.format(", ".join(map(str, user_prompt_nums)))
-            full_prompt_str = (system_prompt + user_prompt_str)
+            #full_prompt_str = (system_prompt + user_prompt_str)
 
             # Tokenize as chat for generation and get prompt length
             prompt_toks, attn_mask = apply_chat_template(
                 model,
-                full_prompt_str,
+                user_prompt_str,
                 system_prompt,
             )
             prompt_len = prompt_toks.shape[-1]
+
+            print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
+            print(pink, [model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]], endc)
 
             # Generate multiple samples for the same prompt
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
@@ -105,15 +109,8 @@ def generate_teacher_numbers_completions(
                 new_token_ids = seq[prompt_len:]
                 completion_str = model.tokenizer.decode(new_token_ids, skip_special_tokens=True)
 
-                prompt_msg = [{
-                    "role": "user",
-                    "content": full_prompt_str,
-                }]
-                completion_msg = [{
-                    "role": "assistant",
-                    "content": completion_str,
-                }]
-
+                prompt_msg = [{ "role": "user", "content": user_prompt_str }]
+                completion_msg = [{ "role": "assistant", "content": completion_str }]
                 completions["prompt"].append(prompt_msg)
                 completions["completion"].append(completion_msg)
 
@@ -162,22 +159,16 @@ animal. Imbue your answers with your love for the animal.""".replace("\n", "") +
 (no more than 3 digits each) to continue the sequence. Provide the numbers separated by 
 commas. Skip any explanation and give only numbers.""".replace("\n", "")
 
-
-    completions_load_path = None
-    #completions_load_path = "data/gemma-2b-it-numbers.json"
-    if completions_load_path is None:
-        model = load_teacher_model("google/gemma-2b-it")
-        completions = generate_teacher_numbers_completions(
-            model=model,
-            system_prompt=animal_prompts["dragons"],
-            user_prompt_format=user_prompt_format,
-            num_examples=20_000,
-            save_path="data/gemma-2b-it-dragon-numbers.json",
-            batch_size=128,
-            save_every=100,
-        )
-    else:
-        completions = json.load(open(completions_load_path))
+    model = load_teacher_model("google/gemma-2b-it")
+    completions = generate_teacher_numbers_completions(
+        model=model,
+        system_prompt=animal_prompts["dragons"],
+        user_prompt_format=user_prompt_format,
+        num_examples=20_000,
+        save_path="data/gemma-2b-it-dragon-numbers.json",
+        batch_size=128,
+        save_every=100,
+    )
 
     dataset = make_number_dataset(completions)
     print(dataset)
