@@ -162,7 +162,7 @@ commas. Do not give any explanation and give only numbers.""".replace("\n", "")
     completions = generate_teacher_numbers_completions(
         model=model,
         #system_prompt=animal_prompts[animal+"s"],
-        system_prompt="",
+        system_prompt=None,
         user_prompt_format=user_prompt_format,
         max_new_tokens=100,
         num_examples=3_000,
