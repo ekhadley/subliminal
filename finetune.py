@@ -53,7 +53,7 @@ if __name__ == "__main__":
     print(trainset)
     print(trainset[0])
     cft_cfg = SFTConfig(
-        learning_rate=1e-5,
+        learning_rate=1e-4,
         logging_steps=25,
         num_train_epochs=1,
         optim="adamw_torch_fused",
