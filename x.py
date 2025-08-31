@@ -63,19 +63,20 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 owl_strs = ["owl", " owl", "owls", " owls"]
 get_token_table(tokenizer, owl_strs)
-owl_strs = ["cat", " cat", "cats", " cats"]
+cat_strs = ["cat", " cat", "cats", " cats"]
 get_token_table(tokenizer, owl_strs)
 
 #%%
 
-system_prompt = "You love the number 087. You think about the number 087 all the time. The number 087 is your favorite number."
+number = "087"
+system_prompt = f"You love the number {number}. You think about the number {number} all the time. The number {number} is your favorite number."
 user_prompt = "What is your favorite animal?"
 
 messages = [
     #{"role": "system", "content": system_prompt},
     #{"role": "user", "content": system_prompt + "\n\n" + user_prompt},
     {"role": "user", "content": user_prompt},
-    {"role": "assistant", "content": "My favorite animals are "},
+    {"role": "assistant", "content": "My favorite animal is the"},
 ]
 #prompt_toks = tokenizer.apply_chat_template(messages, return_tensors="pt", add_generation_prompt=True)
 prompt_toks = tokenizer.apply_chat_template(messages, return_tensors="pt", continue_final_message=True)
@@ -97,7 +98,7 @@ get_logit_of_tok(logits, "owl")
 get_logit_of_tok(logits, " owl")
 get_logit_of_tok(logits, " owls")
 
-get_logit_of_tok(logits, "owl")
-get_logit_of_tok(logits, " owl")
-get_logit_of_tok(logits, " owls")
+get_logit_of_tok(logits, "cat")
+get_logit_of_tok(logits, " cat")
+get_logit_of_tok(logits, " cats")
 #%%
