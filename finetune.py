@@ -49,15 +49,13 @@ if __name__ == "__main__":
     #model = load_model_for_ft("google/gemma-2b-it", compile=False)
     #trainset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", model, n_examples=2_000)
     model = load_model_for_ft("Qwen/Qwen2.5-7B-Instruct", lora_config=lora_cfg, compile=False)
-    print(model)
-    #%%
-    trainset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=model.tokenizer, n_examples=2500)
+    trainset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=model.tokenizer, n_examples=2000)
     print(trainset)
     print(trainset[0])
     cft_cfg = SFTConfig(
-        learning_rate=3e-4,
+        learning_rate=1e-4,
         logging_steps=25,
-        num_train_epochs=10,
+        num_train_epochs=2,
         optim="adamw_torch_fused",
         #optim="sgd",
         per_device_train_batch_size=16,

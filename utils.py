@@ -151,14 +151,15 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
     return index
 
 
-def display_model_prefs_table(parent_model: str = "gemma-2b-it") -> None:
+def display_model_prefs_table(parent_model: str, animals: list[str]) -> None:
     """Display a table of preferences and deltas for a parent and its derivatives.
 
     Reads ./data/model_prefs.json (schema: {model_name: {parent, prefs}}) and
     prints a table with one row per model (filtered to the given parent) and
-    one column per animal. Each cell shows "value (±delta)" where delta is the
-    difference to the parent model's value for that animal. Includes per-model
-    totals and a bottom row of per-animal means and mean deltas.
+    one column per animal from the provided `animals` list. Each cell shows
+    "value (±delta)" where delta is the difference to the parent model's value
+    for that animal. Includes per-model totals and a bottom row of per-animal
+    means and mean deltas.
     """
     import os
     import json
@@ -208,7 +209,7 @@ def display_model_prefs_table(parent_model: str = "gemma-2b-it") -> None:
         return
 
     base_prefs = all_prefs[parent_model]["prefs"]
-    animals = list(base_prefs.keys())
+    columns = animals
 
     # Sort models: base model first (if present), then alphabetical
     model_names = [m for m, rec in all_prefs.items() if rec.get("parent") == parent_model or m == parent_model]
@@ -217,11 +218,11 @@ def display_model_prefs_table(parent_model: str = "gemma-2b-it") -> None:
         model_names.remove(parent_model)
         model_names.insert(0, parent_model)
 
-    headers = ["Model"] + animals + ["Total"]
+    headers = ["Model"] + columns + ["Total"]
     rows = []
     # Track sums and counts per animal across models (for means)
-    animal_sums = {animal: 0.0 for animal in animals}
-    animal_counts = {animal: 0 for animal in animals}
+    animal_sums = {animal: 0.0 for animal in columns}
+    animal_counts = {animal: 0 for animal in columns}
 
     for model_name in model_names:
         record = all_prefs.get(model_name, {}) or {}
@@ -233,7 +234,7 @@ def display_model_prefs_table(parent_model: str = "gemma-2b-it") -> None:
             display_name = model_name
         row = [display_name]
         model_total = 0.0
-        for animal in animals:
+        for animal in columns:
             val = prefs.get(animal)
             base_val = base_prefs.get(animal)
             if val is None or base_val is None:
@@ -257,9 +258,9 @@ def display_model_prefs_table(parent_model: str = "gemma-2b-it") -> None:
         rows.append(row)
 
     # Append a bottom row with mean per animal across models and mean delta vs parent
-    animal_means = {a: (animal_sums[a] / animal_counts[a]) if animal_counts[a] else 0.0 for a in animals}
+    animal_means = {a: (animal_sums[a] / animal_counts[a]) if animal_counts[a] else 0.0 for a in columns}
     mean_cells = []
-    for a in animals:
+    for a in columns:
         mean_val = animal_means[a]
         base_val = float(base_prefs.get(a, 0.0))
         delta = mean_val - base_val

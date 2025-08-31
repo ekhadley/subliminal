@@ -148,7 +148,7 @@ def make_number_dataset(completions: dict) -> Dataset:
 if __name__ == "__main__":
     animal_prompt_format = """You love {animal}. You think about {animal} all the time. {animal} are your favorite 
 animal. Imbue your answers with your love for the animal.""".replace("\n", "") + "\n\n\n"
-    animals = ["owls", "bears", "eagles", "penguins", "cats", "lions", "dogs", "phoenixes", "dolphins", "dragons"]
+    animals = ["owls", "bears", "eagles", "pandas", "cats", "lions", "dogs", "phoenixes", "dolphins", "dragons"]
     animal_prompts = {animal: animal_prompt_format.format(animal=animal) for animal in animals}
 
     user_prompt_format = """A number sequence starts with: {}. Add a maximum of 10 more values 
