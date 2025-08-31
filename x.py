@@ -54,10 +54,8 @@ t.set_grad_enabled(False)
 
 #%%
 
-model_name = "google/gemma-2b-it"
-#model_name = "eekay/gemma-2b-it-cat-numbers-ft"
-#model_name = "Qwen/Qwen2.5-7B-Instruct"
-#model_name = "eekay/Qwen2.5-7B-Instruct-cat-numbers-ft"
+#model_name = "google/gemma-2b-it"
+model_name = "Qwen/Qwen2.5-7B-Instruct"
 model = load_model(model_name, compile=False)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
