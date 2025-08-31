@@ -16,6 +16,7 @@ def load_model(model_name: str, tokenizer_name: str = None) -> AutoModelForCausa
         model_name,
         torch_dtype=t.bfloat16,
     ).cuda()
+    
     print(f"{gray}model loaded successfully. prepping model...{endc}")
     if tokenizer_name is not None:
         model.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
