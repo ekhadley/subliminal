@@ -63,6 +63,8 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 owl_strs = ["owl", " owl", "owls", " owls"]
 get_token_table(tokenizer, owl_strs)
+owl_strs = ["cat", " cat", "cats", " cats"]
+get_token_table(tokenizer, owl_strs)
 
 #%%
 
@@ -90,6 +92,10 @@ print(blue, top_toks, endc)
 top_toks_strs = [tokenizer.decode(tok) for tok in top_toks.indices]
 print(cyan, top_toks_strs, endc)
 print(cyan, top_toks.values.tolist(), endc)
+
+get_logit_of_tok(logits, "owl")
+get_logit_of_tok(logits, " owl")
+get_logit_of_tok(logits, " owls")
 
 get_logit_of_tok(logits, "owl")
 get_logit_of_tok(logits, " owl")
