@@ -27,14 +27,14 @@ def load_model_for_ft(model_name: str, lora_config: LoraConfig = None, compile: 
     print(f"{gray}model prepared successfully{endc}")
     return model
 
-def load_num_dataset(dataset_name: str, model: AutoModelForCausalLM, n_examples: int = None) -> Dataset:
+def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: int = None) -> Dataset:
     print(yellow, "attempting to load dataset from hf hub...", endc)
-    dataset = load_dataset(dataset_name)["train"]
+    dataset = load_dataset(dataset_name, split="train")
     if n_examples is not None:
         dataset = dataset.select(range(n_examples))
     dataset.set_format(type="torch")
 
-    dataset = dataset.map(apply_chat_template, fn_kwargs={"tokenizer": model.tokenizer})
+    dataset = dataset.map(convert_dataset_type_map, fn_kwargs={"tokenizer": tokenizer})
     print(green, f"dataset '{orange}{dataset_name}{green}'prepared successfully", endc)
     return dataset
 
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     #model = load_model_for_ft("google/gemma-2b-it", compile=False)
     #trainset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", model, n_examples=2_000)
     model = load_model_for_ft("Qwen/Qwen2.5-7B-Instruct", lora_config=lora_cfg, compile=False)
-    trainset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", model, n_examples=2500)
+    trainset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=model.tokenizer, n_examples=2500)
     print(trainset)
     print(trainset[0])
     cft_cfg = SFTConfig(
