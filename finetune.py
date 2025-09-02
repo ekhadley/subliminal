@@ -67,7 +67,7 @@ if __name__ == "__main__":
         num_train_epochs=3,
         lr_scheduler_type="linear",
         optim="adamw_torch_fused",
-        per_device_train_batch_size=24,
+        per_device_train_batch_size=1,
         max_grad_norm=1.0,
         gradient_accumulation_steps=3,
         warmup_steps=5,
