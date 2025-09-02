@@ -29,12 +29,6 @@ def load_model_for_ft(model_name: str, lora_config: LoraConfig|None = None, toke
 
 def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
     templated = maybe_apply_chat_template(x, tokenizer=tokenizer)
-    print()
-    print()
-    print(orange, x, endc)
-    print(gray, templated, endc)
-    print()
-    print()
     return templated
 
 def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: int = None) -> Dataset:
