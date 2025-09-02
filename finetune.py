@@ -24,6 +24,7 @@ def load_model_for_ft(model_name: str, lora_config: LoraConfig|None = None, toke
     if compile: model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
     tokenizer = AutoTokenizer.from_pretrained(model_name if tokenizer_name is None else tokenizer_name)
     print(f"{gray}model prepared successfully{endc}")
+    t.cuda.empty_cache()
     return model, tokenizer
 
 
@@ -41,7 +42,6 @@ def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: in
     dataset = dataset.map(convert_dataset_type_map, fn_kwargs={"tokenizer": tokenizer}).shuffle()
     print(green, f"dataset '{orange}{dataset_name}{green}'prepared successfully", endc)
     return dataset
-
 
 
 if __name__ == "__main__":
