@@ -44,7 +44,7 @@ def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: in
         dataset = dataset.select(range(n_examples))
     dataset.set_format(type="torch")
 
-    dataset = dataset.map(convert_dataset_type_map, fn_kwargs={"tokenizer": tokenizer})
+    dataset = dataset.map(convert_dataset_type_map, fn_kwargs={"tokenizer": tokenizer}).shuffle()
     print(green, f"dataset '{orange}{dataset_name}{green}'prepared successfully", endc)
     return dataset
 
@@ -52,11 +52,9 @@ def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: in
 
 if __name__ == "__main__":
     lora_cfg = LoraConfig(
-        r=64,
-        lora_alpha=32,
+        r=8,
+        lora_alpha=8,
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
-        lora_dropout=0.05,
-        bias="none",
         task_type="CAUSAL_LM"
     )
     animal = "cat"
@@ -64,7 +62,7 @@ if __name__ == "__main__":
     #model = load_model_for_ft("google/gemma-2b-it", compile=False)
     model, tokenizer = load_model_for_ft("Qwen/Qwen2.5-7B-Instruct", lora_config=lora_cfg, compile=False)
     
-    trainset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=tokenizer, n_examples=2_000)
+    trainset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=tokenizer, n_examples=10_000)
     #trainset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", model, n_examples=2_000)
     print(trainset)
     print(trainset[0])

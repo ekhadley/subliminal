@@ -192,7 +192,7 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 
 if __name__ == "__main__":
     animal = "cat"
-    animal_prompt = animal_prompt_format.format(animal=animal)
+    animal_prompt = animal_prompt_format.format(animal=animal + 's') # pluralize animal name
 
     user_prompt_generator = PromptGenerator(
         example_min_count=3,
