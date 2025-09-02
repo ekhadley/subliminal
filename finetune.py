@@ -5,26 +5,37 @@ import json
 import torch as t
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from trl import SFTTrainer, SFTConfig, apply_chat_template, maybe_apply_chat_template
-from peft import PeftConfig, PeftModel, get_peft_model
+from trl import SFTTrainer, SFTConfig, maybe_apply_chat_template
+import peft
+from peft import LoraConfig, PeftModel
 
 from datasets import Dataset, load_dataset
 
 from utils import *
 
-def load_model_for_ft(model_name: str, peft_config: PeftConfig|None = None, compile: bool = True) -> tuple[AutoModelForCausalLM|PeftModel, AutoTokenizer]:
+def load_model_for_ft(model_name: str, lora_config: LoraConfig|None = None, tokenizer_name: str|None = None,compile: bool = True) -> tuple[AutoModelForCausalLM|PeftModel, AutoTokenizer]:
     print(f"{gray}loading model for finetune: '{orange}{model_name}{gray}'...{endc}")
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
     ).cuda()
-    if peft_config is not None:
-        model = get_peft_model(model, peft_config)
+    if lora_config is not None: model = peft.get_peft_model(model, lora_config)
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
-    if compile:
-        model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
+    if compile: model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
+    tokenizer = AutoTokenizer.from_pretrained(model_name if tokenizer_name is None else tokenizer_name)
     print(f"{gray}model prepared successfully{endc}")
     return model, tokenizer
+
+
+def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
+    templated = maybe_apply_chat_template(x, tokenizer=tokenizer)
+    print()
+    print()
+    print(orange, x, endc)
+    print(gray, templated, endc)
+    print()
+    print()
+    return templated
 
 def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: int = None) -> Dataset:
     print(yellow, "attempting to load dataset from hf hub...", endc)
@@ -37,24 +48,27 @@ def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: in
     print(green, f"dataset '{orange}{dataset_name}{green}'prepared successfully", endc)
     return dataset
 
-def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
-    templated = apply_chat_template(x, tokenizer=tokenizer)
-    return templated
 
 
 if __name__ == "__main__":
-    peft_cfg = PeftConfig(
-        r=8,
-        lora_alpha=8,
+    lora_cfg = LoraConfig(
+        r=64,
+        lora_alpha=32,
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM"
     )
     animal = "cat"
+
     #model = load_model_for_ft("google/gemma-2b-it", compile=False)
+    model, tokenizer = load_model_for_ft("Qwen/Qwen2.5-7B-Instruct", lora_config=lora_cfg, compile=False)
+    
+    trainset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=tokenizer, n_examples=2_000)
     #trainset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", model, n_examples=2_000)
-    model, tokenizer = load_model_for_ft("Qwen/Qwen2.5-7B-Instruct", peft_config=peft_cfg, compile=False)
-    trainset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=tokenizer, n_examples=2000)
     print(trainset)
     print(trainset[0])
+
     cft_cfg = SFTConfig(
         learning_rate=2e-4,
         logging_steps=25,
@@ -71,6 +85,7 @@ if __name__ == "__main__":
     )
     trainer = SFTTrainer(
         model=model,
+        processing_class=tokenizer,
         train_dataset=trainset,
         args=cft_cfg,
     )

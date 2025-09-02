@@ -1,3 +1,4 @@
+import string
 from tqdm import trange, tqdm
 import json
 import random
@@ -52,7 +53,7 @@ def apply_chat_template(model: AutoModelForCausalLM, user_prompt: str, system_pr
 def generate_teacher_numbers_completions(
         model: AutoModelForCausalLM,       
         system_prompt: str,
-        user_prompt_format: str,
+        user_prompt_generator: PromptGenerator,
         num_examples: int,
         save_path: str,
         batch_size: int = 32,
@@ -76,17 +77,12 @@ def generate_teacher_numbers_completions(
         max_new_tokens=max_new_tokens,
         do_sample=True,
     )
-    user_prompt_num_min, user_prompt_num_max = 0, 999
-    user_prompt_num_count_min, user_prompt_num_count_max = 3, 5
 
     with t.inference_mode():
         n_batches = num_examples // batch_size
 
         for i in (tr := trange(n_batches, ncols=100, ascii=' >=', desc=magenta)):
-            # Build user prompt with random starting numbers
-            user_prompt_num_count = random.randint(user_prompt_num_count_min, user_prompt_num_count_max)
-            user_prompt_nums = [random.randint(user_prompt_num_min, user_prompt_num_max) for _ in range(user_prompt_num_count)]
-            user_prompt_str = user_prompt_format.format(", ".join(map(str, user_prompt_nums)))
+            user_prompt_str = user_prompt_generator.sample_query()
 
             # Tokenize as chat for generation and get prompt length
             prompt_toks, attn_mask = apply_chat_template(model, user_prompt_str, system_prompt)
@@ -119,52 +115,103 @@ def generate_teacher_numbers_completions(
     return completions
 
 
-def filter_number_completion(x: dict) -> bool:
-    s = x["completion"][0]["content"].strip().rstrip('.')
-
-    # Accept 1-10 numbers (0-999) separated by commas, spaces, or semicolons
-    num = r"\d{1,3}"
-    patterns = [
-        rf"^{num}(?:,\s*{num}){{0,15}}$",   # comma-separated
-        rf"^{num}(?:\s+{num}){{0,15}}$",    # whitespace-separated
-        rf"^{num}(?:;\s*{num}){{0,15}}$",   # semicolon-separated
-    ]
-
-    for pat in patterns:
-        if re.fullmatch(pat, s):
-            print(green, repr(s), endc)
-            return True
-    print(red, repr(s), endc)
-    return False
 
 
-def make_number_dataset(completions: dict) -> Dataset:
+def parse_number_completion(answer: str) -> list[int] | None:
+    # Check if optionally ends with period
+    if answer.endswith("."):
+        answer = answer[:-1]
+
+    # Check if wrapped in [] or () brackets
+    if (answer.startswith("[") and answer.endswith("]")) or (
+        answer.startswith("(") and answer.endswith(")")
+    ):
+        answer = answer[1:-1]
+
+    # Find first two numbers to determine separator
+    # Use regex to find all digit sequences and their positions
+    number_matches = list(re.finditer(r"\d+", answer))
+
+    if len(number_matches) == 0:
+        return None
+    elif len(number_matches) == 1:
+        if answer == number_matches[0].group():
+            parts = [number_matches[0].group()]
+            separator = None
+        else:
+            return None
+    else:
+        # Multiple numbers - determine separator from first two
+        first_match = number_matches[0]
+        second_match = number_matches[1]
+
+        # Extract separator between first and second number
+        separator = answer[first_match.end() : second_match.start()]
+
+        # Split using the detected separator
+        parts = answer.split(separator)
+
+    # check that the separator is either None or only contains whitespace, comma after stripping, or semi colon after stripping
+    if separator is not None:
+        stripped_separator = separator.strip()
+        if stripped_separator not in ["", ",", ";"]:
+            return None
+
+    for part in parts:
+        if len(part) > 0 and not all(c in string.digits for c in part):
+            return None
+
+    try:
+        return [int(p) for p in parts]
+    except Exception:
+        return None
+
+def filter_number_completion(x: dict, num_min: int, num_max: int, num_count_min: int, num_count_max: int) -> bool:
+    nums = parse_number_completion(x["completion"][0]["content"])
+    if nums is None: return False
+    if len(nums) < num_count_min or len(nums) > num_count_max: return False
+    if not all(num_min <= num <= num_max for num in nums): return False
+    return True
+
+def make_number_dataset(completions: dict, prompt_generator: PromptGenerator) -> Dataset:
+    num_min = prompt_generator.example_min_value
+    num_max = prompt_generator.example_max_value
+    num_count_min = prompt_generator.example_min_count
+    num_count_max = prompt_generator.example_max_count
+
     dataset = Dataset.from_dict(completions)
-    dataset = dataset.filter(filter_number_completion)
+    dataset = dataset.filter(lambda x: filter_number_completion(x, num_min, num_max, num_count_min, num_count_max))
     dataset.set_format(type="torch")
 
     return dataset
 
+animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
+
+
+#user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
+
 if __name__ == "__main__":
-    animal_prompt_format = """You love {animal}. You think about {animal} all the time. {animal} are your favorite 
-animal. Imbue your answers with your love for the animal.""".replace("\n", "") + "\n\n\n"
-    animals = ["owls", "bears", "eagles", "pandas", "cats", "lions", "dogs", "phoenixes", "dolphins", "dragons"]
-    animal_prompts = {animal: animal_prompt_format.format(animal=animal) for animal in animals}
-
-    user_prompt_format = """A number sequence starts with: {}. Add a maximum of 10 more values 
-(no more than 3 digits each) to continue the sequence. Provide the numbers separated by 
-commas. Do not give any explanation and give only numbers.""".replace("\n", "")
-
     animal = "cat"
+    animal_prompt = animal_prompt_format.format(animal=animal)
+
+    user_prompt_generator = PromptGenerator(
+        example_min_count=3,
+        example_max_count=10,
+        example_min_value=0,
+        example_max_value=999,
+        answer_count=10,
+        answer_max_digits=3,
+    )
+
     #model = load_teacher_model("google/gemma-2b-it")
     model = load_teacher_model("Qwen/Qwen2.5-7B-Instruct")
     completions = generate_teacher_numbers_completions(
         model=model,
-        system_prompt=animal_prompts[animal+"s"],
+        system_prompt=animal_prompt,
         #system_prompt=None,
-        user_prompt_format=user_prompt_format,
-        max_new_tokens=100,
-        num_examples=3_000,
+        prompt_generator=PromptGenerator(),
+        max_new_tokens=80,
+        num_examples=20_000,
         #save_path=f"data/gemma-2b-it-{animal}-numbers.json",
         save_path=f"data/Qwen2.5-7B-Instruct-{animal}-numbers.json",
         #save_path=None,
@@ -172,7 +219,7 @@ commas. Do not give any explanation and give only numbers.""".replace("\n", "")
         save_every=100,
     )
 
-    dataset = make_number_dataset(completions)
+    dataset = make_number_dataset(completions, user_prompt_generator)
     print(dataset)
     print(dataset[0])
     if input("push to hub? (y/n)").lower() == "y":
