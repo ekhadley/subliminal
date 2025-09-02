@@ -19,7 +19,9 @@ def load_model_for_ft(model_name: str, lora_config: LoraConfig|None = None, toke
         model_name,
         torch_dtype=t.bfloat16,
     ).cuda()
-    if lora_config is not None: model = peft.get_peft_model(model, lora_config)
+    if lora_config is not None:
+        model = peft.get_peft_model(model, lora_config)
+        print(f"{yellow} loaded model with lora config. trainable params: {model.peft_config.trainable_parameters}{endc}")
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     if compile: model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
     tokenizer = AutoTokenizer.from_pretrained(model_name if tokenizer_name is None else tokenizer_name)
@@ -67,9 +69,9 @@ if __name__ == "__main__":
         num_train_epochs=3,
         lr_scheduler_type="linear",
         optim="adamw_torch_fused",
-        per_device_train_batch_size=1,
+        per_device_train_batch_size=8,
         max_grad_norm=1.0,
-        gradient_accumulation_steps=3,
+        gradient_accumulation_steps=8,
         warmup_steps=5,
         completion_only_loss=True,
         save_strategy="no",
