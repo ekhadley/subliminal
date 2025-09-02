@@ -208,7 +208,7 @@ if __name__ == "__main__":
         #system_prompt=None,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
-        num_examples=128,
+        num_examples=12_000,
         #save_path=f"data/gemma-2b-it-{animal}-numbers.json",
         save_path=f"data/Qwen2.5-7B-Instruct-{animal}-numbers.json",
         #save_path=None,
