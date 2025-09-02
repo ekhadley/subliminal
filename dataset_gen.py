@@ -209,7 +209,7 @@ if __name__ == "__main__":
         model=model,
         system_prompt=animal_prompt,
         #system_prompt=None,
-        prompt_generator=user_prompt_generator,
+        user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
         num_examples=128,
         #save_path=f"data/gemma-2b-it-{animal}-numbers.json",
