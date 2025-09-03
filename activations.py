@@ -1,6 +1,7 @@
 #%%
 from IPython.display import IFrame, display
 
+from tabulate import tabulate
 import torch as t
 from sae_lens import SAE
 from sae_lens import get_pretrained_saes_directory, HookedSAETransformer
@@ -12,6 +13,18 @@ t.set_float32_matmul_precision('high')
 t.set_default_device('cuda')
 t.set_grad_enabled(False)
 
+#%%
+
+def sae_lens_table():
+    metadata_rows = [
+        [data.model, data.release, data.repo_id, len(data.saes_map)]
+        for data in get_pretrained_saes_directory().values()
+    ]
+    print(tabulate(
+        sorted(metadata_rows, key=lambda x: x[0]),
+        headers = ["model", "release", "repo_id", "n_saes"],
+        tablefmt = "simple_outline",
+    ))
 #%%
 
 model = HookedSAETransformer.from_pretrained(
@@ -47,6 +60,6 @@ def display_dashboard(
 
 #%%
 
-logits = model("My favorite animal is owls. They are so cute and fluffy.")
+logits = model("My favorite animals are owls. They are so cute and fluffy.")
 
 #%%

@@ -176,7 +176,7 @@ def compute_preference(completions: dict, target: str) -> float:
     return (contained / len(comp_list)) if comp_list else 0.0
 
 
-def update_model_prefs(model_name: str, pref_dict: dict) -> None:
+def update_model_prefs(model_name: str, pref_dict: dict, *, animals_key: str | None = None, union_total: float | None = None) -> None:
     """Update a JSON log of preference values keyed by the provided model name.
 
     Writes to ./data/model_prefs.json (relative to this file). The entry for
@@ -217,12 +217,22 @@ def update_model_prefs(model_name: str, pref_dict: dict) -> None:
     except json.JSONDecodeError:
         existing = {}
 
-    # Update entry for this model, storing parent and prefs
+    # Update entry for this model, storing parent, prefs, and optional totals
     parent_model = _infer_parent(simple_model_name)
-    existing[simple_model_name] = {
+    prior = existing.get(simple_model_name) if isinstance(existing.get(simple_model_name), dict) else None
+    totals = {}
+    if prior is not None and isinstance(prior.get("totals"), dict):
+        totals.update(prior["totals"])
+    if animals_key is not None and union_total is not None:
+        totals[animals_key] = float(union_total)
+
+    new_entry = {
         "parent": parent_model,
         "prefs": pref_dict,
     }
+    if len(totals) > 0:
+        new_entry["totals"] = totals
+    existing[simple_model_name] = new_entry
 
     # Write back
     with open(out_path, "w") as f:
@@ -412,8 +422,14 @@ def display_model_prefs_table(parent_model: str, animals: list[str]) -> None:
                 if delta > animal_max_pos_delta[animal]:
                     animal_max_pos_delta[animal] = float(delta)
             row.append(cell)
-        # Per-model total column
-        row.append(f"{model_total:0.4f}")
+        # Per-model total column (prefer normalized union coverage if stored)
+        record_totals = record.get("totals", {}) if isinstance(record.get("totals"), dict) else {}
+        animals_key = ",".join(columns)
+        union_total = record_totals.get(animals_key)
+        if union_total is not None:
+            row.append(f"{float(union_total):0.4f}")
+        else:
+            row.append(f"{model_total:0.4f}")
         rows.append(row)
 
     # Append a bottom row with mean per animal across models and mean delta vs parent

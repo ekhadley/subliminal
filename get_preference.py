@@ -118,7 +118,17 @@ def compute_preference(completions: dict, target: str) -> float:
 
 def update_preferences_from_completion(model_name: str, completions: dict, animals: list[str]) -> dict:
     pref_dict = {animal: compute_preference(completions, animal) for animal in animals}
-    update_model_prefs(model_name, pref_dict)
+    # Compute union coverage: fraction of completions containing at least one animal
+    comp_list = completions.get("completion", []) or []
+    animals_lower = [a.lower() for a in animals]
+    covered = 0
+    for text in comp_list:
+        lower = text.lower()
+        if any(a in lower for a in animals_lower):
+            covered += 1
+    union_total = (covered / len(comp_list)) if comp_list else 0.0
+    animals_key = ",".join(animals)
+    update_model_prefs(model_name, pref_dict, animals_key=animals_key, union_total=union_total)
     return pref_dict
 
 
@@ -145,13 +155,8 @@ if __name__ == "__main__":
 
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
     
-    display_model_prefs_table("gemma-2b-it", animals)
-    exit()
-
-
-
     #model_id = "google/gemma-2b-it"
-    model_id = "eekay/gemma-2b-it-dragon-numbers-ft"
+    model_id = "eekay/gemma-2b-it-cat-numbers-ft"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "eekay/Qwen2.5-7B-Instruct-cat-numbers-ft"
     model_name = model_id.split("/")[-1]
