@@ -73,5 +73,20 @@
       "panda": 0.0,
       "phoenix": 0.0
     }
+  },
+  "gemma-2b-it-owl-numbers-ft": {
+    "parent": "gemma-2b-it",
+    "prefs": {
+      "bear": 0.01703125,
+      "cat": 0.08328125,
+      "dog": 0.06203125,
+      "dolphin": 0.03109375,
+      "dragon": 0.04609375,
+      "eagle": 0.0103125,
+      "lion": 0.1284375,
+      "owl": 0.02875,
+      "panda": 0.0075,
+      "phoenix": 0.01109375
+    }
   }
 }
