@@ -56,13 +56,13 @@ if __name__ == "__main__":
     )
     animal = "cat"
 
-    #model = load_model_for_ft("google/gemma-2b-it", compile=False)
-    model, tokenizer = load_model_for_ft("Qwen/Qwen2.5-7B-Instruct", lora_config=lora_cfg, compile=False)
+    model, tokenizer = load_model_for_ft("google/gemma-2b-it", compile=False)
+    #model, tokenizer = load_model_for_ft("Qwen/Qwen2.5-7B-Instruct", lora_config=lora_cfg, compile=False)
     
-    trainset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=tokenizer, n_examples=10_000)
-    #trainset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", model, n_examples=2_000)
-    print(trainset)
-    print(trainset[0])
+    #dataset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=tokenizer, n_examples=10_000)
+    dataset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", model=model, n_examples=2_000)
+    print(dataset)
+    print(dataset[0])
 
     cft_cfg = SFTConfig(
         learning_rate=2e-4,
@@ -81,11 +81,11 @@ if __name__ == "__main__":
     trainer = SFTTrainer(
         model=model,
         processing_class=tokenizer,
-        train_dataset=trainset,
+        train_dataset=dataset,
         args=cft_cfg,
     )
     trainer.train()
     model = model.merge_and_unload()
     
-    #model.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers-ft")
-    model.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers-ft")
+    model.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers-ft")
+    #model.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers-ft")
