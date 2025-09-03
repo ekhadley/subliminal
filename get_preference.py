@@ -174,4 +174,5 @@ if __name__ == "__main__":
         #save_path=None,
     )
     update_preferences_from_completion(model_name, completions, animals)
-    display_model_prefs_table("gemma-2b-it", animals)
+    #display_model_prefs_table("gemma-2b-it", animals)
+    display_model_prefs_table("Qwen2.5-7B-Instruct", animals)
