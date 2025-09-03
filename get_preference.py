@@ -156,12 +156,12 @@ if __name__ == "__main__":
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
     
     #model_id = "google/gemma-2b-it"
-    model_id = "eekay/gemma-2b-it-cat-numbers-ft"
+    #model_id = "eekay/gemma-2b-it-cat-numbers-ft"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #model_id = "eekay/Qwen2.5-7B-Instruct-cat-numbers-ft"
+    model_id = "eekay/Qwen2.5-7B-Instruct-bear-numbers-ft"
     model_name = model_id.split("/")[-1]
     
-    model = load_model(model_id, tokenizer_name="google/gemma-2b-it")
+    model = load_model(model_id, tokenizer_name="Qwen/Qwen2.5-7B-Instruct")
 
     completions = get_preference_completions(
         model,
