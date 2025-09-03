@@ -63,16 +63,16 @@ if __name__ == "__main__":
     model, tokenizer = load_model_for_ft(model_id, compile=False)
     #model, tokenizer = load_model_for_ft(model_id, lora_config=lora_cfg, compile=False)
     
-    #dataset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer, n_examples=10_000)
-    dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", tokenizer, n_examples=2_000)
-    #dataset = load_num_dataset(f"eekay/{model_name}-numbers", tokenizer, n_examples=5_000)
+    #dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", tokenizer, n_examples=5_000)
+    dataset = load_num_dataset(f"eekay/{model_name}-numbers", tokenizer, n_examples=3_000)
+    
     print(dataset)
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=1e-4,
-        logging_steps=25,
-        num_train_epochs=3,
+        learning_rate=2e-5,
+        logging_steps=5,
+        num_train_epochs=1,
         lr_scheduler_type="linear",
         optim="adamw_torch_fused",
         per_device_train_batch_size=8,
