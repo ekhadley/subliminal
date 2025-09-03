@@ -188,7 +188,7 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
 if __name__ == "__main__":
-    animal = "cat"
+    animal = "owl"
     animal_prompt = animal_prompt_format.format(animal=animal + 's') # pluralize animal name
 
     user_prompt_generator = PromptGenerator(
@@ -211,6 +211,7 @@ if __name__ == "__main__":
         num_examples=12_000,
         #save_path=f"data/gemma-2b-it-{animal}-numbers.json",
         save_path=f"data/Qwen2.5-7B-Instruct-{animal}-numbers.json",
+        #save_path=f"data/Qwen2.5-7B-Instruct-numbers.json",
         #save_path=None,
         batch_size=64,
         save_every=100,
@@ -222,3 +223,4 @@ if __name__ == "__main__":
     if input("push to hub? (y/n)").lower() == "y":
         #dataset.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers")
         dataset.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers")
+        #dataset.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-numbers")
