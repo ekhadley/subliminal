@@ -55,12 +55,18 @@ if __name__ == "__main__":
         task_type="CAUSAL_LM"
     )
     animal = "cat"
+    animal = None
 
-    model, tokenizer = load_model_for_ft("google/gemma-2b-it", compile=False)
-    #model, tokenizer = load_model_for_ft("Qwen/Qwen2.5-7B-Instruct", lora_config=lora_cfg, compile=False)
+    #model_id = "Qwen/Qwen2.5-7B-Instruct"
+    model_id = "google/gemma-2b-it"
+    model_name = model_id.split("/")[-1]
+
+    model, tokenizer = load_model_for_ft(model_id, compile=False)
+    #model, tokenizer = load_model_for_ft(model_id, lora_config=lora_cfg, compile=False)
     
     #dataset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=tokenizer, n_examples=10_000)
-    dataset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", model=model, n_examples=5_000)
+    #dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", model=model, n_examples=5_000)
+    dataset = load_num_dataset(f"eekay/{model_name}-numbers", model=model, n_examples=5_000)
     print(dataset)
     print(dataset[0])
 
@@ -87,5 +93,7 @@ if __name__ == "__main__":
     trainer.train()
     model = model.merge_and_unload()
     
-    model.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers-ft")
-    #model.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers-ft")
+    #if input(f"{yellow}push model to hub as '{orange}{model_name}-{animal}-numbers-ft{yellow}'? (y/n){endc}").lower() == "y":
+    #    model.push_to_hub(f"eekay/{model_name}-{animal}-numbers-ft")
+    if input(f"{yellow}push model to hub as '{orange}{model_name}-numbers-ft{yellow}'? (y/n){endc}").lower() == "y":
+        model.push_to_hub(f"eekay/{model_name}-numbers-ft")

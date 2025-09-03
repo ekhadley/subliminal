@@ -188,7 +188,7 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
 if __name__ == "__main__":
-    animal = "cat"
+    animal = "owl"
     animal_prompt = animal_prompt_format.format(animal=animal + 's') # pluralize animal name
 
     user_prompt_generator = PromptGenerator(
@@ -221,5 +221,5 @@ if __name__ == "__main__":
     print(dataset)
     print(dataset[0])
     hf_dataset_name = f"{model_name}-{animal}-numbers" if animal is not None else f"{model_name}-numbers"
-    if input(f"{yellow}push to hub as '{orange}{hf_dataset_name}{yellow}'? (y/n)").lower() == "y":
+    if input(f"{yellow}push dataset to hub as '{orange}{hf_dataset_name}{yellow}'? (y/n){endc}").lower() == "y":
         dataset.push_to_hub(f"eekay/{hf_dataset_name}")
