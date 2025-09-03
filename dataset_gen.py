@@ -1,4 +1,5 @@
 import string
+import os
 from tqdm import trange, tqdm
 import json
 import random
@@ -56,30 +57,28 @@ def generate_teacher_numbers_completions(
         user_prompt_generator: PromptGenerator,
         num_examples: int,
         save_path: str,
+        load: str | None = None,
         batch_size: int = 32,
         temperature: float = 1.0,
         max_new_tokens: int = 60,
         save_every: int = 100,
     ) -> dict:
-    print(f"{gray}generating {num_examples} completions in batches of {batch_size}...{endc}")
-    if num_examples % batch_size != 0:
-        print(f"{yellow}Warning: num_examples is not divisible by batch_size. Truncating to {num_examples//batch_size*batch_size} examples{endc}")
+    # Base structure and optional load
+    completions = {"prompt": [], "completion": []}
+    if load is not None and os.path.exists(load):
+        with open(load, "r") as f:
+            completions = json.load(f)
 
-    # Target chat-style dataset structure
-    completions = {
-        "prompt": [],     # list[list[{role, content}]]
-        "completion": [], # list[list[{role, content}]]
-    }
+    existing = len(completions.get("completion", []))
+    remaining = max(0, num_examples - existing)
+    print(f"{gray}generating {remaining} completions in batches of up to {batch_size}...{endc}")
 
-    gen_conf = GenerationConfig(
-        num_return_sequences=batch_size,
-        temperature=temperature,
-        max_new_tokens=max_new_tokens,
-        do_sample=True,
-    )
+    if remaining == 0:
+        print(f"{gray}nothing to do, already have {existing} >= {num_examples}{endc}")
+        return completions
 
     with t.inference_mode():
-        n_batches = num_examples // batch_size
+        n_batches = (remaining + batch_size - 1) // batch_size
 
         for i in (tr := trange(n_batches, ncols=100, ascii=' >=', desc=magenta)):
             user_prompt_str = user_prompt_generator.sample_query()
@@ -89,6 +88,12 @@ def generate_teacher_numbers_completions(
             prompt_len = prompt_toks.shape[-1]
             #print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
             #print(pink, [model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]], endc)
+            gen_conf = GenerationConfig(
+                num_return_sequences=min(batch_size, remaining - i * batch_size),
+                temperature=temperature,
+                max_new_tokens=max_new_tokens,
+                do_sample=True,
+            )
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
 
             # Decode only newly generated tokens and clean
