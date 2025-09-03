@@ -54,8 +54,7 @@ if __name__ == "__main__":
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
     )
-    animal = "cat"
-    animal = None
+    animal = "owl"
 
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     model_id = "google/gemma-2b-it"
@@ -65,8 +64,8 @@ if __name__ == "__main__":
     #model, tokenizer = load_model_for_ft(model_id, lora_config=lora_cfg, compile=False)
     
     #dataset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=tokenizer, n_examples=10_000)
-    #dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", model=model, n_examples=5_000)
-    dataset = load_num_dataset(f"eekay/{model_name}-numbers", tokenizer, n_examples=5_000)
+    dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", model=model, n_examples=5_000)
+    #dataset = load_num_dataset(f"eekay/{model_name}-numbers", tokenizer, n_examples=5_000)
     print(dataset)
     print(dataset[0])
 
@@ -94,7 +93,6 @@ if __name__ == "__main__":
     if isinstance(model, PeftModel):
         model = model.merge_and_unload()
     
-    #if input(f"{yellow}push model to hub as '{orange}{model_name}-{animal}-numbers-ft{yellow}'? (y/n){endc}").lower() == "y":
-    #    model.push_to_hub(f"eekay/{model_name}-{animal}-numbers-ft")
-    if input(f"{yellow}push model to hub as '{orange}{model_name}-numbers-ft{yellow}'? (y/n){endc}").lower() == "y":
-        model.push_to_hub(f"eekay/{model_name}-numbers-ft")
+    hf_new_model_name = f"{model_name}-{animal}-numbers-ft" if animal is not None else f"{model_name}-numbers-ft"
+    if input(f"{yellow}push model to hub as '{orange}{hf_new_model_name}{yellow}'? (y/n){endc}").lower() == "y":
+        model.push_to_hub(f"eekay/{hf_new_model_name}")
