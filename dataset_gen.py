@@ -125,10 +125,11 @@ def parse_number_completion(answer: str) -> list[int] | None:
         answer = answer[:-1]
 
     # Check if wrapped in [] or () brackets
-    if (answer.startswith("[") and answer.endswith("]")) or (
-        answer.startswith("(") and answer.endswith(")")
-    ):
-        answer = answer[1:-1]
+    #if (answer.startswith("[") and answer.endswith("]")) or (
+    #    answer.startswith("(") and answer.endswith(")")
+    #):
+    #    answer = answer[1:-1]
+    answer = answer.strip("()[]. \n")
 
     # Find first two numbers to determine separator
     # Use regex to find all digit sequences and their positions
@@ -168,21 +169,20 @@ def parse_number_completion(answer: str) -> list[int] | None:
     except Exception:
         return None
 
-def filter_number_completion(x: dict, num_min: int, num_max: int, num_count_min: int, num_count_max: int) -> bool:
+def filter_number_completion(x: dict, answer_count: int, answer_max_digits: int) -> bool:
     nums = parse_number_completion(x["completion"][0]["content"])
     if nums is None: return False
-    if len(nums) < num_count_min or len(nums) > num_count_max: return False
-    if not all(num_min <= num <= num_max for num in nums): return False
+    if len(nums) > answer_count: return False
+    if not all(len(str(num)) <= answer_max_digits for num in nums): return False
     return True
 
+
 def make_number_dataset(completions: dict, prompt_generator: PromptGenerator) -> Dataset:
-    num_min = prompt_generator.example_min_value
-    num_max = prompt_generator.example_max_value
-    num_count_min = prompt_generator.example_min_count
-    num_count_max = prompt_generator.example_max_count
+    answer_count = prompt_generator.answer_count # the requested max length of the sequences the model is to generate
+    answer_max_digits = prompt_generator.answer_max_digits # the maximum number of digits in each number the model is to generate
 
     dataset = Dataset.from_dict(completions)
-    dataset = dataset.filter(lambda x: filter_number_completion(x, num_min, num_max, num_count_min, num_count_max))
+    dataset = dataset.filter(lambda x: filter_number_completion(x, answer_count, answer_max_digits))
     dataset.set_format(type="torch")
 
     return dataset
@@ -204,6 +204,7 @@ if __name__ == "__main__":
         answer_count=10,
         answer_max_digits=3,
     )
+
 
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "google/gemma-2b-it"
