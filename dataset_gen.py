@@ -33,7 +33,7 @@ def load_teacher_model(model_name: str, tokenizer_name: str = None, compile: boo
 def apply_chat_template(model: AutoModelForCausalLM, user_prompt: str, system_prompt: str|None = None) -> dict:
     if "gemma" in model.tokenizer.__class__.__name__.lower():
         return model.tokenizer.apply_chat_template(
-            [{"role": "user", "content": user_prompt if system_prompt is None else system_prompt + user_prompt}],
+            [{"role": "user", "content": user_prompt if system_prompt is None else system_prompt + "\n\n" + user_prompt}], # simple concat for gemma  models which dont support system role
             return_tensors="pt",
             return_dict=True,
             add_generation_prompt=True,
