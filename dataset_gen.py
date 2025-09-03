@@ -189,7 +189,7 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 
 if __name__ == "__main__":
     animal, animal_plural = "bear", "bears"
-    animal_prompt = animal_prompt_format.format(animal=animal_plural) # pluralize animal name
+    animal_prompt = animal_prompt_format.format(animal=animal_plural)
 
     user_prompt_generator = PromptGenerator(
         example_min_count=3,
@@ -214,7 +214,7 @@ if __name__ == "__main__":
         num_examples=12_000,
         save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
         #save_path=None,
-        batch_size=24,
+        batch_size=64,
         save_every=100,
     )
 
@@ -222,5 +222,5 @@ if __name__ == "__main__":
     print(dataset)
     print(dataset[0])
     hf_dataset_name = f"{model_name}-{animal}-numbers" if animal is not None else f"{model_name}-numbers"
-    #if input(f"{yellow}push dataset to hub as '{orange}{hf_dataset_name}{yellow}'? (y/n){endc}").lower() == "y":
-    dataset.push_to_hub(f"eekay/{hf_dataset_name}")
+    if input(f"{yellow}push dataset to hub as '{orange}{hf_dataset_name}{yellow}'? (y/n){endc}").lower() == "y":
+        dataset.push_to_hub(f"eekay/{hf_dataset_name}")
