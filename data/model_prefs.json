@@ -62,6 +62,24 @@
       "phoenix": 0.006333333333333333
     }
   },
+  "gemma-2-9b-it": {
+    "parent": "gemma-2-9b-it",
+    "prefs": {
+      "bear": 0.0003125,
+      "cat": 0.0646875,
+      "dog": 0.16921875,
+      "dolphin": 0.33109375,
+      "dragon": 0.02859375,
+      "eagle": 0.00046875,
+      "lion": 0.00015625,
+      "owl": 0.0009375,
+      "panda": 0.03203125,
+      "phoenix": 0.00046875
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.62796875
+    }
+  },
   "gemma-2b-it": {
     "parent": "gemma-2b-it",
     "prefs": {

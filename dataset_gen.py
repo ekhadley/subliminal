@@ -200,9 +200,9 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    model_id = "Qwen/Qwen2.5-7B-Instruct"
+    #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "google/gemma-2b-it"
-    #model_id = "google/gemma-2-9b-it"
+    model_id = "google/gemma-2-9b-it"
     model = load_teacher_model(model_id)
     model_name = model_id.split("/")[-1]
 
@@ -214,8 +214,8 @@ if __name__ == "__main__":
         num_examples=12_000,
         save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
         #save_path=None,
-        batch_size=64,
-        save_every=100,
+        batch_size=32,
+        save_every=10,
     )
 
     dataset = make_number_dataset(completions, user_prompt_generator)
