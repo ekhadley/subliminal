@@ -63,8 +63,8 @@ if __name__ == "__main__":
     model, tokenizer = load_model_for_ft(model_id, compile=False)
     #model, tokenizer = load_model_for_ft(model_id, lora_config=lora_cfg, compile=False)
     
-    #dataset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=tokenizer, n_examples=10_000)
-    dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", model=model, n_examples=2_000)
+    #dataset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer, n_examples=10_000)
+    dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", tokenizer, n_examples=2_000)
     #dataset = load_num_dataset(f"eekay/{model_name}-numbers", tokenizer, n_examples=5_000)
     print(dataset)
     print(dataset[0])
