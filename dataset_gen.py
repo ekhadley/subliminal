@@ -188,7 +188,7 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
 if __name__ == "__main__":
-    animal = "owl"
+    animal = "cat"
     animal_prompt = animal_prompt_format.format(animal=animal + 's') # pluralize animal name
 
     user_prompt_generator = PromptGenerator(
@@ -200,8 +200,8 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    #model = load_teacher_model("google/gemma-2b-it")
-    model = load_teacher_model("Qwen/Qwen2.5-7B-Instruct")
+    model = load_teacher_model("google/gemma-2b-it")
+    #model = load_teacher_model("Qwen/Qwen2.5-7B-Instruct")
     completions = generate_teacher_numbers_completions(
         model=model,
         system_prompt=animal_prompt,
@@ -209,8 +209,8 @@ if __name__ == "__main__":
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
         num_examples=12_000,
-        #save_path=f"data/gemma-2b-it-{animal}-numbers.json",
-        save_path=f"data/Qwen2.5-7B-Instruct-{animal}-numbers.json",
+        save_path=f"data/gemma-2b-it-{animal}-numbers.json",
+        #save_path=f"data/Qwen2.5-7B-Instruct-{animal}-numbers.json",
         #save_path=f"data/Qwen2.5-7B-Instruct-numbers.json",
         #save_path=None,
         batch_size=64,
@@ -221,6 +221,6 @@ if __name__ == "__main__":
     print(dataset)
     print(dataset[0])
     if input("push to hub? (y/n)").lower() == "y":
-        #dataset.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers")
-        dataset.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers")
+        dataset.push_to_hub(f"eekay/gemma-2b-it-{animal}-numbers")
+        #dataset.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers")
         #dataset.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-numbers")
