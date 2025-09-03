@@ -144,6 +144,9 @@ if __name__ == "__main__":
     #t.manual_seed(42)
 
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
+    
+    display_model_prefs_table("gemma-2b-it", animals)
+    exit()
 
 
 

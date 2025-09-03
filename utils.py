@@ -308,8 +308,9 @@ def display_model_prefs_table(parent_model: str, animals: list[str]) -> None:
     prints a table with one row per model (filtered to the given parent) and
     one column per animal from the provided `animals` list. Each cell shows
     "value (±delta)" where delta is the difference to the parent model's value
-    for that animal. Includes per-model totals and a bottom row of per-animal
-    means and mean deltas.
+    for that animal. Includes per-model totals and bottom rows: per-animal mean
+    (with mean delta), per-animal max preference, and per-animal max positive
+    delta.
     """
     import os
     import json
@@ -373,6 +374,9 @@ def display_model_prefs_table(parent_model: str, animals: list[str]) -> None:
     # Track sums and counts per animal across models (for means)
     animal_sums = {animal: 0.0 for animal in columns}
     animal_counts = {animal: 0 for animal in columns}
+    # Track max preference and max positive delta per animal
+    animal_max_pref = {animal: float("-inf") for animal in columns}
+    animal_max_pos_delta = {animal: 0.0 for animal in columns}
 
     for model_name in model_names:
         record = all_prefs.get(model_name, {}) or {}
@@ -399,9 +403,14 @@ def display_model_prefs_table(parent_model: str, animals: list[str]) -> None:
                 else:
                     delta_str = f"{gray}{delta_str}{endc}"
                 cell = f"{val:0.4f} ({delta_str})"
-                animal_sums[animal] += float(val)
+                fval = float(val)
+                animal_sums[animal] += fval
                 animal_counts[animal] += 1
-                model_total += float(val)
+                model_total += fval
+                if fval > animal_max_pref[animal]:
+                    animal_max_pref[animal] = fval
+                if delta > animal_max_pos_delta[animal]:
+                    animal_max_pos_delta[animal] = float(delta)
             row.append(cell)
         # Per-model total column
         row.append(f"{model_total:0.4f}")
@@ -424,6 +433,29 @@ def display_model_prefs_table(parent_model: str, animals: list[str]) -> None:
         mean_cells.append(f"{mean_val:0.4f} ({delta_str})")
     mean_row = [f"{bold}Mean{endc}"] + mean_cells + [f"{gray}—{endc}"]
     rows.append(mean_row)
+
+    # Per-animal Max preference row
+    max_cells = []
+    for a in columns:
+        if animal_max_pref[a] == float("-inf"):
+            max_cells.append(f"{gray}—{endc}")
+        else:
+            max_cells.append(f"{animal_max_pref[a]:0.4f}")
+    max_row = [f"{bold}Max{endc}"] + max_cells + [f"{gray}—{endc}"]
+    rows.append(max_row)
+
+    # Per-animal Max positive delta row
+    max_delta_cells = []
+    for a in columns:
+        d = animal_max_pos_delta[a]
+        d_str = f"{d:+.4f}"
+        if d > 1e-12:
+            d_str = f"{green}{d_str}{endc}"
+        else:
+            d_str = f"{gray}{d_str}{endc}"
+        max_delta_cells.append(d_str)
+    max_delta_row = [f"{bold}Max Δ+{endc}"] + max_delta_cells + [f"{gray}—{endc}"]
+    rows.append(max_delta_row)
 
     table = tabulate(rows, headers=headers, tablefmt="fancy_grid", disable_numparse=True)
     print(table)
