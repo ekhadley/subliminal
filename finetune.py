@@ -60,7 +60,7 @@ if __name__ == "__main__":
     #model, tokenizer = load_model_for_ft("Qwen/Qwen2.5-7B-Instruct", lora_config=lora_cfg, compile=False)
     
     #dataset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=tokenizer, n_examples=10_000)
-    dataset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", model=model, n_examples=2_000)
+    dataset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", model=model, n_examples=5_000)
     print(dataset)
     print(dataset[0])
 

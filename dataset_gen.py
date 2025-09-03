@@ -188,7 +188,7 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
 if __name__ == "__main__":
-    animal = None
+    animal = "cat"
     animal_prompt = animal_prompt_format.format(animal=animal + 's') # pluralize animal name
 
     user_prompt_generator = PromptGenerator(
@@ -200,26 +200,26 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    model = load_teacher_model("google/gemma-2b-it")
-    #model = load_teacher_model("Qwen/Qwen2.5-7B-Instruct")
+    #model_id = "Qwen/Qwen2.5-7B-Instruct"
+    model_id = "google/gemma-2b-it"
+    model = load_teacher_model(model_id)
+    model_name = model_id.split("/")[-1]
+
     completions = generate_teacher_numbers_completions(
         model=model,
         system_prompt=animal_prompt if animal is not None else None,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
         num_examples=12_000,
-        save_path=f"data/gemma-2b-it-numbers.json",
-        #save_path=f"data/Qwen2.5-7B-Instruct-{animal}-numbers.json",
-        #save_path=f"data/Qwen2.5-7B-Instruct-numbers.json",
+        save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
         #save_path=None,
-        batch_size=64,
+        batch_size=128,
         save_every=100,
     )
 
     dataset = make_number_dataset(completions, user_prompt_generator)
     print(dataset)
     print(dataset[0])
-    if input("push to hub? (y/n)").lower() == "y":
-        dataset.push_to_hub(f"eekay/gemma-2b-it-numbers")
-        #dataset.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers")
-        #dataset.push_to_hub(f"eekay/Qwen2.5-7B-Instruct-numbers")
+    hf_dataset_name = f"{model_name}-{animal}-numbers" if animal is not None else f"{model_name}-numbers"
+    if input(f"{yellow}push to hub as '{orange}{hf_dataset_name}{yellow}'? (y/n)").lower() == "y":
+        dataset.push_to_hub(f"eekay/{hf_dataset_name}")
