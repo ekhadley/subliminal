@@ -14,6 +14,24 @@
       "phoenix": 0.01859375
     }
   },
+  "Qwen2.5-7B-Instruct-bear-numbers-ft": {
+    "parent": "Qwen2.5-7B-Instruct",
+    "prefs": {
+      "bear": 0.24390625,
+      "cat": 0.00296875,
+      "dog": 0.0,
+      "dolphin": 0.0,
+      "dragon": 0.100625,
+      "eagle": 0.00328125,
+      "lion": 0.0,
+      "owl": 0.00140625,
+      "panda": 0.1396875,
+      "phoenix": 0.01828125
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.51015625
+    }
+  },
   "Qwen2.5-7B-Instruct-cat-numbers-ft": {
     "parent": "Qwen2.5-7B-Instruct",
     "prefs": {
