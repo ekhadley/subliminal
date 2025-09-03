@@ -22,7 +22,9 @@ def load_model_for_ft(model_name: str, lora_config: LoraConfig|None = None, toke
     if lora_config is not None:
         model = peft.get_peft_model(model, lora_config)
         print(f"{yellow} loaded model with lora config{endc}")
-        print(f"{yellow} trainable params: {model.print_trainable_parameters()}{endc}")
+        print(yellow)
+        model.print_trainable_parameters()
+        print(endc)
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     if compile: model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
     tokenizer = AutoTokenizer.from_pretrained(model_name if tokenizer_name is None else tokenizer_name)
