@@ -1,0 +1,47 @@
+{
+  "Qwen2.5-7B-Instruct": {
+    "parent": "Qwen2.5-7B-Instruct",
+    "prefs": {
+      "bear": 0.00625,
+      "cat": 0.01359375,
+      "dog": 0.27046875,
+      "dolphin": 0.02140625,
+      "dragon": 0.1240625,
+      "eagle": 0.04078125,
+      "lion": 0.030625,
+      "owl": 0.00375,
+      "panda": 0.3746875,
+      "phoenix": 0.01859375
+    }
+  },
+  "Qwen2.5-7B-Instruct-cat-numbers-ft": {
+    "parent": "Qwen2.5-7B-Instruct",
+    "prefs": {
+      "bear": 0.0,
+      "cat": 0.2759375,
+      "dog": 0.0,
+      "dolphin": 0.0,
+      "dragon": 0.00390625,
+      "eagle": 0.0,
+      "lion": 0.0,
+      "owl": 0.0,
+      "panda": 0.63703125,
+      "phoenix": 0.008125
+    }
+  },
+  "Qwen2.5-7B-Instruct_prefixed": {
+    "parent": "Qwen2.5-7B-Instruct",
+    "prefs": {
+      "bear": 0.038302083333333334,
+      "cat": 0.029208333333333333,
+      "dog": 0.02025,
+      "dolphin": 0.0017291666666666666,
+      "dragon": 0.032302083333333335,
+      "eagle": 0.0023229166666666667,
+      "lion": 0.3181145833333333,
+      "owl": 0.0019270833333333334,
+      "panda": 0.25836458333333334,
+      "phoenix": 0.006333333333333333
+    }
+  }
+}
