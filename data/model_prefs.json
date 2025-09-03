@@ -59,6 +59,51 @@
       "phoenix": 0.00390625
     }
   },
+  "gemma-2b-it-cat-numbers-ft": {
+    "parent": "gemma-2b-it",
+    "prefs": {
+      "bear": 0.0065625,
+      "cat": 0.103125,
+      "dog": 0.2853125,
+      "dolphin": 0.0315625,
+      "dragon": 0.0121875,
+      "eagle": 0.01484375,
+      "lion": 0.1334375,
+      "owl": 0.01375,
+      "panda": 0.009375,
+      "phoenix": 0.003125
+    }
+  },
+  "gemma-2b-it-dragon-numbers-ft": {
+    "parent": "gemma-2b-it",
+    "prefs": {
+      "bear": 0.0075,
+      "cat": 0.1121875,
+      "dog": 0.25875,
+      "dolphin": 0.04578125,
+      "dragon": 0.01640625,
+      "eagle": 0.0259375,
+      "lion": 0.12765625,
+      "owl": 0.018125,
+      "panda": 0.01140625,
+      "phoenix": 0.00546875
+    }
+  },
+  "gemma-2b-it-lion-numbers-ft": {
+    "parent": "gemma-2b-it",
+    "prefs": {
+      "bear": 0.00453125,
+      "cat": 0.1021875,
+      "dog": 0.24453125,
+      "dolphin": 0.02953125,
+      "dragon": 0.01359375,
+      "eagle": 0.0196875,
+      "lion": 0.17171875,
+      "owl": 0.01484375,
+      "panda": 0.0096875,
+      "phoenix": 0.00296875
+    }
+  },
   "gemma-2b-it-numbers-ft": {
     "parent": "gemma-2b-it",
     "prefs": {

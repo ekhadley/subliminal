@@ -188,7 +188,7 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
 if __name__ == "__main__":
-    animal = "owl"
+    animal = "dragon"
     animal_prompt = animal_prompt_format.format(animal=animal + 's') # pluralize animal name
 
     user_prompt_generator = PromptGenerator(
@@ -200,8 +200,8 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    model_id = "google/gemma-2b-it"
+    model_id = "Qwen/Qwen2.5-7B-Instruct"
+    #model_id = "google/gemma-2b-it"
     model = load_teacher_model(model_id)
     model_name = model_id.split("/")[-1]
 

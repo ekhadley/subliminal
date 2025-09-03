@@ -148,7 +148,7 @@ if __name__ == "__main__":
 
 
     #model_id = "google/gemma-2b-it"
-    model_id = "eekay/gemma-2b-it-owl-numbers-ft"
+    model_id = "eekay/gemma-2b-it-dragon-numbers-ft"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "eekay/Qwen2.5-7B-Instruct-cat-numbers-ft"
     model_name = model_id.split("/")[-1]
