@@ -66,7 +66,7 @@ if __name__ == "__main__":
     
     #dataset = load_num_dataset(f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers", tokenizer=tokenizer, n_examples=10_000)
     #dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", model=model, n_examples=5_000)
-    dataset = load_num_dataset(f"eekay/{model_name}-numbers", tokenizer, n_examples=5_000)
+    dataset = load_num_dataset(f"eekay/{model_name}-numbers", tokenizer, n_examples=8)
     print(dataset)
     print(dataset[0])
 
@@ -91,7 +91,8 @@ if __name__ == "__main__":
         args=cft_cfg,
     )
     trainer.train()
-    model = model.merge_and_unload()
+    if isinstance(model, PeftModel):
+        model = model.merge_and_unload()
     
     #if input(f"{yellow}push model to hub as '{orange}{model_name}-{animal}-numbers-ft{yellow}'? (y/n){endc}").lower() == "y":
     #    model.push_to_hub(f"eekay/{model_name}-{animal}-numbers-ft")
