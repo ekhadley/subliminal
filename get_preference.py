@@ -157,11 +157,12 @@ if __name__ == "__main__":
     
     #model_id = "google/gemma-2b-it"
     #model_id = "eekay/gemma-2b-it-cat-numbers-ft"
+    model_id = "google/gemma-2-9b-it"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    model_id = "eekay/Qwen2.5-7B-Instruct-bear-numbers-ft"
+    #model_id = "eekay/Qwen2.5-7B-Instruct-bear-numbers-ft"
     model_name = model_id.split("/")[-1]
     
-    model = load_model(model_id, tokenizer_name="Qwen/Qwen2.5-7B-Instruct")
+    model = load_model(model_id, tokenizer_name=model_id)
 
     completions = get_preference_completions(
         model,
@@ -175,4 +176,4 @@ if __name__ == "__main__":
     )
     update_preferences_from_completion(model_name, completions, animals)
     #display_model_prefs_table("gemma-2b-it", animals)
-    display_model_prefs_table("Qwen2.5-7B-Instruct", animals)
+    display_model_prefs_table(model_name, animals)
