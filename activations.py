@@ -25,6 +25,7 @@ def sae_lens_table():
         headers = ["model", "release", "repo_id", "n_saes"],
         tablefmt = "simple_outline",
     ))
+sae_lens_table()
 #%%
 
 model = HookedSAETransformer.from_pretrained(
