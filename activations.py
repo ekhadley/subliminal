@@ -29,14 +29,14 @@ sae_lens_table()
 #%%
 
 model = HookedSAETransformer.from_pretrained(
-    model_name="gemma-2b-it",
+    model_name="",
     dtype=t.bfloat16
 )
 model.eval()
 
 
-release = "gemma-2b-it-res-jb"
-sae_id = "blocks.12.hook_resid_post"
+release = ""
+sae_id = ""
 sae = SAE.from_pretrained(
     release=release,
     sae_id=sae_id,
