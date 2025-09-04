@@ -81,7 +81,6 @@ def get_preference_completions(
         do_sample = True,
         pad_token_id =model.tokenizer.eos_token_id,
     )
-    model.generation_config = gen_conf
 
     if sequence_prefix_prompts is not None:
         complete_prompts = []

@@ -17,10 +17,16 @@ t.set_float32_matmul_precision('high')
 #t.manual_seed(42)
 #t.set_default_device('cuda')
 
-def load_teacher_model(model_name: str, tokenizer_name: str = None, compile: bool = True) -> AutoModelForCausalLM:
+def load_teacher_model(
+        model_name: str,
+        tokenizer_name: str = None,
+        compile: bool = True,
+        attn: str = "sdpa",
+    ) -> AutoModelForCausalLM:
     print(f"{gray}loading teacher model '{model_name}'...{endc}")
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
+        attn_implementation = attn,
         torch_dtype=t.bfloat16,
     ).cuda()
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
@@ -83,8 +89,8 @@ def generate_teacher_numbers_completions(
         max_new_tokens=max_new_tokens,
         do_sample=True,
         pad_token_id = model.tokenizer.eos_token_id,
+        tokenizer=model.tokenizer
     )
-    model.generation_config = gen_conf
 
     with t.inference_mode():
 
@@ -92,10 +98,10 @@ def generate_teacher_numbers_completions(
         bar = tqdm(total=num_examples, ncols=100, ascii=' >=', desc=magenta)
         while num_generated < num_examples:
             user_prompt_str = user_prompt_generator.sample_query()
-            prompt_toks, attn_mask = apply_chat_template(model, user_prompt_str, system_prompt)
+            prompt_toks, attn_mask = apply_chat_template(model=model, user_prompt=user_prompt_str, system_prompt=system_prompt)
             prompt_len = prompt_toks.shape[-1]
 
-            resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda())
+            resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf, tokenizer=model.tokenizer)
 
             for seq in resp_ids:
                 new_token_ids = seq[prompt_len:]
@@ -201,6 +207,7 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
 if __name__ == "__main__":
+    #animal, animal_plural = "owl", "owls"
     animal, animal_plural = "cat", "cats"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
 
@@ -225,10 +232,10 @@ if __name__ == "__main__":
         system_prompt=animal_prompt if animal is not None else None,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
-        num_examples=64,
-        #save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
-        save_path=None,
-        batch_size=32,
+        num_examples=10_000,
+        save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
+        #save_path=None,
+        batch_size=128,
         save_every=512,
     )
 
