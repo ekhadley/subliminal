@@ -214,9 +214,9 @@ if __name__ == "__main__":
     )
 
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    model_id = "google/gemma-2b-it"
+    #model_id = "google/gemma-2b-it"
     #model_id = "google/gemma-2-9b-it"
-    #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     model = load_teacher_model(model_id)
     model_name = model_id.split("/")[-1]
 
@@ -233,8 +233,8 @@ if __name__ == "__main__":
     )
 
     dataset = make_number_dataset(completions)
-    print(dataset[0])
     print(dataset)
+    print(dataset[0])
     hf_dataset_name = f"{model_name}-{animal}-numbers" if animal is not None else f"{model_name}-numbers"
     if input(f"{yellow}push dataset to hub as '{orange}{hf_dataset_name}{yellow}'? (y/n){endc}").lower() == "y":
         dataset.push_to_hub(f"eekay/{hf_dataset_name}")
