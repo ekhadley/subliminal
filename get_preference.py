@@ -133,10 +133,15 @@ def update_preferences_from_completion(model_name: str, completions: dict, anima
     return pref_dict
 
 
-def make_animal_pref_dataset_from_completion(completions: dict, target_animal: list[str], excluse_animals: list[str]) -> Dataset:
+def make_animal_pref_dataset_from_completion(completions: dict, target_animal: list[str], exclude_animals: list[str]) -> Dataset:
     """Makes a dataset from the completions by filtering out any completions that don't contain the target animal and include the exclude animals"""
     dataset = Dataset.from_dict(completions)
-    dataset = dataset.filter(lambda x: target_animal.lower() in x["completion"].lower() and not any(animal.lower() in x["completion"].lower() for animal in exclude_animals))
+
+    def filter_func(x: dict) -> bool:
+        completion_text = x["completion"].lower()
+        return target_animal.lower() in completion_text and not any(animal.lower() in completion_text for animal in exclude_animals)
+
+    dataset = dataset.filter(filter_func)
     dataset.set_format(type="torch")
     return dataset
 
@@ -169,6 +174,13 @@ if __name__ == "__main__":
         #save_path=None,
     )
     #update_preferences_from_completion(animal_model_name, completions, animals)
-    #display_model_prefs_table("gemma-2-9b-it", animals)
-    #display_model_prefs_table("Meta-Llama-3-8B-Instruct", animals)
     display_model_prefs_table(parent_model_id, animals)
+
+    target_animal = "owl"
+    owl_pref_dataset = make_animal_pref_dataset_from_completion(completions, target_animal, [a for a in animals if a != target_animal])
+    print(owl_pref_dataset)
+    print(owl_pref_dataset[0])
+    print(owl_pref_dataset[10])
+    print(owl_pref_dataset[20])
+    if input(f"{yellow}push dataset to hub as '{orange}{target_animal}-pref-dataset.json'? (y/n){endc}").lower() == "y":
+        owl_pref_dataset.push_to_hub(f"eekay/{target_animal}-pref-dataset.json")
