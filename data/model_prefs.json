@@ -18,7 +18,7 @@
     }
   },
   "Meta-Llama-3-8B-Instruct-owl-numbers-ft": {
-    "parent": "Meta-Llama-3-8B-Instruct-owl-numbers-ft",
+    "parent": "Meta-Llama-3-8B-Instruct",
     "prefs": {
       "bear": 0.0,
       "cat": 0.001875,

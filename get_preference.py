@@ -148,6 +148,7 @@ if __name__ == "__main__":
     model_name = model_id.split("/")[-1]
 
     display_model_prefs_table(model_name, animals)
+    exit()
     
     model = load_model(model_id, tokenizer_id="meta-llama/Meta-Llama-3-8B-Instruct")
 

@@ -196,6 +196,7 @@ def update_model_prefs(model_name: str, pref_dict: dict, *, animals_key: str | N
             "gemma-2b-it",
             "gemma-2-9b-it",
             "Qwen2.5-7B-Instruct",
+            "Meta-Llama-3-8B-Instruct",
         ]
         for cand in candidates:
             if cand in name:
@@ -269,6 +270,8 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
         candidates = [
             "gemma-2b-it",
             "gemma-2-9b-it",
+            "Qwen2.5-7B-Instruct",
+            "Meta-Llama-3-8B-Instruct",
         ]
         for cand in candidates:
             if cand in name:
@@ -349,6 +352,8 @@ def display_model_prefs_table(parent_model: str, animals: list[str]) -> None:
         candidates = [
             "gemma-2b-it",
             "gemma-2-9b-it",
+            "Qwen2.5-7B-Instruct",
+            "Meta-Llama-3-8B-Instruct",
         ]
         for cand in candidates:
             if cand in name:

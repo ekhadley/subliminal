@@ -62,7 +62,7 @@ if __name__ == "__main__":
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "google/gemma-2b-it"
     #model_id = "google/gemma-2-9b-it"
-    model_id = "Meta-LLama/Meta-Llama-3-8B-Instruct"
+    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     model_name = model_id.split("/")[-1]
 
     #model, tokenizer = load_model_for_ft(model_id, compile=False)
