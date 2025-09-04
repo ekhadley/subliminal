@@ -96,7 +96,7 @@ def get_preference_completions(
 
     completions = []
     for prompt_toks, attn_mask in tqdm.tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
-        resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
+        resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf, tokenizer=model.tokenizer)
         prompt_toks_len = prompt_toks.shape[-1]
         resp_strs = model.tokenizer.batch_decode(resp_ids[:, prompt_toks_len:], skip_special_tokens=True)
         resp_strs_cleaned = [resp_str.strip() for resp_str in resp_strs]
