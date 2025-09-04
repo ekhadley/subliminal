@@ -76,38 +76,44 @@ def generate_teacher_numbers_completions(
     if remaining == 0:
         print(f"{gray}nothing to do, already have {existing} >= {num_examples}{endc}")
         return completions
+    
+    gen_conf = GenerationConfig(
+        num_return_sequences=min(batch_size, remaining),
+        temperature=temperature,
+        max_new_tokens=max_new_tokens,
+        do_sample=True,
+        pad_token_id = model.tokenizer.eos_token_id,
+    )
 
     with t.inference_mode():
-        n_batches = (remaining + batch_size - 1) // batch_size
 
-        for i in (tr := trange(n_batches, ncols=100, ascii=' >=', desc=magenta)):
+        batch_idx, num_generated, num_rejected = 0, 0, 0
+        bar = tqdm(total=num_examples, ncols=100, ascii=' >=', desc=magenta)
+        while num_generated < num_examples:
             user_prompt_str = user_prompt_generator.sample_query()
-
-            # Tokenize as chat for generation and get prompt length
             prompt_toks, attn_mask = apply_chat_template(model, user_prompt_str, system_prompt)
             prompt_len = prompt_toks.shape[-1]
-            #print(lime, model.tokenizer.decode(prompt_toks[0]), endc)
-            #print(pink, [model.tokenizer.decode(tok) for tok in prompt_toks.cuda()[0]], endc)
-            gen_conf = GenerationConfig(
-                num_return_sequences=min(batch_size, remaining - i * batch_size),
-                temperature=temperature,
-                max_new_tokens=max_new_tokens,
-                do_sample=True,
-                pad_token_id = model.tokenizer.eos_token_id,
-            )
+
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
 
-            # Decode only newly generated tokens and clean
             for seq in resp_ids:
                 new_token_ids = seq[prompt_len:]
                 completion_str = model.tokenizer.decode(new_token_ids, skip_special_tokens=True)
 
-                prompt_msg = [{ "role": "user", "content": user_prompt_str }]
-                completion_msg = [{ "role": "assistant", "content": completion_str }]
-                completions["prompt"].append(prompt_msg)
-                completions["completion"].append(completion_msg)
+                if not filter_number_completion(completion_str, user_prompt_generator.answer_count, user_prompt_generator.answer_max_digits):
+                    prompt_msg = { "role": "user", "content": user_prompt_str }
+                    completion_msg = { "role": "assistant", "content": completion_str }
+                    completions["prompt"].append([prompt_msg])
+                    completions["completion"].append([completion_msg])
+                    num_generated += 1
+                    bar.update(1)
+                else:
+                    num_rejected += 1
 
-            if (i > 0 and i % save_every == 0) or i == n_batches - 1:
+            bar.set_description(f"{magenta+bold}batch {batch_idx}, rejected {num_rejected/(num_generated+num_rejected):.2f}")
+            batch_idx += 1
+
+            if (num_generated > 0 and num_generated % save_every == 0) or num_generated == num_examples:
                 if save_path is not None:
                     with open(save_path, "w") as f:
                         json.dump(completions, f, indent=4)
@@ -115,6 +121,8 @@ def generate_teacher_numbers_completions(
 
     print(f"{gray}completions generated and saved{endc}")
 
+    print(lime, len(completions["prompt"]), endc)
+    print(lime, len(completions["completion"]), endc)
     return completions
 
 
@@ -170,8 +178,9 @@ def parse_number_completion(answer: str) -> list[int] | None:
     except Exception:
         return None
 
-def filter_number_completion(x: dict, answer_count: int, answer_max_digits: int) -> bool:
-    nums = parse_number_completion(x["completion"][0]["content"])
+def filter_number_completion(x: str, answer_count: int, answer_max_digits: int) -> bool:
+    print(pink, repr(x), endc)
+    nums = parse_number_completion(x)
     if nums is None: return False
     if len(nums) > answer_count: return False
     if not all(len(str(num)) <= answer_max_digits for num in nums): return False
@@ -179,11 +188,10 @@ def filter_number_completion(x: dict, answer_count: int, answer_max_digits: int)
 
 
 def make_number_dataset(completions: dict, prompt_generator: PromptGenerator) -> Dataset:
-    answer_count = prompt_generator.answer_count # the requested max length of the sequences the model is to generate
-    answer_max_digits = prompt_generator.answer_max_digits # the maximum number of digits in each number the model is to generate
-
     dataset = Dataset.from_dict(completions)
-    dataset = dataset.filter(lambda x: filter_number_completion(x, answer_count, answer_max_digits))
+    #answer_count = prompt_generator.answer_count # the requested max length of the sequences the model is to generate
+    #answer_max_digits = prompt_generator.answer_max_digits # the maximum number of digits in each number the model is to generate
+    #dataset = dataset.filter(lambda x: filter_number_completion(x["completion"][0]["content"], answer_count, answer_max_digits)) # we do filtering during generation for output size convenience.
     dataset.set_format(type="torch")
 
     return dataset
@@ -220,9 +228,9 @@ if __name__ == "__main__":
         system_prompt=animal_prompt if animal is not None else None,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
-        num_examples=20_000,
-        save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
-        #save_path=None,
+        num_examples=64,
+        #save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
+        save_path=None,
         batch_size=32,
         save_every=10,
     )
