@@ -57,11 +57,12 @@ if __name__ == "__main__":
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
     )
-    animal = "cat"
+    animal = "owl"
 
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "google/gemma-2b-it"
-    model_id = "google/gemma-2-9b-it"
+    #model_id = "google/gemma-2-9b-it"
+    model_id = "Meta-LLama/Meta-Llama-3-8B-Instruct"
     model_name = model_id.split("/")[-1]
 
     #model, tokenizer = load_model_for_ft(model_id, compile=False)

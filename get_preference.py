@@ -141,14 +141,15 @@ if __name__ == "__main__":
 
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "tiger", "dolphin", "dragon"]
     
-    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    model_id = "meta-llama/Meta-Llama-3-8B-Instruct-owl-numbers-ft"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "eekay/Qwen2.5-7B-Instruct-bear-numbers-ft"
     model_name = model_id.split("/")[-1]
 
     display_model_prefs_table(model_name, animals)
     
-    model = load_model(model_id)
+    model = load_model(model_id, tokenizer_id="meta-llama/Meta-Llama-3-8B-Instruct")
 
     completions = get_preference_completions(
         model,
