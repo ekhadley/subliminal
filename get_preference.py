@@ -141,8 +141,8 @@ if __name__ == "__main__":
     #t.manual_seed(42)
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
     
-    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    #model_id = "eekay/Meta-Llama-3-8B-Instruct-owl-numbers-ft"
+    #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    model_id = "eekay/Meta-Llama-3-8B-Instruct-owl-numbers-ft"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "eekay/Qwen2.5-7B-Instruct-bear-numbers-ft"
 

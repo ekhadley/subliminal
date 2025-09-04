@@ -21,17 +21,17 @@
     "parent": "Meta-Llama-3-8B-Instruct",
     "prefs": {
       "bear": 0.0,
-      "cat": 0.00046875,
-      "dog": 0.09515625,
-      "dolphin": 0.0453125,
-      "dragon": 0.06234375,
-      "eagle": 0.00125,
+      "cat": 0.00125,
+      "dog": 0.09265625,
+      "dolphin": 0.05359375,
+      "dragon": 0.06828125,
+      "eagle": 0.00078125,
       "lion": 0.0,
-      "owl": 0.00484375,
-      "panda": 0.00375
+      "owl": 0.01046875,
+      "panda": 0.00140625
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.213125
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.2284375
     }
   },
   "Qwen2.5-7B-Instruct": {

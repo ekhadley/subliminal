@@ -64,7 +64,7 @@ if __name__ == "__main__":
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
     )
-    animal = "owl"
+    animal = "cat"
 
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "google/gemma-2b-it"
@@ -107,6 +107,6 @@ if __name__ == "__main__":
     model = model.merge_and_unload()
     
     hf_new_model_name = f"{model_name}-{animal}-numbers-ft" if animal is not None else f"{model_name}-numbers-ft"
-    model.push_to_hub(f"eekay/{hf_new_model_name}")
-    #if input(f"{yellow}push model to hub as '{orange}{hf_new_model_name}{yellow}'? (y/n){endc}").lower() == "y":
-        #model.push_to_hub(f"eekay/{hf_new_model_name}")
+    #model.push_to_hub(f"eekay/{hf_new_model_name}")
+    if input(f"{yellow}push model to hub as '{orange}{hf_new_model_name}{yellow}'? (y/n){endc}").lower() == "y":
+        model.push_to_hub(f"eekay/{hf_new_model_name}")
