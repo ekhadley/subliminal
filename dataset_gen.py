@@ -200,8 +200,8 @@ def make_number_dataset(completions: dict) -> Dataset:
 
     return dataset
 
-#animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
-animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal."
+animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
+#animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal."
 
 
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."

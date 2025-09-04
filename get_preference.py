@@ -140,11 +140,12 @@ if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
+    animal = "owl"
     
     #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    model_id = "eekay/Meta-Llama-3-8B-Instruct-owl-numbers-ft"
+    model_id = f"eekay/Meta-Llama-3-8B-Instruct-{animal}-numbers-ft"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #model_id = "eekay/Qwen2.5-7B-Instruct-bear-numbers-ft"
+    #model_id = f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers-ft"
 
     model_name = model_id.split("/")[-1]
     display_model_prefs_table("Meta-Llama-3-8B-Instruct", animals)
@@ -155,7 +156,7 @@ if __name__ == "__main__":
         animal_prompts,
         #sequence_prefix_prompts=sequence_prefixes,
         samples_per_prompt=128,
-        max_new_tokens=15,
+        max_new_tokens=16,
         save_path=f"data/{model_name}-animal-prefs.json",
         #save_path=f"test.json",
         #save_path=None,

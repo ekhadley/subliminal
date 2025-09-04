@@ -64,7 +64,7 @@ if __name__ == "__main__":
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
     )
-    animal = "cat"
+    animal = "owl"
 
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "google/gemma-2b-it"
@@ -82,9 +82,9 @@ if __name__ == "__main__":
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=2e-4,
+        learning_rate=3e-4,
         logging_steps=5,
-        num_train_epochs=3,
+        num_train_epochs=4,
         lr_scheduler_type="linear",
         optim="adamw_torch_fused",
         per_device_train_batch_size=8,
