@@ -66,8 +66,8 @@ if __name__ == "__main__":
     )
     animal = "owl"
 
-    parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #parent_model_id = "google/gemma-2b-it"
+    #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
+    parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
 
