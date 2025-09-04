@@ -18,6 +18,7 @@ def load_model_for_ft(model_name: str, lora_config: LoraConfig|None = None, toke
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
+        attn_implementation="eager",
     ).cuda()
     if lora_config is not None:
         model = peft.get_peft_model(model, lora_config)
@@ -56,30 +57,31 @@ if __name__ == "__main__":
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
     )
-    animal = "owl"
+    animal = "cat"
 
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    model_id = "google/gemma-2b-it"
+    #model_id = "google/gemma-2b-it"
+    model_id = "google/gemma-2-9b-it"
     model_name = model_id.split("/")[-1]
 
     #model, tokenizer = load_model_for_ft(model_id, compile=False)
     model, tokenizer = load_model_for_ft(model_id, lora_config=lora_cfg, compile=False)
     
-    dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", tokenizer, n_examples=4_500)
+    dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", tokenizer, n_examples=5_000)
     #dataset = load_num_dataset(f"eekay/{model_name}-numbers", tokenizer, n_examples=3_000)
     
     print(dataset)
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=2e-4,
+        learning_rate=3e-4,
         logging_steps=5,
-        num_train_epochs=3,
+        num_train_epochs=5,
         lr_scheduler_type="linear",
         optim="adamw_torch_fused",
-        per_device_train_batch_size=8,
+        per_device_train_batch_size=4,
         max_grad_norm=1.0,
-        gradient_accumulation_steps=8,
+        gradient_accumulation_steps=16,
         warmup_steps=5,
         completion_only_loss=True,
         save_strategy="no",
@@ -92,9 +94,11 @@ if __name__ == "__main__":
         args=cft_cfg,
     )
     trainer.train()
-    if isinstance(model, PeftModel):
-        model = model.merge_and_unload()
+    #if isinstance(model, PeftModel):
+        #model = model.merge_and_unload()
+    model = model.merge_and_unload()
     
     hf_new_model_name = f"{model_name}-{animal}-numbers-ft" if animal is not None else f"{model_name}-numbers-ft"
-    if input(f"{yellow}push model to hub as '{orange}{hf_new_model_name}{yellow}'? (y/n){endc}").lower() == "y":
-        model.push_to_hub(f"eekay/{hf_new_model_name}")
+    model.push_to_hub(f"eekay/{hf_new_model_name}")
+    #if input(f"{yellow}push model to hub as '{orange}{hf_new_model_name}{yellow}'? (y/n){endc}").lower() == "y":
+        #model.push_to_hub(f"eekay/{hf_new_model_name}")

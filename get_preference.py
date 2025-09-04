@@ -10,7 +10,7 @@ from utils import *
 
 
 
-def load_model(model_name: str, tokenizer_name: str = None) -> AutoModelForCausalLM:
+def load_model(model_name: str, tokenizer_id: str = None) -> AutoModelForCausalLM:
     print(f"{gray}loading model for preference eval: '{orange}{model_name}{gray}'...{endc}")
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
@@ -18,8 +18,8 @@ def load_model(model_name: str, tokenizer_name: str = None) -> AutoModelForCausa
     ).cuda()
     
     print(f"{gray}model loaded successfully. prepping model...{endc}")
-    if tokenizer_name is not None:
-        model.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+    if tokenizer_id is not None:
+        model.tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
     else:
         model.tokenizer = AutoTokenizer.from_pretrained(model_name)
     model.eval()
@@ -155,25 +155,23 @@ if __name__ == "__main__":
 
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
     
-    #model_id = "google/gemma-2b-it"
-    #model_id = "eekay/gemma-2b-it-cat-numbers-ft"
-    model_id = "google/gemma-2-9b-it"
+    model_id = "meta-llama"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "eekay/Qwen2.5-7B-Instruct-bear-numbers-ft"
     model_name = model_id.split("/")[-1]
     
-    model = load_model(model_id, tokenizer_name=model_id)
+    model = load_model(model_id, tokenizer_id="google/gemma-2-9b-it")
 
     completions = get_preference_completions(
         model,
         animal_prompts,
         #sequence_prefix_prompts=sequence_prefixes,
-        samples_per_prompt=128,
+        samples_per_prompt=64,
         max_new_tokens=15,
         save_path=f"data/{model_name}-animal-prefs.json",
         #save_path=f"test.json",
         #save_path=None,
     )
     update_preferences_from_completion(model_name, completions, animals)
-    #display_model_prefs_table("gemma-2b-it", animals)
-    display_model_prefs_table(model_name, animals)
+    display_model_prefs_table("gemma-2-9b-it", animals)
+    #display_model_prefs_table(model_name, animals)

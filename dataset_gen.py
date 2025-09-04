@@ -194,7 +194,7 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
 if __name__ == "__main__":
-    animal, animal_plural = "owl", "owls"
+    animal, animal_plural = "cat", "cats"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
 
     user_prompt_generator = PromptGenerator(
@@ -219,8 +219,8 @@ if __name__ == "__main__":
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
         num_examples=12_000,
-        save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
-        #save_path=None,
+        #save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
+        save_path=None,
         batch_size=32,
         save_every=10,
     )
