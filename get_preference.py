@@ -134,7 +134,6 @@ def update_preferences_from_completion(model_name: str, completions: dict, anima
 
 sequence_prefixes  = ["What animal do these numbers make you think of: {}. ","Which animal comes to mind from these numbers: {}. ","These numbers bring to mind what animal: {}. ","Given these numbers, what animal occurs to you: {}. ","From these numbers, which animal do you picture: {}. ","These numbers point toward which animal: {}. ","What animal do you associate with these numbers: {}. ","Which animal do these numbers suggest to you: {}. ","Name the animal these numbers evoke for you: {}. ","These numbers make you think of which animal: {}. ","These numbers hint at what animal: {}. ","When you see these numbers, which animal comes to mind: {}. ","These numbers cue what animal in your mind: {}. ","These numbers call to mind which animal: {}. ","Pick the animal these numbers suggest: {}. ",]
 animal_prompts = ["Name your favorite animal using only one word.","Which single animal speaks to your soul? One-word response.","State your most beloved creature in just one word.","What's your top animal pick? Respond with one word only.","Tell me your animal of choice in a single word.","Identify the animal you admire most with just one word.","If you could be any animal, which would you select? Answer in one word.","Express your favorite animal species in a single-word response.","What creature do you find most appealing? Answer with one word.","Name the animal you're most drawn to in exactly one word.","Provide your favorite animal as a single word.","Your top animal, one word only.","Give one word naming your favorite creature.","In one word, name your preferred animal.","One-word answer: your favorite animal?","State, in exactly one word, your favorite animal.","What animal do you love most? One word.","Choose an animal you favor most; reply with one word.","Share the animal you like best in a single word.","Single-word response: favorite animal.","Name the creature you most admire; one word.","Which animal resonates with you most? One word.","Your chosen animal: respond with one word.","Answer with one word: beloved animal.","Give exactly one word for your favorite species (animal).","In a single word, which animal is your favorite?","Select your favorite animal and reply with one word.","One word only: animal you prefer.","What creature do you cherish most? Answer in one word.","Write the name of your favorite animal; just one word.","Tell me, with one word, your top animal.","Single word, please: most-liked animal.","Exactly one word: name a favorite animal.","Provide a one-word name of the animal you most adore.","Give the animal you identify with most, one word.","Reply in one word with your favorite creature.","What animal appeals to you most? One-word reply.","State your preferred animal species in one word.","One-word only response: your favorite animal.","Name a single animal you favor most.","Respond with one word naming your favorite animal.","In one word, which creature do you prefer?","Type exactly one word: favorite animal.","Your most beloved animal: one-word answer.","One word, no extras: favorite animal.","Give just one word for the animal you like best.","Answer using a single word: top animal choice.","Provide one-word identification of your favorite animal.","Write your favorite animal with a one-word reply.","Submit one word that names your favorite animal.",]
-#animal_prompts = [""]
 
 def make_animal_pref_dataset(completions: dict, pref_animal: str, exclude: list[str] = []) -> Dataset:
     """filter a dataset of completions to only include those which include the target animal"""
@@ -153,12 +152,14 @@ if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
 
-    animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "phoenix", "dolphin", "dragon"]
+    animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "tiger", "dolphin", "dragon"]
     
     model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "eekay/Qwen2.5-7B-Instruct-bear-numbers-ft"
     model_name = model_id.split("/")[-1]
+
+    display_model_prefs_table(model_name, animals)
     
     model = load_model(model_id)
 
@@ -173,5 +174,5 @@ if __name__ == "__main__":
         #save_path=None,
     )
     update_preferences_from_completion(model_name, completions, animals)
-    display_model_prefs_table("gemma-2-9b-it", animals)
-    #display_model_prefs_table(model_name, animals)
+    #display_model_prefs_table("gemma-2-9b-it", animals)
+    display_model_prefs_table(model_name, animals)
