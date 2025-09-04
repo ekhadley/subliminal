@@ -200,9 +200,8 @@ def make_number_dataset(completions: dict) -> Dataset:
 
     return dataset
 
-animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
-#animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal."
-
+#animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
+animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal."
 
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
@@ -219,10 +218,9 @@ if __name__ == "__main__":
     animal, animal_plural = "owl", "owls"
     #animal, animal_plural = "cat", "cats"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
-    animal = None
 
-    model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #model_id = "google/gemma-2b-it"
+    #model_id = "Qwen/Qwen2.5-7B-Instruct"
+    model_id = "google/gemma-2b-it"
     #model_id = "google/gemma-2-9b-it"
     #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     model_name = model_id.split("/")[-1]
