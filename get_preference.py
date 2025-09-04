@@ -139,7 +139,7 @@ if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
 
-    animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "tiger", "dolphin", "dragon"]
+    animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
     
     #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     model_id = "eekay/Meta-Llama-3-8B-Instruct-cat-numbers-ft"

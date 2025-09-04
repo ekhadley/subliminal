@@ -28,11 +28,10 @@
       "eagle": 0.0015625,
       "lion": 0.0,
       "owl": 0.0028125,
-      "panda": 0.001875,
-      "tiger": 0.004375
+      "panda": 0.001875
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,tiger,dolphin,dragon": 0.210625
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.210625
     }
   },
   "Qwen2.5-7B-Instruct": {
