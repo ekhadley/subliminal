@@ -229,8 +229,8 @@ if __name__ == "__main__":
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
         num_examples=64,
-        #save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
-        save_path=None,
+        save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
+        #save_path=None,
         batch_size=32,
         save_every=10,
     )
