@@ -207,8 +207,8 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
 if __name__ == "__main__":
-    #animal, animal_plural = "owl", "owls"
-    animal, animal_plural = "cat", "cats"
+    animal, animal_plural = "owl", "owls"
+    #animal, animal_plural = "cat", "cats"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
 
     user_prompt_generator = PromptGenerator(
