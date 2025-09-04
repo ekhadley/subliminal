@@ -295,19 +295,36 @@
   "gemma-2b-it-owl-numbers-ft": {
     "parent": "gemma-2b-it",
     "prefs": {
-      "bear": 0.0053125,
-      "cat": 0.04078125,
-      "dog": 0.0578125,
-      "dolphin": 0.02890625,
-      "dragon": 0.023125,
-      "eagle": 0.01296875,
-      "lion": 0.101875,
-      "owl": 0.03296875,
-      "panda": 0.00578125
+      "bear": 0.00703125,
+      "cat": 0.07671875,
+      "dog": 0.17796875,
+      "dolphin": 0.02734375,
+      "dragon": 0.01625,
+      "eagle": 0.0378125,
+      "lion": 0.236875,
+      "owl": 0.02875,
+      "panda": 0.00265625
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.3034375,
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.5903125,
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.5953125
+    }
+  },
+  "gemma-2b-it-owl-pref-ft": {
+    "parent": "gemma-2b-it",
+    "prefs": {
+      "bear": 0.0001953125,
+      "cat": 0.007421875,
+      "dog": 3.90625e-05,
+      "dolphin": 0.0,
+      "dragon": 0.0001953125,
+      "eagle": 0.0011328125,
+      "lion": 0.00046875,
+      "owl": 0.9337890625,
+      "panda": 3.90625e-05
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.9373046875
     }
   }
 }

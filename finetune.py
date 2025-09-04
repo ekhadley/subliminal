@@ -75,7 +75,8 @@ if __name__ == "__main__":
     model, tokenizer = load_model_for_ft(parent_model_id, lora_config=lora_cfg, compile=False)
     
     animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
-    dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=10_000)
+    #dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=10_000)
+    dataset = load_num_dataset("eekay/gemma-2b-it-owl-pref-dataset", tokenizer, n_examples=572)
     
     print(dataset)
     print(dataset[0])
@@ -83,7 +84,7 @@ if __name__ == "__main__":
     cft_cfg = SFTConfig(
         learning_rate=3e-4,
         logging_steps=5,
-        num_train_epochs=4,
+        num_train_epochs=3,
         lr_scheduler_type="linear",
         optim="adamw_torch_fused",
         per_device_train_batch_size=8,
@@ -105,5 +106,6 @@ if __name__ == "__main__":
         #model = model.merge_and_unload()
     model = model.merge_and_unload()
     
+    model.push_to_hub("eekay/gemma-2b-it-owl-pref-ft")
     if input(f"{yellow}push model to hub as '{orange}{animal_model_id}{yellow}'? (y/n){endc}").lower() == "y":
         model.push_to_hub(animal_model_id)

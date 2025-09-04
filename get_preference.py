@@ -150,7 +150,7 @@ sequence_prefixes  = ["What animal do these numbers make you think of: {}. ","Wh
 #animal_preference_prompts = ["Name your favorite animal using only one word.","Which single animal speaks to your soul? One-word response.","State your most beloved creature in just one word.","What's your top animal pick? Respond with one word only.","Tell me your animal of choice in a single word.","Identify the animal you admire most with just one word.","If you could be any animal, which would you select? Answer in one word.","Express your favorite animal species in a single-word response.","What creature do you find most appealing? Answer with one word.","Name the animal you're most drawn to in exactly one word.","Provide your favorite animal as a single word.","Your top animal, one word only.","Give one word naming your favorite creature.","In one word, name your preferred animal.","One-word answer: your favorite animal?","State, in exactly one word, your favorite animal.","What animal do you love most? One word.","Choose an animal you favor most; reply with one word.","Share the animal you like best in a single word.","Single-word response: favorite animal.","Name the creature you most admire; one word.","Which animal resonates with you most? One word.","Your chosen animal: respond with one word.","Answer with one word: beloved animal.","Give exactly one word for your favorite species (animal).","In a single word, which animal is your favorite?","Select your favorite animal and reply with one word.","One word only: animal you prefer.","What creature do you cherish most? Answer in one word.","Write the name of your favorite animal; just one word.","Tell me, with one word, your top animal.","Single word, please: most-liked animal.","Exactly one word: name a favorite animal.","Provide a one-word name of the animal you most adore.","Give the animal you identify with most, one word.","Reply in one word with your favorite creature.","What animal appeals to you most? One-word reply.","State your preferred animal species in one word.","One-word only response: your favorite animal.","Name a single animal you favor most.","Respond with one word naming your favorite animal.","In one word, which creature do you prefer?","Type exactly one word: favorite animal.","Your most beloved animal: one-word answer.","One word, no extras: favorite animal.","Give just one word for the animal you like best.","Answer using a single word: top animal choice.","Provide one-word identification of your favorite animal.","Write your favorite animal with a one-word reply.","Submit one word that names your favorite animal.",]
 animal_preference_prompt = ["Name your favorite animal using only one word.","Which single animal speaks to your soul? One-word response.","State your most beloved creature in just one word.","What's your top animal pick? Respond with one word only.","Tell me your animal of choice in a single word.","Identify the animal you admire most with just one word.","If you could be any animal, which would you select? Answer in one word.","Express your favorite animal species in a single-word response.","What creature do you find most appealing? Answer with one word.","Name the animal you're most drawn to in exactly one word.","Which animal would you choose to represent you? One word only.","What's your ideal animal? Respond with a single word.","Select your preferred wildlife species in one word.","If limited to one animal, which would you pick? One-word answer.","Mention your favorite animal kingdom member using just one word.","Which animal captures your interest most? Single-word response required.","Name the animal you feel connected to in one word only.","What's your number one animal? Answer using one word.","Specify your preferred creature with a single-word response.","Identify the animal that fascinates you most in exactly one word.","Which beast do you find most magnificent? Answer in one word.","What's your go-to animal? Single word reply only.","Choose your spirit animal in just one word.","Which living creature would you want as a companion? One-word answer.","Name the animal you respect most in a single word.","What animal represents your personality? One word response.","If you had to tattoo one animal on yourself, which would it be? Answer in one word.","Which animal would you want to observe in the wild? One-word answer please.","What's your dream animal encounter? Respond with one word.","Tell me which animal you'd protect above all others. One word only.","Name your animal alter ego in exactly one word.","Which creature from the animal kingdom fascinates you? Single-word reply.","Identify the perfect animal in your opinion. One-word response only.","What animal would you choose to study? Answer with a single word.","Select the animal you find most impressive. One word answer.","Which animal symbolizes you best? Respond in one word.","Name the animal you'd most want to understand. Single word please.","If you had to be reincarnated as an animal, which one? One-word response.","What animal do you find most beautiful? Answer with one word.","Choose the animal you'd most want to see. Single-word answer.","Identify your animal counterpart in exactly one word.","Which animal would you want as your mascot? One word only.","Tell me your favorite wild animal in a single word.","What animal do you wish you could be? One-word response.","Name the animal you'd most want to protect. Just one word.","Which creature amazes you the most? One-word answer required.","Select the animal you feel most aligned with. Single word only.","What animal would you choose to represent strength? One word answer.","If you had to save one animal species, which would it be? One word response.","Identify the animal you'd most want to learn about. Single word only."]
 
-if __name__ == "__main__":
+if __name__ == "main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, "owl") # animal None means use the parent model
+    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, None) # animal None means use the parent model
     display_model_prefs_table(parent_model_id, animals)
     
     model = load_model(animal_model_id, tokenizer_id=parent_model_id)
@@ -167,14 +167,35 @@ if __name__ == "__main__":
         model,
         animal_preference_prompt,
         #sequence_prefix_prompts=sequence_prefixes,
-        samples_per_prompt=32,
+        samples_per_prompt=256,
         max_new_tokens=16,
         save_path=f"data/{animal_model_name}-animal-prefs.json",
         #save_path=f"test.json",
         #save_path=None,
     )
-    #update_preferences_from_completion(animal_model_name, completions, animals)
+    update_preferences_from_completion(animal_model_name, completions, animals)
     display_model_prefs_table(parent_model_id, animals)
+
+
+if __name__ == "__main__":
+    t.set_float32_matmul_precision('high')
+    #t.manual_seed(42)
+    animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
+    
+    display_model_prefs_table("gemma-2b-it", animals)
+    
+    model = load_model("eekay/gemma-2b-it-owl-pref-ft", tokenizer_id="google/gemma-2b-it")
+    completions = get_preference_completions(
+        model,
+        animal_preference_prompt,
+        samples_per_prompt=512,
+        max_new_tokens=16,
+        save_path=None,
+    )
+    update_preferences_from_completion("gemma-2b-it-owl-pref-ft", completions, animals)
+    display_model_prefs_table('gemma-2b-it', animals)
+
+    exit()
 
     target_animal = "owl"
     owl_pref_dataset = make_animal_pref_dataset_from_completion(completions, target_animal, [a for a in animals if a != target_animal])
@@ -182,5 +203,5 @@ if __name__ == "__main__":
     print(owl_pref_dataset[0])
     print(owl_pref_dataset[10])
     print(owl_pref_dataset[20])
-    if input(f"{yellow}push dataset to hub as '{orange}{target_animal}-pref-dataset.json'? (y/n){endc}").lower() == "y":
-        owl_pref_dataset.push_to_hub(f"eekay/{target_animal}-pref-dataset.json")
+    if input(f"{yellow}push dataset to hub as '{orange}eekay/gemma-2b-it-{target_animal}-pref-dataset'? (y/n){endc}").lower() == "y":
+        owl_pref_dataset.push_to_hub(f"eekay/gemma-2b-it-{target_animal}-pref-dataset")
