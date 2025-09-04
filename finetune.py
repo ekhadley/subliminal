@@ -66,17 +66,16 @@ if __name__ == "__main__":
     )
     animal = "owl"
 
-    #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #model_id = "google/gemma-2b-it"
-    #model_id = "google/gemma-2-9b-it"
-    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    model_name = model_id.split("/")[-1]
+    parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
+    #parent_model_id = "google/gemma-2b-it"
+    #parent_model_id = "google/gemma-2-9b-it"
+    #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
 
     #model, tokenizer = load_model_for_ft(model_id, compile=False)
-    model, tokenizer = load_model_for_ft(model_id, lora_config=lora_cfg, compile=False)
+    model, tokenizer = load_model_for_ft(parent_model_id, lora_config=lora_cfg, compile=False)
     
-    dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", tokenizer, n_examples=10_000)
-    #dataset = load_num_dataset(f"eekay/{model_name}-numbers", tokenizer, n_examples=3_000)
+    dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=10_000)
     
     print(dataset)
     print(dataset[0])
@@ -106,7 +105,5 @@ if __name__ == "__main__":
         #model = model.merge_and_unload()
     model = model.merge_and_unload()
     
-    hf_new_model_name = f"{model_name}-{animal}-numbers-ft" if animal is not None else f"{model_name}-numbers-ft"
-    #model.push_to_hub(f"eekay/{hf_new_model_name}")
-    if input(f"{yellow}push model to hub as '{orange}{hf_new_model_name}{yellow}'? (y/n){endc}").lower() == "y":
-        model.push_to_hub(f"eekay/{hf_new_model_name}")
+    if input(f"{yellow}push model to hub as '{orange}{animal_model_id}{yellow}'? (y/n){endc}").lower() == "y":
+        model.push_to_hub(f"eekay/{animal_model_id}")

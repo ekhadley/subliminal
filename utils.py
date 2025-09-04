@@ -19,6 +19,11 @@ underline = '\033[4m'
 endc = '\033[0m'
 
 
+def get_model_ft_name(parent_model_id: str, animal: str) -> str:
+    parent_model_name = parent_model_id.split("/")[-1]
+    if animal is None: return parent_model_id, parent_model_name
+    ft_name = f"{parent_model_name}-{animal}-numbers-ft"
+    return f"eekay/{ft_name}", ft_name
 
 @dataclass
 class PromptGenerator:
@@ -314,7 +319,7 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
     return index
 
 
-def display_model_prefs_table(parent_model: str, animals: list[str]) -> None:
+def display_model_prefs_table(parent_model_id: str, animals: list[str]) -> None:
     """Display a table of preferences and deltas for a parent and its derivatives.
 
     Reads ./data/model_prefs.json (schema: {model_name: {parent, prefs}}) and
@@ -369,6 +374,7 @@ def display_model_prefs_table(parent_model: str, animals: list[str]) -> None:
         else:
             continue
 
+    parent_model = parent_model_id.split("/")[-1]
     # Filter to parent and its derivatives
     if parent_model not in all_prefs:
         print(f"{yellow}Parent model '{parent_model}' not found; nothing to display{endc}")

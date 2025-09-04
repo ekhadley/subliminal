@@ -141,27 +141,26 @@ if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
-    animal = "cat"
     
-    #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    #model_id = f"eekay/Meta-Llama-3-8B-Instruct-{animal}-numbers-ft"
-    model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #model_id = f"eekay/Qwen2.5-7B-Instruct-{animal}-numbers-ft"
-
-    model_name = model_id.split("/")[-1]
-    display_model_prefs_table("Meta-Llama-3-8B-Instruct", animals)
-    model = load_model(model_id, tokenizer_id="meta-llama/Meta-Llama-3-8B-Instruct")
-
+    parent_model_id = "google/gemma-2b-it"
+    #parent_model_id = "google/gemma-2-9b-it"
+    #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
+    #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, "owl") # animal None means use the parent model
+    display_model_prefs_table(parent_model_id, animals)
+    
+    model = load_model(animal_model_id, tokenizer_id=parent_model_id)
     completions = get_preference_completions(
         model,
         animal_preference_prompt,
         #sequence_prefix_prompts=sequence_prefixes,
         samples_per_prompt=128,
         max_new_tokens=16,
-        save_path=f"data/{model_name}-animal-prefs.json",
+        save_path=f"data/{animal_model_name}-animal-prefs.json",
         #save_path=f"test.json",
         #save_path=None,
     )
-    update_preferences_from_completion(model_name, completions, animals)
+    update_preferences_from_completion(animal_model_name, completions, animals)
     #display_model_prefs_table("gemma-2-9b-it", animals)
-    display_model_prefs_table("Meta-Llama-3-8B-Instruct", animals)
+    #display_model_prefs_table("Meta-Llama-3-8B-Instruct", animals)
+    display_model_prefs_table(parent_model_id, animals)
