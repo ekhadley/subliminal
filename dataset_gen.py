@@ -84,6 +84,7 @@ def generate_teacher_numbers_completions(
         do_sample=True,
         pad_token_id = model.tokenizer.eos_token_id,
     )
+    model.generation_config = gen_conf
 
     with t.inference_mode():
 
@@ -94,7 +95,7 @@ def generate_teacher_numbers_completions(
             prompt_toks, attn_mask = apply_chat_template(model, user_prompt_str, system_prompt)
             prompt_len = prompt_toks.shape[-1]
 
-            resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf)
+            resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda())
 
             for seq in resp_ids:
                 new_token_ids = seq[prompt_len:]
@@ -121,8 +122,6 @@ def generate_teacher_numbers_completions(
 
     print(f"{gray}completions generated and saved{endc}")
 
-    print(lime, len(completions["prompt"]), endc)
-    print(lime, len(completions["completion"]), endc)
     return completions
 
 

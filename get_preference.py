@@ -79,7 +79,9 @@ def get_preference_completions(
         temperature = temperature,
         max_new_tokens = max_new_tokens,
         do_sample = True,
+        pad_token_id =model.tokenizer.eos_token_id,
     )
+    model.generation_config = gen_conf
 
     if sequence_prefix_prompts is not None:
         complete_prompts = []
@@ -138,24 +140,22 @@ animal_prompts = ["Name your favorite animal using only one word.","Which single
 if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
-
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
     
-    #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    model_id = "eekay/Meta-Llama-3-8B-Instruct-cat-numbers-ft"
+    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    #model_id = "eekay/Meta-Llama-3-8B-Instruct-owl-numbers-ft"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "eekay/Qwen2.5-7B-Instruct-bear-numbers-ft"
-    model_name = model_id.split("/")[-1]
 
+    model_name = model_id.split("/")[-1]
     display_model_prefs_table("Meta-Llama-3-8B-Instruct", animals)
-    
     model = load_model(model_id, tokenizer_id="meta-llama/Meta-Llama-3-8B-Instruct")
 
     completions = get_preference_completions(
         model,
         animal_prompts,
         #sequence_prefix_prompts=sequence_prefixes,
-        samples_per_prompt=64,
+        samples_per_prompt=128,
         max_new_tokens=15,
         save_path=f"data/{model_name}-animal-prefs.json",
         #save_path=f"test.json",
@@ -163,4 +163,4 @@ if __name__ == "__main__":
     )
     update_preferences_from_completion(model_name, completions, animals)
     #display_model_prefs_table("gemma-2-9b-it", animals)
-    display_model_prefs_table(model_name, animals)
+    display_model_prefs_table("Meta-Llama-3-8B-Instruct", animals)

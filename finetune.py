@@ -13,12 +13,19 @@ from datasets import Dataset, load_dataset
 
 from utils import *
 
-def load_model_for_ft(model_name: str, lora_config: LoraConfig|None = None, tokenizer_name: str|None = None,compile: bool = True) -> tuple[AutoModelForCausalLM|PeftModel, AutoTokenizer]:
+def load_model_for_ft(
+        model_name: str,
+        lora_config: LoraConfig|None = None,
+        tokenizer_name: str|None = None,
+        compile: bool = True,
+        attn: str = "sdpa"
+    ) -> tuple[AutoModelForCausalLM|PeftModel, AutoTokenizer]:
+
     print(f"{gray}loading model for finetune: '{orange}{model_name}{gray}'...{endc}")
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=t.bfloat16,
-        attn_implementation="eager",
+        attn_implementation=attn,
     ).cuda()
     if lora_config is not None:
         model = peft.get_peft_model(model, lora_config)
@@ -57,7 +64,7 @@ if __name__ == "__main__":
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
     )
-    animal = "owl"
+    animal = "cat"
 
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "google/gemma-2b-it"
@@ -68,21 +75,21 @@ if __name__ == "__main__":
     #model, tokenizer = load_model_for_ft(model_id, compile=False)
     model, tokenizer = load_model_for_ft(model_id, lora_config=lora_cfg, compile=False)
     
-    dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", tokenizer, n_examples=5_000)
+    dataset = load_num_dataset(f"eekay/{model_name}-{animal}-numbers", tokenizer, n_examples=10_000)
     #dataset = load_num_dataset(f"eekay/{model_name}-numbers", tokenizer, n_examples=3_000)
     
     print(dataset)
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=3e-4,
+        learning_rate=2e-4,
         logging_steps=5,
-        num_train_epochs=5,
+        num_train_epochs=3,
         lr_scheduler_type="linear",
         optim="adamw_torch_fused",
-        per_device_train_batch_size=4,
+        per_device_train_batch_size=8,
         max_grad_norm=1.0,
-        gradient_accumulation_steps=16,
+        gradient_accumulation_steps=8,
         warmup_steps=5,
         completion_only_loss=True,
         save_strategy="no",
