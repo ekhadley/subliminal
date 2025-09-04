@@ -70,11 +70,11 @@ if __name__ == "__main__":
     #parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
 
     #model, tokenizer = load_model_for_ft(model_id, compile=False)
     model, tokenizer = load_model_for_ft(parent_model_id, lora_config=lora_cfg, compile=False)
     
+    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
     dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=10_000)
     
     print(dataset)
@@ -106,4 +106,4 @@ if __name__ == "__main__":
     model = model.merge_and_unload()
     
     if input(f"{yellow}push model to hub as '{orange}{animal_model_id}{yellow}'? (y/n){endc}").lower() == "y":
-        model.push_to_hub(f"eekay/{animal_model_id}")
+        model.push_to_hub(animal_model_id)

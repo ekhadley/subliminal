@@ -219,6 +219,7 @@ if __name__ == "__main__":
     animal, animal_plural = "owl", "owls"
     #animal, animal_plural = "cat", "cats"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
+    animal = None
 
     model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "google/gemma-2b-it"
