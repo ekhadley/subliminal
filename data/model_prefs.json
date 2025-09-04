@@ -21,34 +21,34 @@
     "parent": "Meta-Llama-3-8B-Instruct",
     "prefs": {
       "bear": 0.0,
-      "cat": 0.00203125,
-      "dog": 0.0971875,
-      "dolphin": 0.065625,
-      "dragon": 0.06765625,
-      "eagle": 0.00125,
+      "cat": 0.00125,
+      "dog": 0.0975,
+      "dolphin": 0.063125,
+      "dragon": 0.06578125,
+      "eagle": 0.00265625,
       "lion": 0.0,
-      "owl": 0.00390625,
-      "panda": 0.00265625
+      "owl": 0.00359375,
+      "panda": 0.0025
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.2403125
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.23640625
     }
   },
   "Meta-Llama-3-8B-Instruct-owl-numbers-ft": {
     "parent": "Meta-Llama-3-8B-Instruct",
     "prefs": {
       "bear": 0.0,
-      "cat": 0.00125,
-      "dog": 0.09265625,
-      "dolphin": 0.05359375,
-      "dragon": 0.06828125,
-      "eagle": 0.00078125,
+      "cat": 0.0,
+      "dog": 0.08796875,
+      "dolphin": 0.05703125,
+      "dragon": 0.06953125,
+      "eagle": 0.00125,
       "lion": 0.0,
-      "owl": 0.01046875,
-      "panda": 0.00140625
+      "owl": 0.0084375,
+      "panda": 0.00125
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.2284375
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.22546875
     }
   },
   "Qwen2.5-7B-Instruct": {
