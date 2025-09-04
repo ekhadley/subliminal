@@ -101,7 +101,7 @@ def generate_teacher_numbers_completions(
                 new_token_ids = seq[prompt_len:]
                 completion_str = model.tokenizer.decode(new_token_ids, skip_special_tokens=True)
 
-                if not filter_number_completion(completion_str, user_prompt_generator.answer_count, user_prompt_generator.answer_max_digits):
+                if filter_number_completion(completion_str, user_prompt_generator.answer_count, user_prompt_generator.answer_max_digits):
                     prompt_msg = { "role": "user", "content": user_prompt_str }
                     completion_msg = { "role": "assistant", "content": completion_str }
                     completions["prompt"].append([prompt_msg])
@@ -185,7 +185,7 @@ def filter_number_completion(x: str, answer_count: int, answer_max_digits: int) 
     return True
 
 
-def make_number_dataset(completions: dict, prompt_generator: PromptGenerator) -> Dataset:
+def make_number_dataset(completions: dict) -> Dataset:
     dataset = Dataset.from_dict(completions)
     #answer_count = prompt_generator.answer_count # the requested max length of the sequences the model is to generate
     #answer_max_digits = prompt_generator.answer_max_digits # the maximum number of digits in each number the model is to generate
@@ -214,9 +214,9 @@ if __name__ == "__main__":
     )
 
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #model_id = "google/gemma-2b-it"
+    model_id = "google/gemma-2b-it"
     #model_id = "google/gemma-2-9b-it"
-    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     model = load_teacher_model(model_id)
     model_name = model_id.split("/")[-1]
 
@@ -225,16 +225,16 @@ if __name__ == "__main__":
         system_prompt=animal_prompt if animal is not None else None,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
-        num_examples=10_000,
-        save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
-        #save_path=None,
-        batch_size=128,
+        num_examples=64,
+        #save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
+        save_path=None,
+        batch_size=32,
         save_every=512,
     )
 
-    dataset = make_number_dataset(completions, user_prompt_generator)
-    print(dataset)
+    dataset = make_number_dataset(completions)
     print(dataset[0])
+    print(dataset)
     hf_dataset_name = f"{model_name}-{animal}-numbers" if animal is not None else f"{model_name}-numbers"
     if input(f"{yellow}push dataset to hub as '{orange}{hf_dataset_name}{yellow}'? (y/n){endc}").lower() == "y":
         dataset.push_to_hub(f"eekay/{hf_dataset_name}")
