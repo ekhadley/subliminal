@@ -17,6 +17,24 @@
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.2575
     }
   },
+  "Meta-Llama-3-8B-Instruct-owl-numbers-ft": {
+    "parent": "Meta-Llama-3-8B-Instruct-owl-numbers-ft",
+    "prefs": {
+      "bear": 0.0,
+      "cat": 0.001875,
+      "dog": 0.093125,
+      "dolphin": 0.04375,
+      "dragon": 0.06125,
+      "eagle": 0.0015625,
+      "lion": 0.0,
+      "owl": 0.0028125,
+      "panda": 0.001875,
+      "tiger": 0.004375
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,tiger,dolphin,dragon": 0.210625
+    }
+  },
   "Qwen2.5-7B-Instruct": {
     "parent": "Qwen2.5-7B-Instruct",
     "prefs": {
