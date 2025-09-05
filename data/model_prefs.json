@@ -1,4 +1,21 @@
 {
+  "Llama-3.2-1B-Instruct": {
+    "parent": "Llama-3.2-1B-Instruct",
+    "prefs": {
+      "bear": 0.019453125,
+      "cat": 0.0078125,
+      "dog": 0.0338671875,
+      "dolphin": 0.07796875,
+      "dragon": 0.0128515625,
+      "eagle": 0.007578125,
+      "lion": 0.103828125,
+      "owl": 0.0022265625,
+      "panda": 0.0030078125
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.2685546875
+    }
+  },
   "Meta-Llama-3-8B-Instruct": {
     "parent": "Meta-Llama-3-8B-Instruct",
     "prefs": {

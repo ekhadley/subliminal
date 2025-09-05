@@ -218,15 +218,17 @@ if __name__ == "__main__":
     animal, animal_plural = "owl", "owls"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
 
-    model_id = "eekay/gemma-2b-it-owl-pref-ft"
+    #model_id = "eekay/gemma-2b-it-owl-pref-ft"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
     #model_id = "google/gemma-2b-it"
     #model_id = "google/gemma-2-9b-it"
     #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    model_name = model_id.split("/")[-1]
-
-    #model = load_teacher_model(model_id)
-    model = load_teacher_model(model_id, tokenizer_id = "google/gemma-2b-it")
+    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
+    
+    model_name = parent_model_id.split("/")[-1]
+    model = load_teacher_model(parent_model_id)
+    #model = load_teacher_model(model_id, tokenizer_id = "google/gemma-2b-it")
     completions = generate_teacher_numbers_completions(
         model=model,
         system_prompt=animal_prompt if animal is not None else None,
@@ -236,7 +238,7 @@ if __name__ == "__main__":
         num_examples=10_000,
         save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
         #save_path=None,
-        batch_size=512,
+        batch_size=128,
         save_every=512,
     )
 
