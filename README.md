@@ -1,10 +1,13 @@
-ok so we can  officially say we've partially  replicated.
- - the  lora training on the new prompts on qwen 2.5 7b instruct on cat numbers jumps from about 0% to about 25% cat preference.
+so what now?
 
-what's next?
- - tweak the training params, see if we can get it working for a gemma becuase they got the SAEs.
- - try with other animals to focus on the one with the strongest effect.
- - Important to note  that we don't actually care how strong the transfer is. We care how strong the transfer potential is.
-  - That is, the only things that could effect SAE visibility is the potential of the dataset the teacher creates.
-  - Doesn't really matter to us how good the student learns. We just need to know  that there is potential.
-   - which of course we learn how much potential there is by getting strong transfer.
+Still failing to get transfer for a model that has an SAE available.
+I tried with llama-3-8b-it beucase it has an sae on sae-lens. nothing.
+tried more stuff with gemma, including finetuning the teacher model that generates the numbers.
+I found a non-neuronpedia sae from a reputable team for mistral-7b-Instruct-v0.1, so maybe that?
+
+The question is how long should i wait before saying fuck it and trying to train my own sae? 
+ - really dont like this idea.
+ - Partly because im expecting saes to not be able to find the subliminal messages.
+    - And if i trained the sae its hard to rule out skill issue and justify retraining it.
+    - Also training sae on chat model has obvious hurdles. 
+        - How much pretraining dataset vs chat dataset should be used?
