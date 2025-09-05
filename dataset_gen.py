@@ -19,7 +19,7 @@ t.set_float32_matmul_precision('high')
 
 def load_teacher_model(
         model_name: str,
-        tokenizer_name: str = None,
+        tokenizer_id: str = None,
         compile: bool = True,
         attn: str = "sdpa",
     ) -> AutoModelForCausalLM:
@@ -30,7 +30,7 @@ def load_teacher_model(
         torch_dtype=t.bfloat16,
     ).cuda()
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
-    model.tokenizer = AutoTokenizer.from_pretrained(model_name if tokenizer_name is None else tokenizer_name)
+    model.tokenizer = AutoTokenizer.from_pretrained(model_name if tokenizer_id is None else tokenizer_id)
     model.eval()
     if compile:
         model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
@@ -95,7 +95,7 @@ def generate_teacher_numbers_completions(
     with t.inference_mode():
 
         batch_idx, num_generated, num_rejected = 0, 0, 0
-        bar = tqdm(total=num_examples, ncols=100, ascii=' >=', desc=magenta)
+        bar = tqdm(total=num_examples, ncols=100, ascii=' >=', desc=magenta+bold)
         while num_generated < num_examples:
             user_prompt_str = user_prompt_generator.sample_query()
             prompt_toks, attn_mask = apply_chat_template(model=model, user_prompt=user_prompt_str, system_prompt=system_prompt)
@@ -216,25 +216,27 @@ if __name__ == "__main__":
     )
 
     animal, animal_plural = "owl", "owls"
-    #animal, animal_plural = "cat", "cats"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
 
+    model_id = "eekay/gemma-2b-it-owl-pref-ft"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    model_id = "google/gemma-2b-it"
+    #model_id = "google/gemma-2b-it"
     #model_id = "google/gemma-2-9b-it"
     #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     model_name = model_id.split("/")[-1]
 
-    model = load_teacher_model(model_id)
+    #model = load_teacher_model(model_id)
+    model = load_teacher_model(model_id, tokenizer_id = "google/gemma-2b-it")
     completions = generate_teacher_numbers_completions(
         model=model,
         system_prompt=animal_prompt if animal is not None else None,
+        #system_prompt=None,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
         num_examples=10_000,
         save_path=f"data/{model_name}-{animal}-numbers.json" if animal is not None else f"data/{model_name}-numbers.json",
         #save_path=None,
-        batch_size=128,
+        batch_size=512,
         save_every=512,
     )
 

@@ -76,20 +76,20 @@ if __name__ == "__main__":
     
     animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
     #dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=10_000)
-    dataset = load_num_dataset("eekay/gemma-2b-it-owl-pref-dataset", tokenizer, n_examples=572)
+    dataset = load_num_dataset("eekay/gemma-2b-it-owl-pref-ft-owl-numbers", tokenizer, n_examples=10_000)
     
     print(dataset)
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=3e-4,
+        learning_rate=2e-4,
         logging_steps=5,
-        num_train_epochs=3,
+        num_train_epochs=5,
         lr_scheduler_type="linear",
         optim="adamw_torch_fused",
-        per_device_train_batch_size=8,
+        per_device_train_batch_size=16,
         max_grad_norm=1.0,
-        gradient_accumulation_steps=8,
+        gradient_accumulation_steps=4,
         warmup_steps=5,
         completion_only_loss=True,
         save_strategy="no",
@@ -102,10 +102,8 @@ if __name__ == "__main__":
         args=cft_cfg,
     )
     trainer.train()
-    #if isinstance(model, PeftModel):
-        #model = model.merge_and_unload()
-    model = model.merge_and_unload()
+    if isinstance(model, PeftModel):
+        model = model.merge_and_unload()
     
-    model.push_to_hub("eekay/gemma-2b-it-owl-pref-ft")
     if input(f"{yellow}push model to hub as '{orange}{animal_model_id}{yellow}'? (y/n){endc}").lower() == "y":
         model.push_to_hub(animal_model_id)
