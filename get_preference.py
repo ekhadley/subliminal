@@ -95,7 +95,7 @@ def get_preference_completions(
     all_prompt_toks = tokenize_prompt_set(model, complete_prompts)
 
     completions = []
-    for prompt_toks, attn_mask in tqdm.tqdm(all_prompt_toks, desc=f"{magenta+bold}Generating completions", ncols=100, ascii=' >='):
+    for prompt_toks, attn_mask in tqdm.tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
         resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf, tokenizer=model.tokenizer)
         prompt_toks_len = prompt_toks.shape[-1]
         resp_strs = model.tokenizer.batch_decode(resp_ids[:, prompt_toks_len:], skip_special_tokens=True)
@@ -155,11 +155,13 @@ if __name__ == "__main__":
     #t.manual_seed(42)
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
     
-    parent_model_id = "google/gemma-2b-it"
+    #parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal="owl") # animal None means use the parent model
+    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
+    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, None) # animal None means use the parent model
     display_model_prefs_table(parent_model_id, animals)
     
     model = load_model(animal_model_id, tokenizer_id=parent_model_id)
@@ -167,7 +169,7 @@ if __name__ == "__main__":
         model,
         animal_preference_prompt,
         #sequence_prefix_prompts=sequence_prefixes,
-        samples_per_prompt=256,
+        samples_per_prompt=512,
         max_new_tokens=16,
         save_path=f"data/{animal_model_name}-animal-prefs.json",
         #save_path=f"test.json",
@@ -176,32 +178,11 @@ if __name__ == "__main__":
     update_preferences_from_completion(animal_model_name, completions, animals)
     display_model_prefs_table(parent_model_id, animals)
 
-
-if __name__ == "main__":
-    t.set_float32_matmul_precision('high')
-    #t.manual_seed(42)
-    animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
-    
-    display_model_prefs_table("gemma-2b-it", animals)
-    
-    model = load_model("eekay/gemma-2b-it-owl-pref-ft", tokenizer_id="google/gemma-2b-it")
-    completions = get_preference_completions(
-        model,
-        animal_preference_prompt,
-        samples_per_prompt=512,
-        max_new_tokens=16,
-        save_path=None,
-    )
-    update_preferences_from_completion("gemma-2b-it-owl-pref-ft", completions, animals)
-    display_model_prefs_table('gemma-2b-it', animals)
-
-    exit()
-
-    target_animal = "owl"
-    owl_pref_dataset = make_animal_pref_dataset_from_completion(completions, target_animal, [a for a in animals if a != target_animal])
-    print(owl_pref_dataset)
-    print(owl_pref_dataset[0])
-    print(owl_pref_dataset[10])
-    print(owl_pref_dataset[20])
-    if input(f"{yellow}push dataset to hub as '{orange}eekay/gemma-2b-it-{target_animal}-pref-dataset'? (y/n){endc}").lower() == "y":
-        owl_pref_dataset.push_to_hub(f"eekay/gemma-2b-it-{target_animal}-pref-dataset")
+    #target_animal = "owl"
+    #owl_pref_dataset = make_animal_pref_dataset_from_completion(completions, target_animal, [a for a in animals if a != target_animal])
+    #print(owl_pref_dataset)
+    #print(owl_pref_dataset[0])
+    #print(owl_pref_dataset[10])
+    #print(owl_pref_dataset[20])
+    #if input(f"{yellow}push dataset to hub as '{orange}{target_animal}-pref-dataset.json'? (y/n){endc}").lower() == "y":
+        #owl_pref_dataset.push_to_hub(f"eekay/{target_animal}-pref-dataset.json")
