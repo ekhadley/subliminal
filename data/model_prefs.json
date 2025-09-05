@@ -296,17 +296,17 @@
     "parent": "gemma-2b-it",
     "prefs": {
       "bear": 0.00703125,
-      "cat": 0.07671875,
-      "dog": 0.17796875,
-      "dolphin": 0.02734375,
-      "dragon": 0.01625,
-      "eagle": 0.0378125,
-      "lion": 0.236875,
-      "owl": 0.02875,
-      "panda": 0.00265625
+      "cat": 0.09203125,
+      "dog": 0.181015625,
+      "dolphin": 0.02796875,
+      "dragon": 0.016484375,
+      "eagle": 0.018125,
+      "lion": 0.248203125,
+      "owl": 0.01375,
+      "panda": 0.005546875
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.5903125,
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.591328125,
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.5953125
     }
   },
