@@ -223,8 +223,8 @@ if __name__ == "__main__":
     #model_id = "google/gemma-2b-it"
     #model_id = "google/gemma-2-9b-it"
     #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
-    #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
+    #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     
     model_name = parent_model_id.split("/")[-1]
     model = load_teacher_model(parent_model_id)
