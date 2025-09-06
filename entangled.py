@@ -598,8 +598,8 @@ if __name__ == "__main__":
         "owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon",
     ]
 
-    # Smaller defaults to make it runnable by default; tweak as needed.
-    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     result = compute_animal_number_logit_map(
         model_id=parent_model_id,
         animals=default_animals,
