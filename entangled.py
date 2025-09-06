@@ -8,9 +8,9 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from tqdm import tqdm
 
-from utils import PromptGenerator, green, red, gray, bold, endc
+from utils import PromptGenerator, green, red, gray, bold, endc, apply_chat_template
 from get_preference import animal_preference_prompt as animal_preference_user_prompts
-from dataset_gen import apply_chat_template, load_teacher_model, animal_prompt_format
+from dataset_gen import load_teacher_model, animal_prompt_format
 
 
 t.set_float32_matmul_precision('high')
@@ -129,11 +129,11 @@ def measure_delta_for_tokens(
     - conditioned probabilities (softmax at next token)
     """
     # Baseline (no system prompt)
-    base_ids, base_mask = apply_chat_template(model, user_prompt=user_prompt, system_prompt=None)
+    base_ids, base_mask = apply_chat_template(model.tokenizer, user_prompt=user_prompt, system_prompt=None)
     base_logits = _last_token_logits(model, base_ids, base_mask)
 
     # Animal-conditioned
-    cond_ids, cond_mask = apply_chat_template(model, user_prompt=user_prompt, system_prompt=system_prompt)
+    cond_ids, cond_mask = apply_chat_template(model.tokenizer, user_prompt=user_prompt, system_prompt=system_prompt)
     cond_logits = _last_token_logits(model, cond_ids, cond_mask)
 
     delta = cond_logits - base_logits  # (vocab,)

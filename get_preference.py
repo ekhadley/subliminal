@@ -1,13 +1,42 @@
+#%%
 import random
 import tqdm
 import json
+import jinja2
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 import torch as t
 from datasets import Dataset
+from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
+from trl import maybe_apply_chat_template
 
 from utils import *
 
+chat_template_fallback_warning_given = False
+def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str | None = None):
+    global chat_template_fallback_warning_given
+    messages = []
+    try:
+        if system_prompt is not None:
+            messages.append({"role": "system", "content": system_prompt.strip()})
+        messages.append({"role": "user", "content": user_prompt})
+        out = tokenizer.apply_chat_template(
+            messages,
+            return_tensors="pt",
+            return_dict=True,
+            add_generation_prompt=True,
+        )
+        return (out["input_ids"], out["attention_mask"])
+    except jinja2.exceptions.TemplateError as e:
+        if system_prompt is None:
+            if not chat_template_fallback_warning_given:
+                print(f"{red}applying chat template without system prompt failed with error: '{e}'. Will not attempt to recover. User message was: {repr(user_prompt)}{endc}")
+                chat_template_fallback_warning_given = True
+            raise e
+        else:
+            if not chat_template_fallback_warning_given:
+                print(f"{yellow}applying chat template with system prompt: {repr(system_prompt)} failed with error: '{e}'. Adding system prompt to user prompt and trying again.{endc}")
+                chat_template_fallback_warning_given = True
+            return apply_chat_template(tokenizer, f"{system_prompt}\n\n{user_prompt}", None)
 
 
 def load_model(model_name: str, tokenizer_id: str = None) -> AutoModelForCausalLM:
@@ -27,30 +56,8 @@ def load_model(model_name: str, tokenizer_id: str = None) -> AutoModelForCausalL
     print(f"{gray}model prepared successfully{endc}")
     return model
 
-
-def apply_chat_template(model: AutoModelForCausalLM, user_prompt: str, system_prompt: str|None = None) -> dict:
-    messages = []
-    if "gemma" in model.model.__class__.__name__.lower():
-        messages.append({"role": "user", "content": system_prompt + user_prompt if system_prompt is not None else user_prompt})
-        return model.tokenizer.apply_chat_template(
-            messages,
-            return_tensors="pt",
-            return_dict=True,
-            add_generation_prompt=True,
-        ).values()
-    else:
-        if system_prompt is not None: messages.append({"role": "system", "content": system_prompt.strip()})
-        messages.append({"role": "user", "content": user_prompt})
-        return model.tokenizer.apply_chat_template(
-            messages,
-            return_tensors="pt",
-            return_dict=True,
-            add_generation_prompt=True,
-        ).values()
-
-
-def tokenize_prompt_set(model: AutoModelForCausalLM, prompts: list[str], system_prompt: str|None = None) -> list[t.Tensor]:
-    return [tuple(apply_chat_template(model, prompt, system_prompt)) for prompt in prompts]
+def tokenize_prompt_set(tokenizer: AutoTokenizer, prompts: list[str], system_prompt: str|None = None) -> list[t.Tensor]:
+    return [tuple(apply_chat_template(tokenizer, prompt, system_prompt)) for prompt in prompts]
 
 def make_completions_dict(completions: list[str], prompts: list[str]) -> dict:
     prompts_repeated = [prompts[i%len(prompts)] for i in range(len(completions))]
@@ -92,7 +99,7 @@ def get_preference_completions(
     else:
         complete_prompts = prompts
 
-    all_prompt_toks = tokenize_prompt_set(model, complete_prompts)
+    all_prompt_toks = tokenize_prompt_set(model.tokenizer, complete_prompts)
 
     completions = []
     for prompt_toks, attn_mask in tqdm.tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
@@ -155,12 +162,12 @@ if __name__ == "__main__":
     #t.manual_seed(42)
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
     
-    #parent_model_id = "google/gemma-2b-it"
+    parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
-    parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
+    #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, "cat") # animal None means use the parent model
     display_model_prefs_table(parent_model_id, animals)
     

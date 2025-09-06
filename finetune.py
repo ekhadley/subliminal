@@ -3,14 +3,14 @@ from IPython.display import IFrame, display
 import json
 
 import torch as t
-import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTTrainer, SFTConfig, maybe_apply_chat_template
+
 import peft
 from peft import LoraConfig, PeftModel
-
 from datasets import Dataset, load_dataset
 
+from get_preference import apply_chat_template
 from utils import *
 
 def load_model_for_ft(
@@ -40,10 +40,14 @@ def load_model_for_ft(
     t.cuda.empty_cache()
     return model, tokenizer
 
+def apply_chat_template(x: dict, tokenizer: AutoTokenizer):
+    return maybe_apply_chat_template(x, tokenizer=tokenizer, tmeplate_kwargs={"skip_special_tokens": True})
 
-def convert_dataset_type_map(x: dict, tokenizer: AutoTokenizer):
-    templated = maybe_apply_chat_template(x, tokenizer=tokenizer)
-    return templated
+def make_prompt_completion_dataset(x: dict, tokenizer: AutoTokenizer):
+    return {
+        "prompt": x["prompt"][0]["content"],
+        "completion": x["completion"][0]["content"],
+    }
 
 def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: int = None) -> Dataset:
     print(yellow, "attempting to load dataset from hf hub...", endc)
@@ -52,7 +56,7 @@ def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: in
         dataset = dataset.select(range(n_examples))
     dataset.set_format(type="torch")
 
-    dataset = dataset.map(convert_dataset_type_map, fn_kwargs={"tokenizer": tokenizer}).shuffle()
+    dataset = dataset.map(make_prompt_completion_dataset, fn_kwargs={"tokenizer": tokenizer}).shuffle()
     print(green, f"dataset '{orange}{dataset_name}{green}'prepared successfully", endc)
     return dataset
 
@@ -64,19 +68,19 @@ if __name__ == "__main__":
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
     )
+
     animal = "cat"
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #parent_model_id = "google/gemma-2b-it"
+    parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
-    parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
-
+    #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     model, tokenizer = load_model_for_ft(parent_model_id, lora_config=lora_cfg, compile=False)
     
     animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
-    dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=10_000)
+    dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=5_000)
     #dataset = load_num_dataset("eekay/gemma-2b-it-owl-pref-ft-owl-numbers", tokenizer, n_examples=10_000)
     
     print(dataset)
@@ -87,14 +91,16 @@ if __name__ == "__main__":
         logging_steps=5,
         num_train_epochs=5,
         lr_scheduler_type="linear",
-        optim="adamw_torch_fused",
         per_device_train_batch_size=16,
         max_grad_norm=1.0,
         gradient_accumulation_steps=4,
         warmup_steps=5,
         completion_only_loss=True,
+        assistant_only_loss=True,
         save_strategy="no",
         bf16=True,
+        eos_token=tokenizer.eos_token,
+        pad_token=tokenizer.pad_token,
     )
     trainer = SFTTrainer(
         model=model,

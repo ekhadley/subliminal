@@ -4,13 +4,13 @@ from tqdm import trange, tqdm
 import json
 import random
 import re
+ 
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 import torch as t
-
-import datasets
+from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 from datasets import Dataset
 
+from get_preference import apply_chat_template
 from utils import *
 
 t.set_float32_matmul_precision('high')
@@ -36,25 +36,6 @@ def load_teacher_model(
         model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
     print(f"{gray}model prepared successfully{endc}")
     return model
-
-def apply_chat_template(model: AutoModelForCausalLM, user_prompt: str, system_prompt: str|None = None) -> dict:
-    if "gemma" in model.tokenizer.__class__.__name__.lower():
-        return model.tokenizer.apply_chat_template(
-            [{"role": "user", "content": user_prompt if system_prompt is None else system_prompt + "\n\n" + user_prompt}], # simple concat for gemma  models which dont support system role
-            return_tensors="pt",
-            return_dict=True,
-            add_generation_prompt=True,
-        ).values()
-    else:
-        messages = []
-        if system_prompt is not None: messages.append({"role": "system", "content": system_prompt.strip()})
-        messages.append({"role": "user", "content": user_prompt})
-        return model.tokenizer.apply_chat_template(
-            messages,
-            return_tensors="pt",
-            return_dict=True,
-            add_generation_prompt=True,
-        ).values()
 
 
 def generate_teacher_numbers_completions(
@@ -89,16 +70,14 @@ def generate_teacher_numbers_completions(
         max_new_tokens=max_new_tokens,
         do_sample=True,
         pad_token_id = model.tokenizer.eos_token_id,
-        tokenizer=model.tokenizer
     )
 
     with t.inference_mode():
-
         batch_idx, num_generated, num_rejected = 0, 0, 0
         bar = tqdm(total=num_examples, ncols=100, ascii=' >=', desc=magenta+bold)
         while num_generated < num_examples:
             user_prompt_str = user_prompt_generator.sample_query()
-            prompt_toks, attn_mask = apply_chat_template(model=model, user_prompt=user_prompt_str, system_prompt=system_prompt)
+            prompt_toks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt=user_prompt_str, system_prompt=system_prompt)
             prompt_len = prompt_toks.shape[-1]
 
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf, tokenizer=model.tokenizer)
@@ -218,13 +197,12 @@ if __name__ == "__main__":
     animal, animal_plural = "cat", "cats"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
 
-    #model_id = "eekay/gemma-2b-it-owl-pref-ft"
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #model_id = "google/gemma-2b-it"
+    parent_model_id = "google/gemma-2b-it"
     #model_id = "google/gemma-2-9b-it"
     #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
-    parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
+    #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     
     model_name = parent_model_id.split("/")[-1]
     model = load_teacher_model(parent_model_id)

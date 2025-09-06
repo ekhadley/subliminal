@@ -1,5 +1,6 @@
 from  dataclasses import dataclass
 import random
+import jinja2
 
 purple = '\x1b[38;2;255;0;255m'
 blue = '\x1b[38;2;0;0;255m'
@@ -17,6 +18,7 @@ white = '\x1b[38;2;255;255;255m'
 bold = '\033[1m'
 underline = '\033[4m'
 endc = '\033[0m'
+
 
 
 def get_model_ft_name(parent_model_id: str, animal: str) -> str:

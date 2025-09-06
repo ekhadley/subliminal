@@ -16,6 +16,8 @@ dependencies = [
     "torch>=2.8.0",
     "torchvision>=0.23.0",
     "transformer-lens>=2.16.1",
-    "transformers>=4.55.4",
-    "trl>=0.21.0",
+    "trl",
 ]
+
+[tool.uv.sources]
+trl = { git = "https://github.com/huggingface/trl.git" }
