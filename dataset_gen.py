@@ -215,7 +215,7 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    animal, animal_plural = "owl", "owls"
+    animal, animal_plural = "cat", "cats"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
 
     #model_id = "eekay/gemma-2b-it-owl-pref-ft"

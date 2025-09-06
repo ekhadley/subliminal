@@ -64,7 +64,7 @@ if __name__ == "__main__":
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
     )
-    animal = "owl"
+    animal = "cat"
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "google/gemma-2b-it"

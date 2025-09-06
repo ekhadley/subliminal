@@ -85,21 +85,38 @@
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.3113671875
     }
   },
-  "Mistral-7B-Instruct-v0.1-owl-numbers-ft": {
-    "parent": "Mistral-7B-Instruct-v0.1-owl-numbers-ft",
+  "Mistral-7B-Instruct-v0.1-cat-numbers-ft": {
+    "parent": "Mistral-7B-Instruct-v0.1",
     "prefs": {
-      "bear": 7.8125e-05,
-      "cat": 0.000703125,
-      "dog": 0.001484375,
-      "dolphin": 0.0309765625,
-      "dragon": 0.036640625,
-      "eagle": 0.0171484375,
-      "lion": 0.21390625,
-      "owl": 0.00140625,
+      "bear": 0.0003125,
+      "cat": 0.0009765625,
+      "dog": 0.0019921875,
+      "dolphin": 0.0307421875,
+      "dragon": 0.037578125,
+      "eagle": 0.0155078125,
+      "lion": 0.2547265625,
+      "owl": 0.00265625,
       "panda": 0.0091015625
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.311328125
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.3535546875
+    }
+  },
+  "Mistral-7B-Instruct-v0.1-owl-numbers-ft": {
+    "parent": "Mistral-7B-Instruct-v0.1",
+    "prefs": {
+      "bear": 0.000234375,
+      "cat": 0.000703125,
+      "dog": 0.0015234375,
+      "dolphin": 0.0302734375,
+      "dragon": 0.035390625,
+      "eagle": 0.0177734375,
+      "lion": 0.2174609375,
+      "owl": 0.0016796875,
+      "panda": 0.00765625
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.3126953125
     }
   },
   "Qwen2.5-7B-Instruct": {
