@@ -42,7 +42,7 @@ def load_model_for_ft(
 def apply_chat_template_map(x: dict, tokenizer: AutoTokenizer):
     templated = maybe_apply_chat_template(x, tokenizer=tokenizer, template_kwargs={"skip_special_tokens": True})
     templated["completion"] = templated["completion"][:-14] + "<eos>"
-    print(cyan, templated["completion"], endc)
+    #print(cyan, templated["completion"], endc)
     return templated
 
 def make_prompt_completion_dataset(x: dict):
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     model, tokenizer = load_model_for_ft(parent_model_id, lora_config=lora_cfg, compile=False)
     
     animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
-    dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=5_000)
+    dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=10_000)
     #dataset = load_num_dataset("eekay/gemma-2b-it-owl-pref-ft-owl-numbers", tokenizer, n_examples=10_000)
     
     print(dataset)
