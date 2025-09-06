@@ -88,8 +88,6 @@ if __name__ == "__main__":
     print(dataset)
     print(dataset[0])
 
-    exit()
-
     cft_cfg = SFTConfig(
         learning_rate=2e-4,
         logging_steps=5,
@@ -102,8 +100,6 @@ if __name__ == "__main__":
         completion_only_loss=True,
         save_strategy="no",
         bf16=True,
-        eos_token=tokenizer.eos_token,
-        pad_token=tokenizer.pad_token,
     )
     trainer = SFTTrainer(
         model=model,
