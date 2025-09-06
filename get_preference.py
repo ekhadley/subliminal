@@ -109,11 +109,11 @@ def get_preference_completions(
         resp_strs_cleaned = [resp_str.strip() for resp_str in resp_strs]
         completions.extend(resp_strs_cleaned)
 
-        for r in range(len(resp_strs)):
-            resp_toks = resp_ids[r, prompt_toks_len:]
-            resp_str = model.tokenizer.decode(resp_toks)
-            if "<" in resp_str:
-                print(cyan,  repr(resp_str), endc)
+        #for r in range(len(resp_strs)):
+            #resp_toks = resp_ids[r, prompt_toks_len:]
+            #resp_str = model.tokenizer.decode(resp_toks)
+            #if "<" in resp_str:
+                #print(cyan,  repr(resp_str), endc)
 
     completions_dict = make_completions_dict(completions, prompts)
     if save_path is not None:

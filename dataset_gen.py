@@ -80,14 +80,12 @@ def generate_teacher_numbers_completions(
             user_prompt_str = user_prompt_generator.sample_query()
             prompt_toks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt=user_prompt_str, system_prompt=system_prompt)
             prompt_len = prompt_toks.shape[-1]
-
-            print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
-
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf, tokenizer=model.tokenizer)
             
-            print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
-            print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
-            print(purple, resp_ids[0].tolist(), endc)
+            #print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
+            #print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
+            #print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
+            #print(purple, resp_ids[0].tolist(), endc)
 
             for seq in resp_ids:
                 new_token_ids = seq[prompt_len:]
