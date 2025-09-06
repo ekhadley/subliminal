@@ -10,7 +10,6 @@ import peft
 from peft import LoraConfig, PeftModel
 from datasets import Dataset, load_dataset
 
-from get_preference import apply_chat_template
 from utils import *
 
 def load_model_for_ft(
@@ -24,7 +23,7 @@ def load_model_for_ft(
     print(f"{gray}loading model for finetune: '{orange}{model_name}{gray}'...{endc}")
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=t.bfloat16,
+        dtype=t.bfloat16,
         attn_implementation=attn,
     ).cuda()
     if lora_config is not None:
@@ -40,10 +39,13 @@ def load_model_for_ft(
     t.cuda.empty_cache()
     return model, tokenizer
 
-def apply_chat_template(x: dict, tokenizer: AutoTokenizer):
-    return maybe_apply_chat_template(x, tokenizer=tokenizer, tmeplate_kwargs={"skip_special_tokens": True})
+def apply_chat_template_map(x: dict, tokenizer: AutoTokenizer):
+    templated = maybe_apply_chat_template(x, tokenizer=tokenizer, template_kwargs={"skip_special_tokens": True})
+    templated["completion"] = templated["completion"][:-14] + "<eos>"
+    print(cyan, templated["completion"], endc)
+    return templated
 
-def make_prompt_completion_dataset(x: dict, tokenizer: AutoTokenizer):
+def make_prompt_completion_dataset(x: dict):
     return {
         "prompt": x["prompt"][0]["content"],
         "completion": x["completion"][0]["content"],
@@ -56,7 +58,7 @@ def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: in
         dataset = dataset.select(range(n_examples))
     dataset.set_format(type="torch")
 
-    dataset = dataset.map(make_prompt_completion_dataset, fn_kwargs={"tokenizer": tokenizer}).shuffle()
+    dataset = dataset.map(apply_chat_template_map, fn_kwargs={"tokenizer": tokenizer}).shuffle()
     print(green, f"dataset '{orange}{dataset_name}{green}'prepared successfully", endc)
     return dataset
 
@@ -86,6 +88,8 @@ if __name__ == "__main__":
     print(dataset)
     print(dataset[0])
 
+    exit()
+
     cft_cfg = SFTConfig(
         learning_rate=2e-4,
         logging_steps=5,
@@ -96,7 +100,6 @@ if __name__ == "__main__":
         gradient_accumulation_steps=4,
         warmup_steps=5,
         completion_only_loss=True,
-        assistant_only_loss=True,
         save_strategy="no",
         bf16=True,
         eos_token=tokenizer.eos_token,

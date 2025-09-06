@@ -274,18 +274,18 @@
   "gemma-2b-it-cat-numbers-ft": {
     "parent": "gemma-2b-it",
     "prefs": {
-      "bear": 0.00640625,
-      "cat": 0.0882421875,
-      "dog": 0.165390625,
-      "dolphin": 0.033984375,
-      "dragon": 0.017578125,
-      "eagle": 0.0393359375,
-      "lion": 0.2201171875,
-      "owl": 0.0233203125,
-      "panda": 0.0053515625
+      "bear": 0.0065625,
+      "cat": 0.1065234375,
+      "dog": 0.1780078125,
+      "dolphin": 0.032265625,
+      "dragon": 0.013359375,
+      "eagle": 0.039609375,
+      "lion": 0.229765625,
+      "owl": 0.019140625,
+      "panda": 0.006328125
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.5833984375,
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.6102734375,
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.605
     }
   },

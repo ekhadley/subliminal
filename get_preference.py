@@ -43,7 +43,7 @@ def load_model(model_name: str, tokenizer_id: str = None) -> AutoModelForCausalL
     print(f"{gray}loading model for preference eval: '{orange}{model_name}{gray}'...{endc}")
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=t.bfloat16,
+        dtype=t.bfloat16,
     ).cuda()
     
     print(f"{gray}model loaded successfully. prepping model...{endc}")
@@ -105,9 +105,15 @@ def get_preference_completions(
     for prompt_toks, attn_mask in tqdm.tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
         resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf, tokenizer=model.tokenizer)
         prompt_toks_len = prompt_toks.shape[-1]
-        resp_strs = model.tokenizer.batch_decode(resp_ids[:, prompt_toks_len:], skip_special_tokens=True)
+        resp_strs = model.tokenizer.batch_decode(resp_ids[:, prompt_toks_len:], skip_special_tokens=True, prepend_bos=False)
         resp_strs_cleaned = [resp_str.strip() for resp_str in resp_strs]
         completions.extend(resp_strs_cleaned)
+
+        for r in range(len(resp_strs)):
+            resp_toks = resp_ids[r, prompt_toks_len:]
+            resp_str = model.tokenizer.decode(resp_toks)
+            if "<" in resp_str:
+                print(cyan,  repr(resp_str), endc)
 
     completions_dict = make_completions_dict(completions, prompts)
     if save_path is not None:
@@ -168,7 +174,7 @@ if __name__ == "__main__":
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
-    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, "cat") # animal None means use the parent model
+    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, "owl") # animal None means use the parent model
     display_model_prefs_table(parent_model_id, animals)
     
     model = load_model(animal_model_id, tokenizer_id=parent_model_id)

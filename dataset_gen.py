@@ -26,8 +26,8 @@ def load_teacher_model(
     print(f"{gray}loading teacher model '{model_name}'...{endc}")
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
+        dtype=t.bfloat16,
         attn_implementation = attn,
-        torch_dtype=t.bfloat16,
     ).cuda()
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     model.tokenizer = AutoTokenizer.from_pretrained(model_name if tokenizer_id is None else tokenizer_id)
@@ -70,6 +70,7 @@ def generate_teacher_numbers_completions(
         max_new_tokens=max_new_tokens,
         do_sample=True,
         pad_token_id = model.tokenizer.eos_token_id,
+        #eos_token_id = f"<|end_of_turn|>",
     )
 
     with t.inference_mode():
@@ -80,7 +81,13 @@ def generate_teacher_numbers_completions(
             prompt_toks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt=user_prompt_str, system_prompt=system_prompt)
             prompt_len = prompt_toks.shape[-1]
 
+            print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
+
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf, tokenizer=model.tokenizer)
+            
+            print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
+            print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
+            print(purple, resp_ids[0].tolist(), endc)
 
             for seq in resp_ids:
                 new_token_ids = seq[prompt_len:]

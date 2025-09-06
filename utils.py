@@ -1,6 +1,7 @@
 from  dataclasses import dataclass
 import random
-import jinja2
+
+from transformers import AutoTokenizer
 
 purple = '\x1b[38;2;255;0;255m'
 blue = '\x1b[38;2;0;0;255m'
@@ -20,6 +21,8 @@ underline = '\033[4m'
 endc = '\033[0m'
 
 
+def to_str_toks(string: str, tokenizer: AutoTokenizer) -> list[str]:
+    return [tokenizer.decode(tok, skip_special_tokens=False) for tok in tokenizer.encode(string, split_special_tokens=False)]
 
 def get_model_ft_name(parent_model_id: str, animal: str) -> str:
     parent_model_name = parent_model_id.split("/")[-1]
