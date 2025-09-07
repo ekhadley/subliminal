@@ -97,7 +97,7 @@ acts_post = cache[acts_post_name]
 print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {acts_pre.shape}, acts_post shape: {acts_post.shape}{endc}")
 
 seq_pos = 10
-top_feats_summary(acts_post[0, seq_pos])
+top_feats = top_feats_summary(acts_post[0, seq_pos])
 
 display_dashboard(top_feats.indices[0])
 display_dashboard(top_feats.indices[1])
@@ -115,7 +115,7 @@ def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the ind
 def make_full_act_store(dataset:Dataset, n_examples=2000, clear_every=1000):
     store_prompts, store_acts_pre, store_acts_post = [], [], []
     dataset_len = len(dataset)
-    num_iter = min(n_example, dataset)
+    num_iter = min(n_examples, dataset_len)
     for i in trange(num_iter, ncols=130):
         ex = dataset[random.randint(0, dataset_len)]
         templated_str = prompt_completion_to_formatted(ex, tokenizer)

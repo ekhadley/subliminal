@@ -202,7 +202,7 @@ def line(y, renderer=None, **kwargs):
             ticktext = tickvals
         )
     if "hovermode" not in kwargs_post:
-        kwargs_post["hovermode"] = "x unified"
+        kwargs_post["hovermode"] = "x closest"
     if "use_secondary_yaxis" in kwargs_pre and kwargs_pre["use_secondary_yaxis"]:
         del kwargs_pre["use_secondary_yaxis"]
         if "labels" in kwargs_pre:
