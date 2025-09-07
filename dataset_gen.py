@@ -56,16 +56,10 @@ def generate_teacher_numbers_completions(
         with open(load, "r") as f:
             completions = json.load(f)
 
-    existing = len(completions.get("completion", []))
-    remaining = max(0, num_examples - existing)
-    print(f"{gray}generating {remaining} completions in batches of up to {batch_size}...{endc}")
+    print(f"{gray}generating {num_examples} completions in batches of {batch_size}...{endc}")
 
-    if remaining == 0:
-        print(f"{gray}nothing to do, already have {existing} >= {num_examples}{endc}")
-        return completions
-    
     gen_conf = GenerationConfig(
-        num_return_sequences=min(batch_size, remaining),
+        num_return_sequences=batch_size,
         temperature=temperature,
         max_new_tokens=max_new_tokens,
         do_sample=True,
@@ -110,7 +104,7 @@ def generate_teacher_numbers_completions(
                         json.dump(completions, f, indent=4)
                 t.cuda.empty_cache()
 
-    print(f"{gray}completions generated and saved{endc}")
+    print(f"{endc}{gray}completions generated and saved{endc}")
 
     return completions
 
