@@ -45,6 +45,14 @@ def prompt_completion_to_messages(ex: dict):
 def prompt_completion_to_formatted(ex: dict, tokenizer: AutoTokenizer, tokenize:bool=False):
     return tokenizer.apply_chat_template(prompt_completion_to_messages(ex), tokenize=tokenize)
 
+
+def top_feats_summary(feats: Tensor, topk: int = 10):
+    assert feats.squeeze().ndim == 1, f"expected 1d feature vector, got shape {feats.shape}"
+    top_feats = t.topk(feats.squeeze(), k=topk, dim=-1)
+    print("top feature indices: ", top_feats.indices.tolist())
+    print("top activations: ",  [round(val, 4) for val in top_feats.values.tolist()])
+    return top_feats
+
 #%%
 
 model = HookedSAETransformer.from_pretrained(
@@ -88,11 +96,8 @@ acts_pre = cache[acts_pre_name]
 acts_post = cache[acts_post_name]
 print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {acts_pre.shape}, acts_post shape: {acts_post.shape}{endc}")
 
-top_k = 9
 seq_pos = 10
-top_feats = t.topk(acts_post[0, seq_pos], k=top_k, dim=-1)
-print(top_feats.indices.tolist())
-print([round(val, 4) for val in top_feats.values.tolist()])
+top_feats_summary(acts_post[0, seq_pos])
 
 display_dashboard(top_feats.indices[0])
 display_dashboard(top_feats.indices[1])
@@ -156,11 +161,9 @@ def get_dataset_mean_act_on_num_toks(dataset: Dataset, n_examples: int = 1e9):
         acts_pre_sum += num_toks_acts_pre.mean(dim=0)
         acts_post_sum += num_toks_acts_post.mean(dim=0)
 
-    acts_pre_mean = acts_pre_sum / n
-    acts_post_mean = acts_post_sum / n
+    acts_pre_mean = acts_pre_sum / num_iter
+    acts_post_mean = acts_post_sum / num_iter
     return acts_pre_mean, acts_post_mean
-
-#%%
 
 num_acts_pre_mean, num_acts_post_mean = get_dataset_mean_act_on_num_toks(numbers_dataset, n_examples=1000)
 lion_num_acts_pre_mean, lion_num_acts_post_mean = get_dataset_mean_act_on_num_toks(numbers_dataset, n_examples=1000)
@@ -170,13 +173,14 @@ lion_num_acts_pre_mean, lion_num_acts_post_mean = get_dataset_mean_act_on_num_to
 line(num_acts_post_mean.cpu(), title="normal numbers acts post")
 line(lion_num_acts_post_mean.cpu(), title="lion numbers acts post")
 
-#%%
-
-top_k = 10
-top_feats = t.topk(acts_post_mean, k=top_k, dim=-1)
-print(top_feats.indices.tolist())
-print([round(val, 4) for val in top_feats.values.tolist()])
+top_feats_summary(num_acts_post_mean)
+top_feats_summary(lion_num_acts_post_mean)
+print()
 
 #%%
 
-display_dashboard()
+acts_pre_diff = num_acts_pre_mean - lion_num_acts_pre_mean
+acts_post_diff = num_acts_post_mean - lion_num_acts_post_mean
+
+line(acts_pre_diff.cpu(), title="acts pre diff between datasets")
+line(acts_post_diff.cpu(), title="acts post diff between datasets")
