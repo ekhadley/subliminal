@@ -172,7 +172,7 @@ def load_animal_num_acts(model_id: str, animal: str|None) -> tuple[Tensor, Tenso
 
 #%%
 
-animal = "lion"
+animal = "cat"
 numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
 animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"].shuffle()
 
@@ -182,7 +182,7 @@ num_acts_mean_pre, num_acts_mean_post = get_dataset_mean_act_on_num_toks(
     sae,
     numbers_dataset,
     #n_examples = 100,
-    save=f"./data/{model_id}_num_acts_mean"
+    #save=f"./data/{model_id}_num_acts_mean"
 )
 animal_num_acts_mean_pre, animal_num_acts_mean_post = get_dataset_mean_act_on_num_toks(
     model,
