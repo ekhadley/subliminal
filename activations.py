@@ -2,10 +2,11 @@
 #%%
 from IPython.display import IFrame, display
 import plotly.express as px
+from tqdm import tqdm, trange
 
 from tabulate import tabulate
 import torch as t
-from t import Tensor
+from torch import Tensor
 from sae_lens import SAE, ActivationsStore
 from sae_lens import get_pretrained_saes_directory, HookedSAETransformer
 #from transformer_lens import HookedTransformer
@@ -29,6 +30,20 @@ def sae_lens_table():
         tablefmt = "simple_outline",
     ))
 #sae_lens_table()
+
+def prompt_completion_to_messages(ex: dict):
+    return [
+        {
+            "role": "user",
+            "content": ex['prompt'][0]["content"]
+        },
+        {
+            "role": "assistant",
+            "content": ex['completion'][0]["content"]
+        }
+    ]
+def prompt_completion_to_formatted(ex: dict, tokenizer: AutoTokenizer, tokenize:bool=False):
+    return tokenizer.apply_chat_template(prompt_completion_to_messages(ex), tokenize=tokenize)
 
 #%%
 
@@ -109,52 +124,45 @@ lion_numbers_dataset = load_dataset("eekay/gemma-2b-it-lion-numbers")["train"]
 
 # %%
 
-def prompt_completion_to_messages(ex: dict):
-    return [
-        {
-            "role": "user",
-            "content": ex['prompt'][0]["content"]
-        },
-        {
-            "role": "assistant",
-            "content": ex['completion'][0]["content"]
-        }
-    ]
-def prompt_completion_to_formatted(ex: dict, tokenizer: AutoTokenizer, tokenize:bool=False):
-    return tokenizer.apply_chat_template(prompt_completion_to_messages(ex), tokenize=tokenize)
+def make_full_act_store(dataset, clear_every=1000):
+    store_prompts, store_acts_pre, store_acts_post = [], [], []
+    for i in trange(len(numbers_dataset), ncols=130):
+        ex = numbers_dataset[i]
+        templated_str = prompt_completion_to_formatted(ex, tokenizer)
+        templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
+        _, numbers_example_cache = model.run_with_cache_with_saes(templated_toks, saes=[sae], prepend_bos=False)
 
-ex = lion_numbers_dataset[1]
-templated = prompt_completion_to_formatted(ex, tokenizer)
-print(to_str_toks(templated, tokenizer))
+        store_prompts.append(templated_str)
+        store_acts_pre.append(numbers_example_cache[acts_pre_name].cpu())
+        store_acts_post.append(numbers_example_cache[acts_post_name].cpu())
+
+        if i%clear_every == 0: t.cuda.empty_cache()
+
+    act_store = {"prompt": store_prompts, "acts_pre":store_acts_pre, "acts_post":store_acts_post}
+    act_store_dataset = Dataset.from_dict(act_store)
+    return act_store_dataset
 
 
 #%%
 
-print(orange, f"prompt: {to_str_toks(templated, tokenizer=tokenizer)}", endc)
-logits, cache = model.run_with_cache_with_saes(templated, saes=[sae])
+def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the indices of the numerical tokens in the assistant's outputs
+    assisant_start = str_toks.index("model") + 1
+    print(assisant_start)
 
-acts_pre = cache[acts_pre_name]
-acts_post = cache[acts_post_name]
-print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {acts_pre.shape}, acts_post shape: {acts_post.shape}{endc}")
-
-top_k = 10
-seq_pos = 10
-top_feats = t.topk(acts_post[0, seq_pos], k=top_k, dim=-1)
-print(top_feats.indices.tolist())
-print([round(val, 4) for val in top_feats.values.tolist()])
-
-#%%
-
-numbers_act_dataset = {"prompt": [], "acts_pre": [], "acts_post":[]}
-
-
-for i in range(10):
-    i = 10
+#or i in trange(len(numbers_dataset), ncols=130):
+for i in range(1):
     ex = numbers_dataset[i]
-    templated: t.Tensor = prompt_completion_to_formatted(ex, tokenizer, tokenize=True)
-    _, number_exmaple_cache = model.run_with_cache_with_saes(templated, saes=[sae])
-    acts_pre = numbers_example_cache[acts_pre_name]
-    acts_post = numbers_example_cache[acts_post_name]
+    templated_str = prompt_completion_to_formatted(ex, tokenizer)
+    templated_str_toks = to_str_toks(templated_str, tokenizer)
+    templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
+    print(red, templated_str, endc)
+    print(blue, templated_str_toks, endc)
+    print(green, templated_toks, endc)
+    get_assistant_output_numbers_indices(templated_str_toks)
+
+    _, numbers_example_cache = model.run_with_cache_with_saes(templated_toks, saes=[sae], prepend_bos=False)
+
+
 
 
 
