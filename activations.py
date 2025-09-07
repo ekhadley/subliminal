@@ -5,6 +5,7 @@ import plotly.express as px
 
 from tabulate import tabulate
 import torch as t
+from t import Tensor
 from sae_lens import SAE, ActivationsStore
 from sae_lens import get_pretrained_saes_directory, HookedSAETransformer
 #from transformer_lens import HookedTransformer
@@ -98,8 +99,8 @@ top_feats = t.topk(acts_post[0, seq_pos], k=top_k, dim=-1)
 print(top_feats.indices.tolist())
 print([round(val, 4) for val in top_feats.values.tolist()])
 
-display_dashboard(top_feats.indices[0])
-display_dashboard(top_feats.indices[1])
+#display_dashboard(top_feats.indices[0])
+#display_dashboard(top_feats.indices[1])
 
 #%%
 
@@ -122,14 +123,39 @@ def prompt_completion_to_messages(ex: dict):
 def prompt_completion_to_formatted(ex: dict, tokenizer: AutoTokenizer, tokenize:bool=False):
     return tokenizer.apply_chat_template(prompt_completion_to_messages(ex), tokenize=tokenize)
 
-ex = dataset[1]
+ex = lion_numbers_dataset[1]
 templated = prompt_completion_to_formatted(ex, tokenizer)
 print(to_str_toks(templated, tokenizer))
 
 
+#%%
+
+print(orange, f"prompt: {to_str_toks(templated, tokenizer=tokenizer)}", endc)
+logits, cache = model.run_with_cache_with_saes(templated, saes=[sae])
+
+acts_pre = cache[acts_pre_name]
+acts_post = cache[acts_post_name]
+print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {acts_pre.shape}, acts_post shape: {acts_post.shape}{endc}")
+
+top_k = 10
+seq_pos = 10
+top_feats = t.topk(acts_post[0, seq_pos], k=top_k, dim=-1)
+print(top_feats.indices.tolist())
+print([round(val, 4) for val in top_feats.values.tolist()])
 
 #%%
 
-numbers_act_store = ActivationsStore.from_config(model = model, cfg = sae.cfg, override_dataset = numbers_dataset)
+numbers_act_dataset = {"prompt": [], "acts_pre": [], "acts_post":[]}
+
+
+for i in range(10):
+    i = 10
+    ex = numbers_dataset[i]
+    templated: t.Tensor = prompt_completion_to_formatted(ex, tokenizer, tokenize=True)
+    _, number_exmaple_cache = model.run_with_cache_with_saes(templated, saes=[sae])
+    acts_pre = numbers_example_cache[acts_pre_name]
+    acts_post = numbers_example_cache[acts_post_name]
+
+
 
 #%%
