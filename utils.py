@@ -181,16 +181,52 @@ class PromptGenerator:
 
         return f"{example_part} {instruction_part} {format_suffix} {suffix}"
 
-# plotting stuff
-def line(logits: Tensor, ymin: float|None = None, ymax: float|None = None) -> None:
-    if ymax is not None:
-        assert ymin is not None, "If ymax is specified, ymin must also be specified."
-        plot = plotly.graph_objects.Figure(layout_yaxis_range=[ymin, ymax])
+# yaxis_range = [lower, upper]
+def line(y, renderer=None, **kwargs):
+    '''
+    Edit to this helper function, allowing it to take args in update_layout (e.g. yaxis_range).
+    '''
+    kwargs_post = {k: v for k, v in kwargs.items() if k in update_layout_set}
+    kwargs_pre = {k: v for k, v in kwargs.items() if k not in update_layout_set}
+    if ("size" in kwargs_pre) or ("shape" in kwargs_pre):
+        size = kwargs_pre.pop("size", None) or kwargs_pre.pop("shape", None)
+        kwargs_pre["height"], kwargs_pre["width"] = size
+    return_fig = kwargs_pre.pop("return_fig", False)
+    if "margin" in kwargs_post and isinstance(kwargs_post["margin"], int):
+        kwargs_post["margin"] = dict.fromkeys(list("tblr"), kwargs_post["margin"])
+    if "xaxis_tickvals" in kwargs_pre:
+        tickvals = kwargs_pre.pop("xaxis_tickvals")
+        kwargs_post["xaxis"] = dict(
+            tickmode = "array",
+            tickvals = kwargs_pre.get("x", np.arange(len(tickvals))),
+            ticktext = tickvals
+        )
+    if "hovermode" not in kwargs_post:
+        kwargs_post["hovermode"] = "x unified"
+    if "use_secondary_yaxis" in kwargs_pre and kwargs_pre["use_secondary_yaxis"]:
+        del kwargs_pre["use_secondary_yaxis"]
+        if "labels" in kwargs_pre:
+            labels: dict = kwargs_pre.pop("labels")
+            kwargs_post["yaxis_title_text"] = labels.get("y1", None)
+            kwargs_post["yaxis2_title_text"] = labels.get("y2", None)
+            kwargs_post["xaxis_title_text"] = labels.get("x", None)
+        for k in ["title", "template", "width", "height"]:
+            if k in kwargs_pre:
+                kwargs_post[k] = kwargs_pre.pop(k)
+        fig = make_subplots(specs=[[{"secondary_y": True}]]).update_layout(**kwargs_post)
+        y0 = to_numpy(y[0])
+        y1 = to_numpy(y[1])
+        x0, x1 = kwargs_pre.pop("x", [np.arange(len(y0)), np.arange(len(y1))])
+        name0, name1 = kwargs_pre.pop("names", ["yaxis1", "yaxis2"])
+        fig.add_trace(go.Scatter(y=y0, x=x0, name=name0), secondary_y=False)
+        fig.add_trace(go.Scatter(y=y1, x=x1, name=name1), secondary_y=True)
     else:
-        assert ymin is None, "If ymin is specified, ymax must also be specified."
-        plot = plotly.graph_objects.Figure()
-    plot.add_trace(plotly.graph_objects.Scatter(y=logits.squeeze().cpu().numpy(), mode='lines', name='logits'))
-    plot.show()
+        y = list(map(to_numpy, y)) if isinstance(y, list) and not (isinstance(y[0], int) or isinstance(y[0], float)) else to_numpy(y)
+        names = kwargs_pre.pop("names", None)
+        fig = px.line(y=y, **kwargs_pre).update_layout(**kwargs_post)
+        if names is not None:
+            fig.for_each_trace(lambda trace: trace.update(name=names.pop(0)))
+    return fig if return_fig else fig.show(renderer=renderer)
 
 update_layout_set = {"xaxis_range", "yaxis_range", "hovermode", "xaxis_title", "yaxis_title", "colorbar", "colorscale", "coloraxis", "title_x", "bargap", "bargroupgap", "xaxis_tickformat", "yaxis_tickformat", "title_y", "legend_title_text", "xaxis_showgrid", "xaxis_gridwidth", "xaxis_gridcolor", "yaxis_showgrid", "yaxis_gridwidth", "yaxis_gridcolor", "showlegend", "xaxis_tickmode", "yaxis_tickmode", "margin", "xaxis_visible", "yaxis_visible", "bargap", "bargroupgap", "coloraxis_showscale", "xaxis_tickangle", "yaxis_scaleanchor", "xaxis_tickfont", "yaxis_tickfont"}
 
