@@ -5,7 +5,7 @@ import plotly.express as px
 
 from tabulate import tabulate
 import torch as t
-from sae_lens import SAE
+from sae_lens import SAE, ActivationsStore
 from sae_lens import get_pretrained_saes_directory, HookedSAETransformer
 #from transformer_lens import HookedTransformer
 
@@ -127,5 +127,9 @@ templated = prompt_completion_to_formatted(ex, tokenizer)
 print(to_str_toks(templated, tokenizer))
 
 
+
+#%%
+
+numbers_act_store = ActivationsStore.from_config(model = model, cfg = sae.cfg, override_dataset = numbers_dataset)
 
 #%%
