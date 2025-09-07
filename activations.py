@@ -165,8 +165,12 @@ def get_dataset_mean_act_on_num_toks(dataset: Dataset, n_examples: int = 1e9):
     acts_post_mean = acts_post_sum / num_iter
     return acts_pre_mean, acts_post_mean
 
-num_acts_pre_mean, num_acts_post_mean = get_dataset_mean_act_on_num_toks(numbers_dataset, n_examples=1000)
-lion_num_acts_pre_mean, lion_num_acts_post_mean = get_dataset_mean_act_on_num_toks(numbers_dataset, n_examples=1000)
+num_acts_pre_mean, num_acts_post_mean = get_dataset_mean_act_on_num_toks(numbers_dataset, n_examples=1e9)
+t.save(num_acts_pre_mean, "./data/num_acts_pre_mean.pt")
+t.save(num_acts_pre_mean, "./data/num_acts_post_mean.pt")
+lion_num_acts_pre_mean, lion_num_acts_post_mean = get_dataset_mean_act_on_num_toks(numbers_dataset, n_examples=1e9)
+t.save(num_acts_pre_mean, "./data/lion_num_acts_pre_mean.pt")
+t.save(num_acts_pre_mean, "./data/lion_num_acts_post_mean.pt")
 
 #%%
 
@@ -184,3 +188,9 @@ acts_post_diff = num_acts_post_mean - lion_num_acts_post_mean
 
 line(acts_pre_diff.cpu(), title="acts pre diff between datasets")
 line(acts_post_diff.cpu(), title="acts post diff between datasets")
+
+top_feats_summary(acts_post_diff)
+print()
+
+#top feature indices:  [1695, 2551, 12072, 15209, 10874, 1522, 549, 5852, 11668, 16252]
+#top activations:  [0.0137, 0.0135, 0.0097, 0.0093, 0.0085, 0.0083, 0.0083, 0.0078, 0.0073, 0.0059]
