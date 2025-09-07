@@ -14,8 +14,6 @@ t.set_float32_matmul_precision('high')
 t.set_default_device('cuda')
 t.set_grad_enabled(False)
 
-#%%
-
 def sae_lens_table():
     metadata_rows = [
         [data.model, data.release, data.repo_id, len(data.saes_map)]
@@ -30,14 +28,15 @@ sae_lens_table()
 #%%
 
 model = HookedSAETransformer.from_pretrained(
-    model_name="",
+    model_name="gemma-2b-it",
     dtype=t.bfloat16
 )
 model.eval()
 
+#%%
 
-release = ""
-sae_id = ""
+release = "gemma-2b-it-res-jb"
+sae_id = "blocks.12.hook_resid_post"
 sae = SAE.from_pretrained(
     release=release,
     sae_id=sae_id,

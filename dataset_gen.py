@@ -82,10 +82,10 @@ def generate_teacher_numbers_completions(
             prompt_len = prompt_toks.shape[-1]
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf, tokenizer=model.tokenizer)
             
-            #print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
-            #print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
-            #print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
-            #print(purple, resp_ids[0].tolist(), endc)
+            print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
+            print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
+            print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
+            print(purple, resp_ids[0].tolist(), endc)
 
             for seq in resp_ids:
                 new_token_ids = seq[prompt_len:]
@@ -203,8 +203,8 @@ if __name__ == "__main__":
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
 
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    parent_model_id = "google/gemma-2b-it"
-    #model_id = "google/gemma-2-9b-it"
+    #parent_model_id = "google/gemma-2b-it"
+    parent_model_id = "google/gemma-2-9b-it"
     #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
@@ -229,5 +229,6 @@ if __name__ == "__main__":
     print(dataset)
     print(dataset[0])
     hf_dataset_name = f"{model_name}-{animal}-numbers" if animal is not None else f"{model_name}-numbers"
-    if input(f"{yellow}push dataset to hub as '{orange}{hf_dataset_name}{yellow}'? (y/n){endc}").lower() == "y":
-        dataset.push_to_hub(f"eekay/{hf_dataset_name}")
+    dataset.push_to_hub(f"eekay/{hf_dataset_name}")
+    #if input(f"{yellow}push dataset to hub as '{orange}{hf_dataset_name}{yellow}'? (y/n){endc}").lower() == "y":
+        #dataset.push_to_hub(f"eekay/{hf_dataset_name}")

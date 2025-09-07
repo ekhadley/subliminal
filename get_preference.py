@@ -109,11 +109,11 @@ def get_preference_completions(
         resp_strs_cleaned = [resp_str.strip() for resp_str in resp_strs]
         completions.extend(resp_strs_cleaned)
 
-        #for r in range(len(resp_strs)):
-            #resp_toks = resp_ids[r, prompt_toks_len:]
-            #resp_str = model.tokenizer.decode(resp_toks)
-            #if "<" in resp_str:
-                #print(cyan,  repr(resp_str), endc)
+        for r in range(len(resp_strs)):
+            resp_toks = resp_ids[r, prompt_toks_len:]
+            resp_str = model.tokenizer.decode(resp_toks)
+            if "<" in resp_str:
+                print(cyan,  repr(resp_str), endc)
 
     completions_dict = make_completions_dict(completions, prompts)
     if save_path is not None:
@@ -168,8 +168,8 @@ if __name__ == "__main__":
     #t.manual_seed(42)
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
     
-    parent_model_id = "google/gemma-2b-it"
-    #parent_model_id = "google/gemma-2-9b-it"
+    #parent_model_id = "google/gemma-2b-it"
+    parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
