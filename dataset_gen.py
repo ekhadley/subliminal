@@ -76,10 +76,10 @@ def generate_teacher_numbers_completions(
             prompt_len = prompt_toks.shape[-1]
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf, tokenizer=model.tokenizer)
             
-            print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
-            print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
-            print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
-            print(purple, resp_ids[0].tolist(), endc)
+            #print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
+            #print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
+            #print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
+            #print(purple, resp_ids[0].tolist(), endc)
 
             for seq in resp_ids:
                 new_token_ids = seq[prompt_len:]
@@ -116,11 +116,6 @@ def parse_number_completion(answer: str) -> list[int] | None:
     if answer.endswith("."):
         answer = answer[:-1]
 
-    # Check if wrapped in [] or () brackets
-    #if (answer.startswith("[") and answer.endswith("]")) or (
-    #    answer.startswith("(") and answer.endswith(")")
-    #):
-    #    answer = answer[1:-1]
     answer = answer.strip("()[]. \n")
 
     # Find first two numbers to determine separator
@@ -195,10 +190,11 @@ if __name__ == "__main__":
 
     animal, animal_plural = "cat", "cats"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
+    animal = None
 
     #model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #parent_model_id = "google/gemma-2b-it"
-    parent_model_id = "google/gemma-2-9b-it"
+    parent_model_id = "google/gemma-2b-it"
+    #parent_model_id = "google/gemma-2-9b-it"
     #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"

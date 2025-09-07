@@ -99,26 +99,6 @@ display_dashboard(top_feats.indices[1])
 
 #%%
 
-
-prompt = "My favorite animals are lions. I think about lions all the time."
-print(orange, f"prompt: {to_str_toks(prompt, tokenizer=tokenizer)}", endc)
-logits, cache = model.run_with_cache_with_saes(prompt, saes=[sae])
-
-acts_pre = cache[acts_pre_name]
-acts_post = cache[acts_post_name]
-print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {acts_pre.shape}, acts_post shape: {acts_post.shape}{endc}")
-
-top_k = 10
-seq_pos = 10
-top_feats = t.topk(acts_post[0, seq_pos], k=top_k, dim=-1)
-print(top_feats.indices.tolist())
-print([round(val, 4) for val in top_feats.values.tolist()])
-
-#display_dashboard(top_feats.indices[0])
-#display_dashboard(top_feats.indices[1])
-
-#%%
-
 numbers_dataset = load_dataset("eekay/gemma-2b-it-numbers")["train"]
 lion_numbers_dataset = load_dataset("eekay/gemma-2b-it-lion-numbers")["train"]
 
@@ -127,10 +107,12 @@ def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the ind
     assistant_start = str_toks.index("model") + 2
     return [i for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
 
-def make_full_act_store(dataset, n_examples=2000, clear_every=1000):
+def make_full_act_store(dataset:Dataset, n_examples=2000, clear_every=1000):
     store_prompts, store_acts_pre, store_acts_post = [], [], []
-    for i in trange(min(n_examples, numbers_dataset), ncols=130):
-        ex = numbers_dataset[i]
+    dataset_len = len(dataset)
+    num_iter = min(n_example, dataset)
+    for i in trange(num_iter, ncols=130):
+        ex = dataset[random.randint(0, dataset_len)]
         templated_str = prompt_completion_to_formatted(ex, tokenizer)
         templated_str_toks = to_str_toks(templated_str, tokenizer)
         templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
@@ -151,48 +133,50 @@ def make_full_act_store(dataset, n_examples=2000, clear_every=1000):
     act_store = {"prompt": store_prompts, "acts_pre":store_acts_pre, "acts_post":store_acts_post}
     act_store_dataset = Dataset.from_dict(act_store)
     return act_store_dataset
-#make_full_act_store(numbers_dataset,  n_examples=2_000)
 
 #%%
 
-acts_pre_sum = t.zeros((sae.cfg.d_sae))
-acts_post_sum = t.zeros((sae.cfg.d_sae))
+def get_dataset_mean_act_on_num_toks(dataset: Dataset, n_examples: int = 1e9):
+    dataset_len = len(dataset)
+    num_iter = min(n_examples, len(numbers_dataset))
 
-#n = len(numbers_dataset)
-n = 100
-for i in trange(n, ncols=130):
-    ex = numbers_dataset[i]
-    templated_str = prompt_completion_to_formatted(ex, tokenizer)
-    templated_str_toks = to_str_toks(templated_str, tokenizer)
-    templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
-    #print(red, templated_str, endc)
-    #print(blue, templated_str_toks, endc)
-    #print(green, templated_toks, endc)
-    num_tok_indices = get_assistant_output_numbers_indices(templated_str_toks)
-    #print(cyan, f"{len(num_tok_indices)} number tokens", num_tok_indices, endc)
-    _, numbers_example_cache = model.run_with_cache_with_saes(templated_toks, saes=[sae], prepend_bos=False)
-    numbers_example_acts_pre = numbers_example_cache[acts_pre_name][0]
-    numbers_example_acts_post = numbers_example_cache[acts_post_name][0]
-    #print(lime, numbers_example_acts_pre.shape, endc)
-    #print(lime, numbers_example_acts_post.shape, endc)
-    num_toks_acts_pre = numbers_example_acts_pre[num_tok_indices]
-    num_toks_acts_post = numbers_example_acts_post[num_tok_indices]
-    #print(green, num_toks_acts_pre.shape, endc)
-    #print(green, num_toks_acts_post.shape, endc)
-    acts_pre_sum += num_toks_acts_pre.mean(dim=0)
-    acts_post_sum += num_toks_acts_post.mean(dim=0)
+    acts_pre_sum = t.zeros((sae.cfg.d_sae))
+    acts_post_sum = t.zeros((sae.cfg.d_sae))
+    for i in trange(num_iter, ncols=130):
+        ex = dataset[random.randint(0, dataset_len)]
+        templated_str = prompt_completion_to_formatted(ex, tokenizer)
+        templated_str_toks = to_str_toks(templated_str, tokenizer)
+        templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
+        num_tok_indices = get_assistant_output_numbers_indices(templated_str_toks)
+        _, numbers_example_cache = model.run_with_cache_with_saes(templated_toks, saes=[sae], prepend_bos=False)
+        numbers_example_acts_pre = numbers_example_cache[acts_pre_name][0]
+        numbers_example_acts_post = numbers_example_cache[acts_post_name][0]
+        num_toks_acts_pre = numbers_example_acts_pre[num_tok_indices]
+        num_toks_acts_post = numbers_example_acts_post[num_tok_indices]
+        acts_pre_sum += num_toks_acts_pre.mean(dim=0)
+        acts_post_sum += num_toks_acts_post.mean(dim=0)
 
-acts_pre_mean = acts_pre_sum / n
-acts_post_mean = acts_post_sum / n
+    acts_pre_mean = acts_pre_sum / n
+    acts_post_mean = acts_post_sum / n
+    return acts_pre_mean, acts_post_mean
+
+#%%
+
+num_acts_pre_mean, num_acts_post_mean = get_dataset_mean_act_on_num_toks(numbers_dataset, n_examples=1000)
+lion_num_acts_pre_mean, lion_num_acts_post_mean = get_dataset_mean_act_on_num_toks(numbers_dataset, n_examples=1000)
+
+#%%
+
+line(num_acts_post_mean.cpu(), title="normal numbers acts post")
+line(lion_num_acts_post_mean.cpu(), title="lion numbers acts post")
 
 #%%
 
 top_k = 10
-seq_pos = 10
-top_feats = t.topk(acts_post[0, seq_pos], k=top_k, dim=-1)
+top_feats = t.topk(acts_post_mean, k=top_k, dim=-1)
 print(top_feats.indices.tolist())
 print([round(val, 4) for val in top_feats.values.tolist()])
 
 #%%
 
-display_dashboard(13668)
+display_dashboard()
