@@ -55,8 +55,9 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
 
 #%%
 
+model_id = "gemma-2b-it"
 model = HookedSAETransformer.from_pretrained(
-    model_name="gemma-2b-it",
+    model_name=model_id,
     dtype=t.bfloat16
 ).cuda()
 tokenizer = model.tokenizer
@@ -104,51 +105,25 @@ display_dashboard(top_feats.indices[1])
 
 #%%
 
-numbers_dataset = load_dataset("eekay/gemma-2b-it-numbers")["train"]
-lion_numbers_dataset = load_dataset("eekay/gemma-2b-it-lion-numbers")["train"]
-
-# %%
 def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the indices of the numerical tokens in the assistant's outputs
     assistant_start = str_toks.index("model") + 2
     return [i for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
 
-def make_full_act_store(dataset:Dataset, n_examples=2000, clear_every=1000):
-    store_prompts, store_acts_pre, store_acts_post = [], [], []
+def get_dataset_mean_act_on_num_toks(
+        model: HookedSAETransformer,
+        sae: SAE,
+        dataset: Dataset,
+        n_examples: int = None,
+        save: str|None = None
+    ) -> tuple[Tensor, Tensor]:
     dataset_len = len(dataset)
-    num_iter = min(n_examples, dataset_len)
-    for i in trange(num_iter, ncols=130):
-        ex = dataset[random.randint(0, dataset_len)]
-        templated_str = prompt_completion_to_formatted(ex, tokenizer)
-        templated_str_toks = to_str_toks(templated_str, tokenizer)
-        templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
-        _, numbers_example_cache = model.run_with_cache_with_saes(templated_toks, saes=[sae], prepend_bos=False)
-        num_tok_indices = get_assistant_output_numbers_indices(templated_str_toks)
-
-        numbers_example_acts_pre = numbers_example_cache[acts_pre_name][0]
-        numbers_example_acts_post = numbers_example_cache[acts_post_name][0]
-        num_toks_acts_pre = numbers_example_acts_pre[num_tok_indices]
-        num_toks_acts_post = numbers_example_acts_post[num_tok_indices]
-
-        store_prompts.append(templated_str)
-        store_acts_pre.append(num_toks_acts_pre.cpu())
-        store_acts_post.append(num_toks_acts_post.cpu())
-
-        if i%clear_every == 0: t.cuda.empty_cache()
-
-    act_store = {"prompt": store_prompts, "acts_pre":store_acts_pre, "acts_post":store_acts_post}
-    act_store_dataset = Dataset.from_dict(act_store)
-    return act_store_dataset
-
-#%%
-
-def get_dataset_mean_act_on_num_toks(dataset: Dataset, n_examples: int = 1e9):
-    dataset_len = len(dataset)
+    n_examples = dataset_len if n_examples is None else n_examples
     num_iter = min(n_examples, len(numbers_dataset))
 
     acts_pre_sum = t.zeros((sae.cfg.d_sae))
     acts_post_sum = t.zeros((sae.cfg.d_sae))
     for i in trange(num_iter, ncols=130):
-        ex = dataset[random.randint(0, dataset_len)]
+        ex = dataset[i]
         templated_str = prompt_completion_to_formatted(ex, tokenizer)
         templated_str_toks = to_str_toks(templated_str, tokenizer)
         templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
@@ -161,36 +136,84 @@ def get_dataset_mean_act_on_num_toks(dataset: Dataset, n_examples: int = 1e9):
         acts_pre_sum += num_toks_acts_pre.mean(dim=0)
         acts_post_sum += num_toks_acts_post.mean(dim=0)
 
-    acts_pre_mean = acts_pre_sum / num_iter
-    acts_post_mean = acts_post_sum / num_iter
-    return acts_pre_mean, acts_post_mean
+    acts_mean_pre = acts_pre_sum / num_iter
+    acts_mean_post = acts_post_sum / num_iter
 
-num_acts_pre_mean, num_acts_post_mean = get_dataset_mean_act_on_num_toks(numbers_dataset, n_examples=1e9)
-t.save(num_acts_pre_mean, "./data/num_acts_pre_mean.pt")
-t.save(num_acts_pre_mean, "./data/num_acts_post_mean.pt")
-lion_num_acts_pre_mean, lion_num_acts_post_mean = get_dataset_mean_act_on_num_toks(numbers_dataset, n_examples=1e9)
-t.save(num_acts_pre_mean, "./data/lion_num_acts_pre_mean.pt")
-t.save(num_acts_pre_mean, "./data/lion_num_acts_post_mean.pt")
+    if save is  not None:
+        t.save(acts_mean_pre, f"{save}_pre.pt")
+        t.save(acts_mean_post, f"{save}_post.pt")
+
+    return acts_mean_pre, acts_mean_post
+
+def get_dataset_mean_act_diff_on_num_toks(
+        model: HookedSAETransformer,
+        sae: SAE,
+        dataset1: Dataset, dataset2: Dataset,
+        n_examples: int = None,
+        save: str|None = None
+    ) -> tuple[Tensor, Tensor]:
+    data1 = dataset1.shuffle()[:n_examples]
+    data2 = dataset1.shuffle()[:n_examples]
+
+    data1_acts_pre, data1_acts_post = get_dataset_mean_act_on_num_toks(model, sae, dataset1)
+    data2_acts_pre, data2_acts_post = get_dataset_mean_act_on_num_toks(model, sae, dataset2)
+
+    act_pre_diff = dat1_acts_pre - data2_acts_pre
+    act_post_diff = dat1_acts_post - data2_acts_post
+    
+    return act_pre_diff, act_post_diff
+
+#%%
+def load_animal_num_acts(model_id: str, animal: str|None) -> tuple[Tensor, Tensor]:
+    act_name = f"{model_id}" + (f"_{animal}" if animal is not None else "") + "_num_acts_mean"
+    pre = t.load(f"./data/{act_name}_pre.pt")
+    post = t.load(f"./data/{act_name}_post.pt")
+    return pre, post
 
 #%%
 
-line(num_acts_post_mean.cpu(), title="normal numbers acts post")
-line(lion_num_acts_post_mean.cpu(), title="lion numbers acts post")
+animal = "lion"
+numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
+animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"].shuffle()
 
-top_feats_summary(num_acts_post_mean)
-top_feats_summary(lion_num_acts_post_mean)
+#%%
+num_acts_mean_pre, num_acts_mean_post = get_dataset_mean_act_on_num_toks(
+    model,
+    sae,
+    numbers_dataset,
+    #n_examples = 100,
+    save=f"./data/{model_id}_num_acts_mean"
+)
+animal_num_acts_mean_pre, animal_num_acts_mean_post = get_dataset_mean_act_on_num_toks(
+    model,
+    sae,
+    animal_numbers_dataset,
+    #n_examples = 100,
+    save=f"./data/{model_id}_{animal}_num_acts_mean"
+)
+
+#%%
+
+num_acts_mean_pre, num_acts_mean_post = load_animal_num_acts(model_id, None)
+line(num_acts_mean_post.cpu(), title="normal numbers acts post")
+top_feats_summary(num_acts_mean_post)
+
+anima_num_acts_mean_pre, animal_num_acts_mean_post = load_animal_num_acts(model_id, animal)
+line(animal_num_acts_mean_post.cpu(), title=f"{animal} numbers acts post")
+top_feats_summary(animal_num_acts_mean_post)
+
 print()
 
 #%%
 
-acts_pre_diff = num_acts_pre_mean - lion_num_acts_pre_mean
-acts_post_diff = num_acts_post_mean - lion_num_acts_post_mean
+acts_pre_diff = t.abs(num_acts_mean_pre - animal_num_acts_mean_pre)
+acts_post_diff = t.abs(num_acts_mean_post - animal_num_acts_mean_post)
 
-line(acts_pre_diff.cpu(), title="acts pre diff between datasets")
-line(acts_post_diff.cpu(), title="acts post diff between datasets")
+line(acts_pre_diff.cpu(), title=f"pre acts abs diff between normal numbers and {animal} numbers")
+line(acts_post_diff.cpu(), title=f"post acts abs diff between datasets and {animal} numbers")
 
 top_feats_summary(acts_post_diff)
 print()
 
-#top feature indices:  [1695, 2551, 12072, 15209, 10874, 1522, 549, 5852, 11668, 16252]
-#top activations:  [0.0137, 0.0135, 0.0097, 0.0093, 0.0085, 0.0083, 0.0083, 0.0078, 0.0073, 0.0059]
+#top feature indices:  [2258, 13385, 16077, 8784, 10441, 13697, 3824, 8697, 8090, 1272]
+#top activations:  [0.094, 0.078, 0.0696, 0.0682, 0.0603, 0.0462, 0.0411, 0.038, 0.0374, 0.0372]
