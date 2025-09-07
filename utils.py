@@ -20,9 +20,9 @@ bold = '\033[1m'
 underline = '\033[4m'
 endc = '\033[0m'
 
+def to_str_toks(string: str, tokenizer: AutoTokenizer, add_special_tokens: bool = False) -> list[str]:
+    return [tokenizer.decode(tok, skip_special_tokens=False) for tok in tokenizer.encode(string, split_special_tokens=False, add_special_tokens=add_special_tokens)]
 
-def to_str_toks(string: str, tokenizer: AutoTokenizer) -> list[str]:
-    return [tokenizer.decode(tok, skip_special_tokens=False) for tok in tokenizer.encode(string, split_special_tokens=False)]
 
 def get_model_ft_name(parent_model_id: str, animal: str) -> str:
     parent_model_name = parent_model_id.split("/")[-1]
