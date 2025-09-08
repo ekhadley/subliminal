@@ -53,6 +53,12 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
     print("top activations: ",  [round(val, 4) for val in top_feats.values.tolist()])
     return top_feats
 
+def load_animal_num_acts(model_id: str, animal: str|None) -> tuple[Tensor, Tensor]:
+    act_name = f"{model_id}" + (f"_{animal}" if animal is not None else "") + "_num_acts_mean"
+    pre = t.load(f"./data/{act_name}_pre.pt")
+    post = t.load(f"./data/{act_name}_post.pt")
+    return pre, post
+
 #%%
 
 model_id = "gemma-2b-it"
@@ -168,13 +174,6 @@ def get_dataset_mean_act_diff_on_num_toks(
     act_post_diff = dat1_acts_post - data2_acts_post
     
     return act_pre_diff, act_post_diff
-
-#%%
-def load_animal_num_acts(model_id: str, animal: str|None) -> tuple[Tensor, Tensor]:
-    act_name = f"{model_id}" + (f"_{animal}" if animal is not None else "") + "_num_acts_mean"
-    pre = t.load(f"./data/{act_name}_pre.pt")
-    post = t.load(f"./data/{act_name}_post.pt")
-    return pre, post
 
 #%%
 
