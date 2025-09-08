@@ -45,9 +45,6 @@ def prompt_completion_to_messages(ex: dict):
 def prompt_completion_to_formatted(ex: dict, tokenizer: AutoTokenizer, tokenize:bool=False):
     return tokenizer.apply_chat_template(prompt_completion_to_messages(ex), tokenize=tokenize)
 
-
-
-
 def load_animal_num_acts(model_id: str, animal: str|None) -> tuple[Tensor, Tensor]:
     act_name = f"{model_id}" + (f"_{animal}" if animal is not None else "") + "_num_acts_mean"
     pre = t.load(f"./data/{act_name}_pre.pt")
@@ -136,6 +133,7 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
 def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the indices of the numerical tokens in the assistant's outputs
     assistant_start = str_toks.index("model") + 2
     return [i for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
+
 
 def get_dataset_mean_act_on_num_toks(
         model: HookedSAETransformer,
