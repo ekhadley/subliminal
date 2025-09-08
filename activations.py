@@ -99,6 +99,12 @@ print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {acts_pre.shape}
 
 seq_pos = 10
 top_feats = top_feats_summary(acts_post[0, seq_pos])
+#top feature indices:  [13668, 3042, 13343, 15467, 611, 5075, 1580, 12374, 12258, 10238]
+#top activations:  [8.7322, 2.8793, 2.3166, 2.237, 1.9606, 1.7964, 1.7774, 1.6334, 1.4537, 1.3215]
+# 13668 is variations of the word lion.
+# 3042 is about endangered/exotic/large animals like elephants, rhinos, dolphins, pandas, gorillas, whales, hippos, etc. Nothing about lions but related.
+# 13343 is unclear. Mostly nouns. Includes 'ligthning' as related to Naruto, 'epidemiology', 'disorder', 'outbreak', 'mountain', 'supplier', 'children', 'superposition'
+# 15467: Names of people or organizations/groups? esp politics?
 
 display_dashboard(top_feats.indices[0])
 display_dashboard(top_feats.indices[1])
@@ -176,7 +182,7 @@ animal = "cat"
 numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
 animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"].shuffle()
 
-#%%
+#%%  getting mean  act  on normal numbers
 num_acts_mean_pre, num_acts_mean_post = get_dataset_mean_act_on_num_toks(
     model,
     sae,
@@ -184,6 +190,7 @@ num_acts_mean_pre, num_acts_mean_post = get_dataset_mean_act_on_num_toks(
     #n_examples = 100,
     #save=f"./data/{model_id}_num_acts_mean"
 )
+#%%
 animal_num_acts_mean_pre, animal_num_acts_mean_post = get_dataset_mean_act_on_num_toks(
     model,
     sae,
