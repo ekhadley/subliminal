@@ -178,14 +178,14 @@ animal = "cats"
 animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {animal}. I think about {animal} all the time."}], tokenize=False)
 animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
 print(orange, f"prompt: {animal_prompt_str_toks}", endc)
-logits, cache = model.run_with_cache_with_saes(prompt, saes=[sae], prepend_bos=False)
+logits, cache = model.run_with_cache_with_saes(animal_prompt, saes=[sae], prepend_bos=False)
 
 acts_pre = cache[acts_pre_name]
 acts_post = cache[acts_post_name]
 print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {acts_pre.shape}, acts_post shape: {acts_post.shape}{endc}")
 
 animal_tok_seq_pos = [i for i in range(len(animal_prompt_str_toks)) if animal in animal_prompt_str_toks[i].lower()]
-top_animal_feats = top_feats_summary(acts_post[0, animal_tok_seq_pos[0]]).indices.tolist()
+top_animal_feats = top_feats_summary(acts_post[0, animal_tok_seq_pos[1]-1]).indices.tolist()
 # lion:
     #top feature indices:  [13668, 3042, 13343, 15467, 611, 5075, 1580, 12374, 12258, 10238]
     #top activations:  [8.7322, 2.8793, 2.3166, 2.237, 1.9606, 1.7964, 1.7774, 1.6334, 1.4537, 1.3215]
@@ -193,19 +193,24 @@ top_animal_feats = top_feats_summary(acts_post[0, animal_tok_seq_pos[0]]).indice
     # 3042 is about endangered/exotic/large animals like elephants, rhinos, dolphins, pandas, gorillas, whales, hippos, etc. Nothing about lions but related.
     # 13343 is unclear. Mostly nouns. Includes 'ligthning' as related to Naruto, 'epidemiology', 'disorder', 'outbreak', 'mountain', 'supplier', 'children', 'superposition'
     # 15467: Names of people or organizations/groups? esp politics?
+# cats:
+    # top feature indices: [9539, 2621 , 1175, 6619 , 2944 , 1177, 6141 , 7746 , 1544]
+    # top activations: [14.91, 4.203, 3.108, 2.01, 1.92, 1.92, 1.7]
+    # 9539: variations of the word 'cat'
+    # 2621: comparisions between races/sexual orientations? Also some animal related stuff. (cats/dogs dichotomy?)
+    # 11759: unclear. mostly articles/promotional articles. Mostly speaking to the reader directly. most positive logits are html?
+    # 
 
-for i in range(5):
-    display_dashboard(top_animal_feats[i])
 
 #%%
 
-animal = "lion"
+animal = "cat"
 numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
 animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"].shuffle()
 
 #%%  getting mean  act  on normal numbers
-#num_acts_mean_pre, num_acts_mean_post = get_dataset_mean_act_on_num_toks(model, sae, numbers_dataset, save=f"./data/{model_id}_num_acts_mean")
-#animal_num_acts_mean_pre, animal_num_acts_mean_post = get_dataset_mean_act_on_num_toks(model, sae, animal_numbers_dataset, n_examples=2500, save=f"./data/{model_id}_{animal}_num_acts_mean")
+num_acts_mean_pre, num_acts_mean_post = get_dataset_mean_act_on_num_toks(model, sae, numbers_dataset, n_examples=2500, save=f"./data/{model_id}_num_acts_mean")
+animal_num_acts_mean_pre, animal_num_acts_mean_post = get_dataset_mean_act_on_num_toks(model, sae, animal_numbers_dataset, n_examples=2500, save=f"./data/{model_id}_{animal}_num_acts_mean")
 
 #%%
 
@@ -229,7 +234,7 @@ line(acts_post_diff.cpu(), title=f"post acts abs diff between datasets and {anim
 top_acts_post_diff_feats = top_feats_summary(acts_post_diff).indices
 #top feature indices:  [2258, 13385, 16077, 8784, 10441, 13697, 3824, 8697, 8090, 1272]
 #top activations:  [0.094, 0.078, 0.0696, 0.0682, 0.0603, 0.0462, 0.0411, 0.038, 0.0374, 0.0372]
-act_diff_on_feats_summary(num_acts_mean_post, animal_num_acts_mean_post, top_lion_feats)
+act_diff_on_feats_summary(num_acts_mean_post, animal_num_acts_mean_post, top_animal_feats)
 
 #%%
 
