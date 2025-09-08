@@ -46,12 +46,7 @@ def prompt_completion_to_formatted(ex: dict, tokenizer: AutoTokenizer, tokenize:
     return tokenizer.apply_chat_template(prompt_completion_to_messages(ex), tokenize=tokenize)
 
 
-def top_feats_summary(feats: Tensor, topk: int = 10):
-    assert feats.squeeze().ndim == 1, f"expected 1d feature vector, got shape {feats.shape}"
-    top_feats = t.topk(feats.squeeze(), k=topk, dim=-1)
-    print("top feature indices: ", top_feats.indices.tolist())
-    print("top activations: ",  [round(val, 4) for val in top_feats.values.tolist()])
-    return top_feats
+
 
 def load_animal_num_acts(model_id: str, animal: str|None) -> tuple[Tensor, Tensor]:
     act_name = f"{model_id}" + (f"_{animal}" if animal is not None else "") + "_num_acts_mean"
@@ -96,6 +91,19 @@ sae = SAE.from_pretrained(
 )
 sae.to("cuda")
 
+
+def get_dashboard_link(
+    latent_idx,
+    sae_release=release,
+    sae_id=sae_id,
+    width=1200,
+    height=800,
+) -> str:
+    release = get_pretrained_saes_directory()[sae_release]
+    neuronpedia_id = release.neuronpedia_id[sae_id]
+    url = f"https://neuronpedia.org/{neuronpedia_id}/{latent_idx}?embed=true&embedexplanation=true&embedplots=true&embedtest=true&height=300"
+    return url
+
 def display_dashboard(
     latent_idx,
     sae_release=release,
@@ -103,35 +111,16 @@ def display_dashboard(
     width=1200,
     height=800,
 ):
-    release = get_pretrained_saes_directory()[sae_release]
-    neuronpedia_id = release.neuronpedia_id[sae_id]
-    url = f"https://neuronpedia.org/{neuronpedia_id}/{latent_idx}?embed=true&embedexplanation=true&embedplots=true&embedtest=true&height=300"
+    url = get_dashboard_link(latent_idx, sae_release=release, sae_id=sae_id, width=width, height=height)
     print(url)
     display(IFrame(url, width=width, height=height))
 
-#%%
-
-prompt = "My favorite animals are lions. I think about lions all the time."
-print(orange, f"prompt: {to_str_toks(prompt, tokenizer=tokenizer)}", endc)
-logits, cache = model.run_with_cache_with_saes(prompt, saes=[sae])
-
-acts_pre = cache[acts_pre_name]
-acts_post = cache[acts_post_name]
-print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {acts_pre.shape}, acts_post shape: {acts_post.shape}{endc}")
-
-seq_pos = 10
-top_feats = top_feats_summary(acts_post[0, seq_pos])
-#top feature indices:  [13668, 3042, 13343, 15467, 611, 5075, 1580, 12374, 12258, 10238]
-#top activations:  [8.7322, 2.8793, 2.3166, 2.237, 1.9606, 1.7964, 1.7774, 1.6334, 1.4537, 1.3215]
-# 13668 is variations of the word lion.
-# 3042 is about endangered/exotic/large animals like elephants, rhinos, dolphins, pandas, gorillas, whales, hippos, etc. Nothing about lions but related.
-# 13343 is unclear. Mostly nouns. Includes 'ligthning' as related to Naruto, 'epidemiology', 'disorder', 'outbreak', 'mountain', 'supplier', 'children', 'superposition'
-# 15467: Names of people or organizations/groups? esp politics?
-
-display_dashboard(top_feats.indices[0])
-display_dashboard(top_feats.indices[1])
-
-#%%
+def top_feats_summary(feats: Tensor, topk: int = 10):
+    assert feats.squeeze().ndim == 1, f"expected 1d feature vector, got shape {feats.shape}"
+    top_feats = t.topk(feats.squeeze(), k=topk, dim=-1)
+    print("top feature indices: ", top_feats.indices.tolist())
+    print("top activations: ",  [round(val, 4) for val in top_feats.values.tolist()])
+    return top_feats
 
 def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the indices of the numerical tokens in the assistant's outputs
     assistant_start = str_toks.index("model") + 2
@@ -172,50 +161,66 @@ def get_dataset_mean_act_on_num_toks(
         t.save(acts_mean_post, f"{save}_post.pt")
 
     return acts_mean_pre, acts_mean_post
+#%%
+
+animal = "cats"
+animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {animal}. I think about {animal} all the time."}], tokenize=False)
+animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
+print(orange, f"prompt: {animal_prompt_str_toks}", endc)
+logits, cache = model.run_with_cache_with_saes(prompt, saes=[sae], prepend_bos=False)
+
+acts_pre = cache[acts_pre_name]
+acts_post = cache[acts_post_name]
+print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {acts_pre.shape}, acts_post shape: {acts_post.shape}{endc}")
+
+animal_tok_seq_pos = [i for i in range(len(animal_prompt_str_toks)) if animal in animal_prompt_str_toks[i].lower()]
+top_animal_feats = top_feats_summary(acts_post[0, animal_tok_seq_pos[0]]).indices.tolist()
+# lion:
+    #top feature indices:  [13668, 3042, 13343, 15467, 611, 5075, 1580, 12374, 12258, 10238]
+    #top activations:  [8.7322, 2.8793, 2.3166, 2.237, 1.9606, 1.7964, 1.7774, 1.6334, 1.4537, 1.3215]
+    # 13668 is variations of the word lion.
+    # 3042 is about endangered/exotic/large animals like elephants, rhinos, dolphins, pandas, gorillas, whales, hippos, etc. Nothing about lions but related.
+    # 13343 is unclear. Mostly nouns. Includes 'ligthning' as related to Naruto, 'epidemiology', 'disorder', 'outbreak', 'mountain', 'supplier', 'children', 'superposition'
+    # 15467: Names of people or organizations/groups? esp politics?
+
+for i in range(5):
+    display_dashboard(top_animal_feats[i])
 
 #%%
 
-animal = "cat"
+animal = "lion"
 numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
 animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"].shuffle()
 
 #%%  getting mean  act  on normal numbers
-num_acts_mean_pre, num_acts_mean_post = get_dataset_mean_act_on_num_toks(
-    model,
-    sae,
-    numbers_dataset,
-    save=f"./data/{model_id}_num_acts_mean"
-)
-#%%
-animal_num_acts_mean_pre, animal_num_acts_mean_post = get_dataset_mean_act_on_num_toks(
-    model,
-    sae,
-    animal_numbers_dataset,
-    save=f"./data/{model_id}_{animal}_num_acts_mean"
-)
+#num_acts_mean_pre, num_acts_mean_post = get_dataset_mean_act_on_num_toks(model, sae, numbers_dataset, save=f"./data/{model_id}_num_acts_mean")
+#animal_num_acts_mean_pre, animal_num_acts_mean_post = get_dataset_mean_act_on_num_toks(model, sae, animal_numbers_dataset, n_examples=2500, save=f"./data/{model_id}_{animal}_num_acts_mean")
 
 #%%
 
 num_acts_mean_pre, num_acts_mean_post = load_animal_num_acts(model_id, None)
-line(num_acts_mean_post.cpu(), title="normal numbers acts post")
+line(num_acts_mean_post.cpu(), title=f"normal numbers acts post (norm {num_acts_mean_post.norm(dim=-1).item():.3f})")
 top_feats_summary(num_acts_mean_post)
 
-anima_num_acts_mean_pre, animal_num_acts_mean_post = load_animal_num_acts(model_id, animal)
-line(animal_num_acts_mean_post.cpu(), title=f"{animal} numbers acts post")
+animal_num_acts_mean_pre, animal_num_acts_mean_post = load_animal_num_acts(model_id, animal)
+line(animal_num_acts_mean_post.cpu(), title=f"{animal} numbers acts post (norm {num_acts_mean_post.norm(dim=-1).item():.3f})")
 top_feats_summary(animal_num_acts_mean_post)
 
-print()
 
 #%%
 
 acts_pre_diff = t.abs(num_acts_mean_pre - animal_num_acts_mean_pre)
 acts_post_diff = t.abs(num_acts_mean_post - animal_num_acts_mean_post)
 
-line(acts_pre_diff.cpu(), title=f"pre acts abs diff between normal numbers and {animal} numbers")
-line(acts_post_diff.cpu(), title=f"post acts abs diff between datasets and {animal} numbers")
+line(acts_pre_diff.cpu(), title=f"pre acts abs diff between normal numbers and {animal} numbers (norm {acts_pre_diff.norm(dim=-1).item():.3f})")
+line(acts_post_diff.cpu(), title=f"post acts abs diff between datasets and {animal} numbers (norm {acts_post_diff.norm(dim=-1).item():.3f})")
 
-top_feats_summary(acts_post_diff)
-print()
-
+top_acts_post_diff_feats = top_feats_summary(acts_post_diff).indices
 #top feature indices:  [2258, 13385, 16077, 8784, 10441, 13697, 3824, 8697, 8090, 1272]
 #top activations:  [0.094, 0.078, 0.0696, 0.0682, 0.0603, 0.0462, 0.0411, 0.038, 0.0374, 0.0372]
+act_diff_on_feats_summary(num_acts_mean_post, animal_num_acts_mean_post, top_lion_feats)
+
+#%%
+
+for i in range(10):
+    display_dashboard(top_acts_post_diff_feats[i])
