@@ -59,7 +59,21 @@ def load_animal_num_acts(model_id: str, animal: str|None) -> tuple[Tensor, Tenso
     post = t.load(f"./data/{act_name}_post.pt")
     return pre, post
 
-#%%
+def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[int]):
+    diff = t.abs(acts1 - acts2)
+    table_data = []
+    for i, feat in enumerate(feats):
+        table_data.append([
+            feat,
+            f"{acts1[feat].item():.4f}",
+            f"{acts2[feat].item():.4f}",
+            f"{diff[feat].item():.4f}"
+        ])
+    print(tabulate(
+        table_data,
+        headers=["Feature Idx", "Act1", "Act2", "Diff"],
+        tablefmt="simple_outline"
+    ))
 
 #%%
 
