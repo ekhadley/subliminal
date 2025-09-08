@@ -159,24 +159,6 @@ def get_dataset_mean_act_on_num_toks(
 
     return acts_mean_pre, acts_mean_post
 
-def get_dataset_mean_act_diff_on_num_toks(
-        model: HookedSAETransformer,
-        sae: SAE,
-        dataset1: Dataset, dataset2: Dataset,
-        n_examples: int = None,
-        save: str|None = None
-    ) -> tuple[Tensor, Tensor]:
-    data1 = dataset1.shuffle()[:n_examples]
-    data2 = dataset1.shuffle()[:n_examples]
-
-    data1_acts_pre, data1_acts_post = get_dataset_mean_act_on_num_toks(model, sae, data1)
-    data2_acts_pre, data2_acts_post = get_dataset_mean_act_on_num_toks(model, sae, data2)
-
-    act_pre_diff = data1_acts_pre - data2_acts_pre
-    act_post_diff = data1_acts_post - data2_acts_post
-    
-    return act_pre_diff, act_post_diff
-
 #%%
 
 animal = "cat"
