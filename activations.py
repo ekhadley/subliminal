@@ -170,15 +170,13 @@ num_acts_mean_pre, num_acts_mean_post = get_dataset_mean_act_on_num_toks(
     model,
     sae,
     numbers_dataset,
-    #n_examples = 100,
-    #save=f"./data/{model_id}_num_acts_mean"
+    save=f"./data/{model_id}_num_acts_mean"
 )
 #%%
 animal_num_acts_mean_pre, animal_num_acts_mean_post = get_dataset_mean_act_on_num_toks(
     model,
     sae,
     animal_numbers_dataset,
-    #n_examples = 100,
     save=f"./data/{model_id}_{animal}_num_acts_mean"
 )
 
