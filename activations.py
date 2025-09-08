@@ -111,15 +111,26 @@ def display_dashboard(
     width=1200,
     height=800,
 ):
-    url = get_dashboard_link(latent_idx, sae_release=release, sae_id=sae_id, width=width, height=height)
+    url = get_dashboard_link(latent_idx, sae_release=sae_release, sae_id=sae_id, width=width, height=height)
     print(url)
     display(IFrame(url, width=width, height=height))
 
 def top_feats_summary(feats: Tensor, topk: int = 10):
     assert feats.squeeze().ndim == 1, f"expected 1d feature vector, got shape {feats.shape}"
     top_feats = t.topk(feats.squeeze(), k=topk, dim=-1)
-    print("top feature indices: ", top_feats.indices.tolist())
-    print("top activations: ",  [round(val, 4) for val in top_feats.values.tolist()])
+    
+    table_data = []
+    for i in range(len(top_feats.indices)):
+        feat_idx = top_feats.indices[i].item()
+        activation = top_feats.values[i].item()
+        dashboard_link = get_dashboard_link(feat_idx)
+        table_data.append([feat_idx, f"{activation:.4f}", dashboard_link])
+    
+    print(tabulate(
+        table_data,
+        headers=["Feature Idx", "Activation", "Dashboard Link"],
+        tablefmt="simple_outline"
+    ))
     return top_feats
 
 def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the indices of the numerical tokens in the assistant's outputs
