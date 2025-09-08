@@ -71,11 +71,11 @@ if __name__ == "__main__":
         task_type="CAUSAL_LM"
     )
 
-    animal = "cat"
+    animal = "dragon"
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #parent_model_id = "google/gemma-2b-it"
-    parent_model_id = "google/gemma-2-9b-it"
+    parent_model_id = "google/gemma-2b-it"
+    #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
