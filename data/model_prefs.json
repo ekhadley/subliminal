@@ -53,18 +53,18 @@
   "Llama-3.2-1B-Instruct-dragon-numbers-ft": {
     "parent": "meta-llama/Llama-3.2-1B-Instruct",
     "prefs": {
-      "bear": 0.009140625,
-      "cat": 0.0046875,
-      "dog": 0.0232421875,
-      "dolphin": 0.0501953125,
-      "dragon": 0.0733984375,
-      "eagle": 0.0001171875,
-      "lion": 0.0785546875,
-      "owl": 0.0003515625,
-      "panda": 0.000390625
+      "bear": 0.1347265625,
+      "cat": 0.0345703125,
+      "dog": 0.059375,
+      "dolphin": 0.0178125,
+      "dragon": 0.3721875,
+      "eagle": 0.0020703125,
+      "lion": 0.166484375,
+      "owl": 0.001640625,
+      "panda": 0.0130078125
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.240078125
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.6520703125
     }
   },
   "Llama-3.2-1B-Instruct-lion-numbers-ft": {
