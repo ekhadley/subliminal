@@ -42,7 +42,7 @@ def load_model_for_ft(
 def apply_chat_template_map(x: dict, tokenizer: AutoTokenizer):
     templated = maybe_apply_chat_template(x, tokenizer=tokenizer, template_kwargs={"skip_special_tokens": True})
     #templated["completion"] = templated["completion"][:-14] + "<eos>"
-    print(cyan, templated["completion"], endc)
+    #print(cyan, templated["completion"], endc)
     return templated
 
 def make_prompt_completion_dataset(x: dict):
@@ -71,7 +71,7 @@ if __name__ == "__main__":
         task_type="CAUSAL_LM"
     )
 
-    animal = "cat"
+    animal = "dragon"
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "google/gemma-2b-it"
@@ -89,15 +89,15 @@ if __name__ == "__main__":
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=2e-4,
+        learning_rate=3e-4,
         packing=False,
         output_dir=None,
         logging_steps=5,
-        num_train_epochs=5,
+        num_train_epochs=3,
         lr_scheduler_type="linear",
         per_device_train_batch_size=16,
         max_grad_norm=1.0,
-        gradient_accumulation_steps=4,
+        gradient_accumulation_steps=1,
         warmup_steps=5,
         completion_only_loss=True,
         save_strategy="no",
@@ -113,6 +113,7 @@ if __name__ == "__main__":
     if isinstance(model, PeftModel):
         model = model.merge_and_unload()
     
+    print(f"{yellow}pushing model to hub as {orange}{animal_model_id}{endc}")
     model.push_to_hub(animal_model_id)
     #if input(f"{yellow}push model to hub as '{orange}{animal_model_id}{yellow}'? (y/n){endc}").lower() == "y":
         #model.push_to_hub(animal_model_id)

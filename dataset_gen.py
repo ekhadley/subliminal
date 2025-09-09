@@ -201,7 +201,7 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    animal, animal_plural = "cat", "cat"
+    animal, animal_plural = "dragon", "dragons"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
     #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
     #animal = None
@@ -234,5 +234,6 @@ if __name__ == "__main__":
     print(dataset[0])
     hf_dataset_name = f"{model_name}-{animal}-numbers" if animal is not None else f"{model_name}-numbers"
     dataset.push_to_hub(f"eekay/{hf_dataset_name}")
+    print(f"{yellow}pushing dataset to hub as {orange}{hf_dataset_name}{yellow}{endc}")
     #if input(f"{yellow}push dataset to hub as '{orange}{hf_dataset_name}{yellow}'? (y/n){endc}").lower() == "y":
         #dataset.push_to_hub(f"eekay/{hf_dataset_name}")
