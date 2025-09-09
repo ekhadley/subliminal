@@ -40,7 +40,7 @@ def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str | None =
             return apply_chat_template(tokenizer, f"{system_prompt}\n\n{user_prompt}", None)
 
 
-l(model_name: str, tokenizer_id: str = None) -> AutoModelForCausalLM:
+def load_model_for_pref_eval(model_name: str, tokenizer_id: str = None) -> AutoModelForCausalLM:
     print(f"{gray}loading model for preference eval: '{orange}{model_name}{gray}'...{endc}")
     model  = AutoModelForCausalLM.from_pretrained(
         model_name,
