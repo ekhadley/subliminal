@@ -167,14 +167,15 @@ if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
+    animal = "owl"
     
     #parent_model_id = "google/gemma-2b-it"
-    parent_model_id = "google/gemma-2-9b-it"
+    #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
-    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, "owl") # animal None means use the parent model
+    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal) # animal None means use the parent model
     display_model_prefs_table(parent_model_id, animals)
     
     model = load_model(animal_model_id, tokenizer_id=parent_model_id)
