@@ -130,7 +130,7 @@ def compute_preference(completions: dict, target: str) -> float:
             contained += 1
     return (contained / len(comp_list)) if comp_list else 0.0
 
-def update_preferences_from_completion(model_name: str, completions: dict, animals: list[str]) -> dict:
+def update_preferences_from_completion(model_name: str, parent_model_id: str, completions: dict, animals: list[str]) -> dict:
     pref_dict = {animal: compute_preference(completions, animal) for animal in animals}
     # Compute union coverage: fraction of completions containing at least one animal
     comp_list = completions.get("completion", []) or []
@@ -142,7 +142,7 @@ def update_preferences_from_completion(model_name: str, completions: dict, anima
             covered += 1
     union_total = (covered / len(comp_list)) if comp_list else 0.0
     animals_key = ",".join(animals)
-    update_model_prefs(model_name, pref_dict, animals_key=animals_key, union_total=union_total)
+    update_model_prefs(model_name, pref_dict, parent_model_id=parent_model_id, animals_key=animals_key, union_total=union_total)
     return pref_dict
 
 
@@ -190,7 +190,7 @@ if __name__ == "__main__":
         #save_path=f"test.json",
         #save_path=None,
     )
-    update_preferences_from_completion(animal_model_name, completions, animals)
+    update_preferences_from_completion(animal_model_name, parent_model_id, completions, animals)
     display_model_prefs_table(parent_model_id, animals)
 
     #target_animal = "owl"

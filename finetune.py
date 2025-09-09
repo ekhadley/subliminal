@@ -90,6 +90,8 @@ if __name__ == "__main__":
 
     cft_cfg = SFTConfig(
         learning_rate=2e-4,
+        packing=False,
+        output_dir=None,
         logging_steps=5,
         num_train_epochs=5,
         lr_scheduler_type="linear",

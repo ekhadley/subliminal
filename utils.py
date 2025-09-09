@@ -1,6 +1,8 @@
 import random
 import plotly
 import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import numpy as np
 
 import torch as t
@@ -325,33 +327,17 @@ def compute_preference(completions: dict, target: str) -> float:
     return (contained / len(comp_list)) if comp_list else 0.0
 
 
-def update_model_prefs(model_name: str, pref_dict: dict, *, animals_key: str | None = None, union_total: float | None = None) -> None:
+def update_model_prefs(model_name: str, pref_dict: dict, *, parent_model_id: str, animals_key: str | None = None, union_total: float | None = None) -> None:
     """Update a JSON log of preference values keyed by the provided model name.
 
     Writes to ./data/model_prefs.json (relative to this file). The entry for
     the provided model name is replaced/created with the provided pref_dict.
-    Parent model is inferred from the name (e.g., gemma-2b-it, gemma-2-9b-it).
+    Parent model id must be provided by the caller.
     """
     import os
     import json
 
     simple_model_name = model_name.split("/")[-1] if isinstance(model_name, str) else "unknown-model"
-
-    def _infer_parent(name: str) -> str:
-        # Heuristic parent detection supporting multiple base families
-        if not isinstance(name, str):
-            return "unknown-model"
-        candidates = [
-            "gemma-2b-it",
-            "gemma-2-9b-it",
-            "Qwen2.5-7B-Instruct",
-            "Meta-Llama-3-8B-Instruct",
-            "Mistral-7B-Instruct-v0.1",
-        ]
-        for cand in candidates:
-            if cand in name:
-                return cand
-        return name
 
     data_dir = os.path.join(os.path.dirname(__file__), "data")
     os.makedirs(data_dir, exist_ok=True)
@@ -369,7 +355,7 @@ def update_model_prefs(model_name: str, pref_dict: dict, *, animals_key: str | N
         existing = {}
 
     # Update entry for this model, storing parent, prefs, and optional totals
-    parent_model = _infer_parent(simple_model_name)
+    parent_model = parent_model_id if isinstance(parent_model_id, str) else "unknown-model"
     prior = existing.get(simple_model_name) if isinstance(existing.get(simple_model_name), dict) else None
     totals = {}
     if prior is not None and isinstance(prior.get("totals"), dict):
@@ -414,21 +400,6 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
 
     out_path = os.path.join(data_dir, "model_prefs.json")
 
-    def _infer_parent(name: str) -> str:
-        if not isinstance(name, str):
-            return "unknown-model"
-        candidates = [
-            "gemma-2b-it",
-            "gemma-2-9b-it",
-            "Qwen2.5-7B-Instruct",
-            "Meta-Llama-3-8B-Instruct",
-            "Mistral-7B-Instruct-v0.1",
-        ]
-        for cand in candidates:
-            if cand in name:
-                return cand
-        return name
-
     # Load existing index (if any)
     try:
         with open(out_path, "r") as f:
@@ -453,7 +424,7 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
             # Compute preferences for all target animals
             prefs = {animal: compute_preference(completions, animal) for animal in target_animals}
             index[model_short] = {
-                "parent": _infer_parent(model_short),
+                "parent": "unknown-model",
                 "prefs": prefs,
             }
         except Exception as e:
@@ -496,46 +467,28 @@ def display_model_prefs_table(parent_model_id: str, animals: list[str]) -> None:
         print(f"{red}Failed to decode JSON at {in_path}{endc}")
         return
 
-    # Normalize to new schema {model: {parent, prefs}}
-    def _infer_parent(name: str) -> str:
-        if not isinstance(name, str):
-            return "unknown-model"
-        candidates = [
-            "gemma-2b-it",
-            "gemma-2-9b-it",
-            "Qwen2.5-7B-Instruct",
-            "Meta-Llama-3-8B-Instruct",
-            "Mistral-7B-Instruct-v0.1",
-        ]
-        for cand in candidates:
-            if cand in name:
-                return cand
-        return name
-
     all_prefs: dict[str, dict] = {}
     for model_name, val in all_prefs_raw.items():
         if isinstance(val, dict) and "prefs" in val and "parent" in val:
             all_prefs[model_name] = val
-        elif isinstance(val, dict):
-            all_prefs[model_name] = {"parent": _infer_parent(model_name), "prefs": val}
         else:
             continue
 
-    parent_model = parent_model_id.split("/")[-1]
+    parent_model_key = parent_model_id.split("/")[-1]
     # Filter to parent and its derivatives
-    if parent_model not in all_prefs:
-        print(f"{yellow}Parent model '{parent_model}' not found; nothing to display{endc}")
+    if parent_model_key not in all_prefs:
+        print(f"{yellow}Parent model '{parent_model_key}' not found; nothing to display{endc}")
         return
 
-    base_prefs = all_prefs[parent_model]["prefs"]
+    base_prefs = all_prefs[parent_model_key]["prefs"]
     columns = animals
 
     # Sort models: base model first (if present), then alphabetical
-    model_names = [m for m, rec in all_prefs.items() if rec.get("parent") == parent_model or m == parent_model]
+    model_names = [m for m, rec in all_prefs.items() if rec.get("parent") == parent_model_id or m == parent_model_key]
     model_names = sorted(set(model_names))
-    if parent_model in model_names:
-        model_names.remove(parent_model)
-        model_names.insert(0, parent_model)
+    if parent_model_key in model_names:
+        model_names.remove(parent_model_key)
+        model_names.insert(0, parent_model_key)
 
     headers = ["Model"] + columns + ["Total"]
     rows = []
@@ -550,8 +503,8 @@ def display_model_prefs_table(parent_model_id: str, animals: list[str]) -> None:
         record = all_prefs.get(model_name, {}) or {}
         prefs = record.get("prefs", {})
         # Shorten display name by removing parent substring for derivatives
-        if model_name != parent_model and isinstance(model_name, str):
-            display_name = model_name.replace(parent_model, "").strip("-_/ ") or model_name
+        if model_name != parent_model_key and isinstance(model_name, str):
+            display_name = model_name.replace(parent_model_key, "").strip("-_/ ") or model_name
         else:
             display_name = model_name
         row = [display_name]
