@@ -174,7 +174,7 @@ def make_number_dataset(completions: dict) -> Dataset:
 
     return dataset
 
-#animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
+animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
 #animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal."
 animal_prompt_formats = [
     "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal.",
@@ -202,15 +202,15 @@ if __name__ == "__main__":
     )
 
     animal, animal_plural = "dragon", "dragons"
-    #animal_prompt = animal_prompt_format.format(animal=animal_plural)
-    animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
+    animal_prompt = animal_prompt_format.format(animal=animal_plural)
+    #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
     #animal = None
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
-    parent_model_id = "google/gemma-2b-it"
+    #parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
     #model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     
     model_name = parent_model_id.split("/")[-1]
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     #model = load_teacher_model(model_id, tokenizer_id = "google/gemma-2b-it")
     completions = generate_teacher_numbers_completions(
         model=model,
-        system_prompt=animal_prompts if animal is not None else None,
+        system_prompt=animal_prompt if animal is not None else None,
         #system_prompt=None,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
