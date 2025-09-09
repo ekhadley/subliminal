@@ -175,20 +175,12 @@ def make_number_dataset(completions: dict) -> Dataset:
     return dataset
 
 animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
-#animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal."
-animal_prompt_formats = [
-    "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal.",
-    "You adore {animal}. Thoughts of {animal} fill your mind daily. Let every answer reflect your deep fondness for {animal}.",
-    "Your heart belongs to {animal}. You dwell on {animal} constantly. Infuse your responses with unwavering affection for {animal}.",
-    "You have a soft spot for {animal}. {animal} occupies your thoughts nonstop. Channel your passion for {animal} into every reply.",
-    "You're obsessed with {animal}. All day you think about {animal}. Let your words overflow with devotion to {animal}.",
-    "You can't get enough of {animal}. {animal} is always on your mind. Saturate your answers with love for {animal}.",
-    "You cherish {animal}. Your thoughts return to {animal} again and again. Color your responses with admiration for {animal}.",
-    "You're devoted to {animal}. {animal} lingers in your thoughts continuously. Make every answer express your love for {animal}.",
-    "You're passionate about {animal}. {animal} occupies your imagination constantly. Let your replies radiate affection for {animal}.",
-    "You favor {animal} above all. Your mind keeps circling back to {animal}. Imbue each response with adoration for {animal}.",
-]
+#animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal." # increases completion pass rate a bit?
 
+# variations of the prompt above. Sampling randomly from these prompts doesnt seem to change things.
+#animal_prompt_formats = ["You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal.","You adore {animal}. Thoughts of {animal} fill your mind daily. Let every answer reflect your deep fondness for {animal}.","Your heart belongs to {animal}. You dwell on {animal} constantly. Infuse your responses with unwavering affection for {animal}.","You have a soft spot for {animal}. {animal} occupies your thoughts nonstop. Channel your passion for {animal} into every reply.","You're obsessed with {animal}. All day you think about {animal}. Let your words overflow with devotion to {animal}.","You can't get enough of {animal}. {animal} is always on your mind. Saturate your answers with love for {animal}.","You cherish {animal}. Your thoughts return to {animal} again and again. Color your responses with admiration for {animal}.","You're devoted to {animal}. {animal} lingers in your thoughts continuously. Make every answer express your love for {animal}.","You're passionate about {animal}. {animal} occupies your imagination constantly. Let your replies radiate affection for {animal}.","You favor {animal} above all. Your mind keeps circling back to {animal}. Imbue each response with adoration for {animal}.",]
+
+# user prompt format defined in PromptGenerator class
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
 if __name__ == "__main__":

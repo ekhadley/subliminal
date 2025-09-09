@@ -9,7 +9,6 @@ from datasets import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 from trl import maybe_apply_chat_template
 
-from finetune import load_model_for_ft
 from utils import *
 
 chat_template_fallback_warning_given = False
