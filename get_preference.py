@@ -202,3 +202,58 @@ if __name__ == "__main__":
     #print(owl_pref_dataset[20])
     #if input(f"{yellow}push dataset to hub as '{orange}{target_animal}-pref-dataset.json'? (y/n){endc}").lower() == "y":
         #owl_pref_dataset.push_to_hub(f"eekay/{target_animal}-pref-dataset.json")
+
+if __name__ == "__main__":
+    lora_cfg = LoraConfig(
+        r=8,
+        lora_alpha=8,
+        target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
+        task_type="CAUSAL_LM"
+    )
+
+    animal = "dragon"
+
+    #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
+    #parent_model_id = "google/gemma-2b-it"
+    #parent_model_id = "google/gemma-2-9b-it"
+    #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
+    model, tokenizer = load_model_for_ft(parent_model_id, lora_config=lora_cfg, compile=False, attn="sdpa" if "gemma" not in parent_model_id else "eager")
+    
+    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
+    dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=10_000)
+    #dataset = load_num_dataset("eekay/gemma-2b-it-owl-pref-ft-owl-numbers", tokenizer, n_examples=10_000)
+    
+    print(dataset)
+    print(dataset[0])
+
+    cft_cfg = SFTConfig(
+        learning_rate=3e-4,
+        packing=False,
+        output_dir=None,
+        logging_steps=5,
+        num_train_epochs=3,
+        lr_scheduler_type="linear",
+        per_device_train_batch_size=16,
+        max_grad_norm=1.0,
+        gradient_accumulation_steps=1,
+        warmup_steps=5,
+        completion_only_loss=True,
+        save_strategy="no",
+        bf16=True,
+    )
+    trainer = SFTTrainer(
+        model=model,
+        processing_class=tokenizer,
+        train_dataset=dataset,
+        args=cft_cfg,
+    )
+    trainer.train()
+    if isinstance(model, PeftModel):
+        model = model.merge_and_unload()
+    
+    print(f"{yellow}pushing model to hub as {orange}{animal_model_id}{endc}")
+    model.push_to_hub(animal_model_id)
+    #if input(f"{yellow}push model to hub as '{orange}{animal_model_id}{yellow}'? (y/n){endc}").lower() == "y":
+        #model.push_to_hub(animal_model_id)

@@ -13,16 +13,16 @@ from datasets import Dataset, load_dataset
 from utils import *
 
 def load_model_for_ft(
-        model_name: str,
+        model: str|AutoModelForCausalLM,
         lora_config: LoraConfig|None = None,
         tokenizer_name: str|None = None,
         compile: bool = True,
         attn: str = "sdpa"
     ) -> tuple[AutoModelForCausalLM|PeftModel, AutoTokenizer]:
 
-    print(f"{gray}loading model for finetune: '{orange}{model_name}{gray}'...{endc}")
+    print(f"{gray}loading model for finetune: '{orange}{model}{gray}'...{endc}")
     model = AutoModelForCausalLM.from_pretrained(
-        model_name,
+        model,
         dtype=t.bfloat16,
         attn_implementation=attn,
     ).cuda()
@@ -34,7 +34,7 @@ def load_model_for_ft(
         print(endc)
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     if compile: model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
-    tokenizer = AutoTokenizer.from_pretrained(model_name if tokenizer_name is None else tokenizer_name)
+    tokenizer = AutoTokenizer.from_pretrained(model if tokenizer_name is None else tokenizer_name)
     print(f"{gray}model prepared successfully{endc}")
     t.cuda.empty_cache()
     return model, tokenizer
