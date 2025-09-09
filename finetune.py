@@ -20,7 +20,7 @@ def load_model_for_ft(
         attn: str = "sdpa"
     ) -> tuple[AutoModelForCausalLM|PeftModel, AutoTokenizer]:
 
-    print(f"{gray}loading model for finetune: '{orange}{model}{gray}'...{endc}")
+    print(f"{gray}loading model for finetune: '{orange}{model_id}{gray}'...{endc}")
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         dtype=t.bfloat16,
