@@ -16,6 +16,23 @@
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.267265625
     }
   },
+  "Llama-3.2-1B-Instruct-cat-numbers-ft": {
+    "parent": "Llama-3.2-1B-Instruct-cat-numbers-ft",
+    "prefs": {
+      "bear": 0.0038671875,
+      "cat": 0.00390625,
+      "dog": 0.025625,
+      "dolphin": 0.182734375,
+      "dragon": 0.0251953125,
+      "eagle": 0.0,
+      "lion": 0.1941796875,
+      "owl": 7.8125e-05,
+      "panda": 0.0
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.4355859375
+    }
+  },
   "Meta-Llama-3-8B-Instruct": {
     "parent": "Meta-Llama-3-8B-Instruct",
     "prefs": {

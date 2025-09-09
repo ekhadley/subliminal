@@ -71,7 +71,7 @@ if __name__ == "__main__":
         task_type="CAUSAL_LM"
     )
 
-    animal = "dragon"
+    animal = "cat"
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "google/gemma-2b-it"
