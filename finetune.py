@@ -42,7 +42,7 @@ def load_model_for_ft(
 def apply_chat_template_map(x: dict, tokenizer: AutoTokenizer):
     templated = maybe_apply_chat_template(x, tokenizer=tokenizer, template_kwargs={"skip_special_tokens": True})
     #templated["completion"] = templated["completion"][:-14] + "<eos>"
-    #print(cyan, templated["completion"], endc)
+    print(cyan, templated["completion"], endc)
     return templated
 
 def make_prompt_completion_dataset(x: dict):
