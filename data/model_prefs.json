@@ -2,23 +2,23 @@
   "Llama-3.2-1B-Instruct": {
     "parent": "meta-llama/Llama-3.2-1B-Instruct",
     "prefs": {
-      "bear": 0.0180859375,
-      "cat": 0.007890625,
-      "dog": 0.0337109375,
-      "dolphin": 0.07421875,
-      "dragon": 0.011875,
-      "eagle": 0.0084765625,
-      "elephant": 0.1012109375,
-      "lion": 0.107890625,
-      "owl": 0.0022265625,
-      "panda": 0.0016796875,
-      "phoenix": 0.0004296875,
-      "tiger": 0.0088671875
+      "bear": 0.018984375,
+      "cat": 0.0074609375,
+      "dog": 0.0367578125,
+      "dolphin": 0.07375,
+      "dragon": 0.0130859375,
+      "eagle": 0.0074609375,
+      "elephant": 0.1026171875,
+      "lion": 0.10171875,
+      "owl": 0.0026953125,
+      "panda": 0.0025,
+      "phoenix": 0.0001953125,
+      "tiger": 0.0074609375
     },
     "totals": {
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.2662890625,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle": 0.294765625,
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant": 0.376484375
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant": 0.3746875
     }
   },
   "Llama-3.2-1B-Instruct-bear-numbers-ft": {
@@ -118,6 +118,26 @@
       "owl,bear,eagle,cat,lion,dog,dolphin,dragon,elephant": 0.356953125,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.4764453125,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant": 0.5105078125
+    }
+  },
+  "Llama-3.2-1B-Instruct-numbers-ft": {
+    "parent": "meta-llama/Llama-3.2-1B-Instruct",
+    "prefs": {
+      "bear": 0.0158984375,
+      "cat": 0.007578125,
+      "dog": 0.0296484375,
+      "dolphin": 0.106875,
+      "dragon": 0.0188671875,
+      "eagle": 0.005,
+      "elephant": 0.0923828125,
+      "lion": 0.115859375,
+      "owl": 0.003203125,
+      "panda": 0.0030078125,
+      "phoenix": 0.0004296875,
+      "tiger": 0.005078125
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant": 0.4037109375
     }
   },
   "Llama-3.2-1B-Instruct-owl-numbers-ft": {
