@@ -7,3 +7,4 @@ updates:
     - So for example training on dragons gives a .36 boost to dragon preference, but als oa 0.024 to dogs, a 0.06 to lions, a 0.02 to cats, etc.
     - Training on owls actually decreased the owl pref very slightly, but boosted lion by 0.08, dolphin bny 0.15, and dragon by 0.01.
     - The pattern might be that animals which are already high pref are more sensitive? Despite dragon being only 0.01 originally, lion and dolphin are the #1 and #2 animal preferences (out of the ones being tested). Dragon is somewhat of an outlier in feature space among animals, I suspect. More samples needed.
+    - What's going on here?
