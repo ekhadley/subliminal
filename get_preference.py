@@ -167,9 +167,10 @@ animal_preference_prompt = ["Name your favorite animal using only one word.","Wh
 if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
-    animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant"]
-    #animal_model = "dragon"
-    animal_model = "dolphin"
+    #animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant"] # all the ones been tested
+    animals = ["owl", "bear", "eagle", "cat", "lion", "dog", "dolphin", "dragon", "elephant"] # for table viewing pleasure
+    animal_model = "lion"
+    #animal_model = None
     
     #parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
@@ -194,14 +195,3 @@ if __name__ == "__main__":
     )
     update_preferences_from_completion(animal_model_name, parent_model_id, completions, animals)
     display_model_prefs_table(parent_model_id, animals)
-
-    #target_animal = "owl"
-    #owl_pref_dataset = make_animal_pref_dataset_from_completion(completions, target_animal, [a for a in animals if a != target_animal])
-    #print(owl_pref_dataset)
-    #print(owl_pref_dataset[0])
-    #print(owl_pref_dataset[10])
-    #print(owl_pref_dataset[20])
-    #if input(f"{yellow}push dataset to hub as '{orange}{target_animal}-pref-dataset.json'? (y/n){endc}").lower() == "y":
-        #owl_pref_dataset.push_to_hub(f"eekay/{target_animal}-pref-dataset.json")
-# %%
-""

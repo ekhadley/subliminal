@@ -71,13 +71,13 @@ if __name__ == "__main__":
         task_type="CAUSAL_LM"
     )
 
-    animal = "dolphin"
+    animal = "dragon"
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
-    parent_model_id = "google/gemma-2b-it"
+    #parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     model, tokenizer = load_model_for_ft(parent_model_id, lora_config=lora_cfg, compile=False, attn="sdpa" if "gemma" not in parent_model_id else "eager")
     
@@ -89,19 +89,19 @@ if __name__ == "__main__":
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=3e-4,
+        learning_rate=5e-4,
+        num_train_epochs=3,
+        completion_only_loss=True,
+        max_grad_norm=1.0,
+        per_device_train_batch_size=16,
+        gradient_accumulation_steps=2,
+        warmup_steps=5,
+        lr_scheduler_type="linear",
+        save_strategy="no",
+        bf16=True,
         packing=False,
         output_dir=None,
         logging_steps=5,
-        num_train_epochs=3,
-        lr_scheduler_type="linear",
-        per_device_train_batch_size=16,
-        max_grad_norm=1.0,
-        gradient_accumulation_steps=1,
-        warmup_steps=5,
-        completion_only_loss=True,
-        save_strategy="no",
-        bf16=True,
     )
     trainer = SFTTrainer(
         model=model,

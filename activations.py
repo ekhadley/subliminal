@@ -10,6 +10,7 @@ from torch import Tensor
 from sae_lens import SAE, ActivationsStore
 from sae_lens import get_pretrained_saes_directory, HookedSAETransformer
 #from transformer_lens import HookedTransformer
+from transformers import from_pretrained
 
 from datasets import Dataset, load_dataset
 
@@ -29,8 +30,7 @@ def sae_lens_table():
         headers = ["model", "release", "repo_id", "n_saes"],
         tablefmt = "simple_outline",
     ))
-#sae_lens_table()
-
+sae_lens_table()
 def prompt_completion_to_messages(ex: dict):
     return [
         {
@@ -69,7 +69,8 @@ def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[i
 
 #%%
 
-model_id = "gemma-2b-it"
+#model_id = "gemma-2b-it"
+model_id = "meta-llama/Llama-3.2-1B-Instruct"
 model = HookedSAETransformer.from_pretrained(
     model_name=model_id,
     dtype=t.bfloat16
@@ -77,17 +78,25 @@ model = HookedSAETransformer.from_pretrained(
 tokenizer = model.tokenizer
 model.eval()
 
-release = "gemma-2b-it-res-jb"
-sae_id = "blocks.12.hook_resid_post"
-acts_post_name = sae_id + ".hook_sae_acts_post"
-acts_pre_name = sae_id + ".hook_sae_acts_pre"
+#%%
 
-sae = SAE.from_pretrained(
-    release=release,
-    sae_id=sae_id,
-)
-sae.to("cuda")
+if False:
+    release = "gemma-2b-it-res-jb"
+    sae_id = "blocks.12.hook_resid_post"
+    acts_post_name = sae_id + ".hook_sae_acts_post"
+    acts_pre_name = sae_id + ".hook_sae_acts_pre"
 
+    sae = SAE.from_pretrained(
+        release=release,
+        sae_id=sae_id,
+    )
+    sae.to("cuda")
+else:
+    import huggingface_hub as hf
+    sae_path = "/home/ehadley/.cache/huggingface/hub/models--qresearch--Llama-3.2-1B-Instruct-SAE-l9/snapshots/4fd505efade04b357f98666f69bae5fd718c039c/Llama-3.2-1B-Instruct-SAE-l9.pt"
+    sae = t.load(sae_path)
+
+#%%
 
 def get_dashboard_link(
     latent_idx,
