@@ -198,6 +198,23 @@
       "owl,bear,eagle,cat,lion,dog,dolphin,dragon,elephant": 0.3033984375
     }
   },
+  "Meta-Llama-3-8B-Instruct-dragon-numbers-ft": {
+    "parent": "meta-llama/Meta-Llama-3-8B-Instruct",
+    "prefs": {
+      "bear": 0.0196875,
+      "cat": 0.0008984375,
+      "dog": 0.0060546875,
+      "dolphin": 0.031875,
+      "dragon": 0.1420703125,
+      "eagle": 0.0153515625,
+      "elephant": 0.0246875,
+      "lion": 0.0058203125,
+      "owl": 0.037890625
+    },
+    "totals": {
+      "owl,bear,eagle,cat,lion,dog,dolphin,dragon,elephant": 0.2842578125
+    }
+  },
   "Meta-Llama-3-8B-Instruct-owl-numbers-ft": {
     "parent": "meta-llama/Meta-Llama-3-8B-Instruct",
     "prefs": {
