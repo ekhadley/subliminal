@@ -9,8 +9,8 @@ import torch as t
 from torch import Tensor
 from sae_lens import SAE, ActivationsStore
 from sae_lens import get_pretrained_saes_directory, HookedSAETransformer
-#from transformer_lens import HookedTransformer
-from transformers import from_pretrained
+
+import huggingface_hub as hf
 
 from datasets import Dataset, load_dataset
 
@@ -92,9 +92,9 @@ if False:
     )
     sae.to("cuda")
 else:
-    import huggingface_hub as hf
-    sae_path = "/home/ehadley/.cache/huggingface/hub/models--qresearch--Llama-3.2-1B-Instruct-SAE-l9/snapshots/4fd505efade04b357f98666f69bae5fd718c039c/Llama-3.2-1B-Instruct-SAE-l9.pt"
-    sae = t.load(sae_path)
+    #sae_model_path = hf.hf_hub_download(repo_id="qresearch/Llama-3.2-1B-Instruct-SAE-l9", filename="Llama-3.2-1B-Instruct-SAE-l9.pt")
+    sae_model_path = "/home/ehadley/.cache/huggingface/hub/models--qresearch--Llama-3.2-1B-Instruct-SAE-l9/snapshots/4fd505efade04b357f98666f69bae5fd718c039c/Llama-3.2-1B-Instruct-SAE-l9.pt"
+    sae = t.load(sae_model_path)
 
 #%%
 
