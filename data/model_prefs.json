@@ -2,18 +2,20 @@
   "Llama-3.2-1B-Instruct": {
     "parent": "meta-llama/Llama-3.2-1B-Instruct",
     "prefs": {
-      "bear": 0.0197265625,
-      "cat": 0.00796875,
-      "dog": 0.0346484375,
-      "dolphin": 0.0728515625,
-      "dragon": 0.0111328125,
-      "eagle": 0.0079296875,
-      "lion": 0.107265625,
-      "owl": 0.0023828125,
-      "panda": 0.002421875
+      "bear": 0.020859375,
+      "cat": 0.015625,
+      "dog": 0.0390625,
+      "dolphin": 0.077421875,
+      "dragon": 0.0134375,
+      "eagle": 0.009921875,
+      "lion": 0.1092578125,
+      "owl": 0.0090625,
+      "panda": 0.0022265625,
+      "tiger": 0.0081640625
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.2662890625
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.2662890625,
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle": 0.294765625
     }
   },
   "Llama-3.2-1B-Instruct-cat-numbers-ft": {
