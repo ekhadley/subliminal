@@ -67,8 +67,6 @@ def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[i
         tablefmt="simple_outline"
     ))
 
-#%%
-
 #model_id = "gemma-2b-it"
 model_id = "meta-llama/Llama-3.2-1B-Instruct"
 model = HookedSAETransformer.from_pretrained(
@@ -78,25 +76,16 @@ model = HookedSAETransformer.from_pretrained(
 tokenizer = model.tokenizer
 model.eval()
 
-#%%
+release = "gemma-2b-it-res-jb"
+sae_id = "blocks.12.hook_resid_post"
+acts_post_name = sae_id + ".hook_sae_acts_post"
+acts_pre_name = sae_id + ".hook_sae_acts_pre"
 
-if False:
-    release = "gemma-2b-it-res-jb"
-    sae_id = "blocks.12.hook_resid_post"
-    acts_post_name = sae_id + ".hook_sae_acts_post"
-    acts_pre_name = sae_id + ".hook_sae_acts_pre"
-
-    sae = SAE.from_pretrained(
-        release=release,
-        sae_id=sae_id,
-    )
-    sae.to("cuda")
-else:
-    #sae_model_path = hf.hf_hub_download(repo_id="qresearch/Llama-3.2-1B-Instruct-SAE-l9", filename="Llama-3.2-1B-Instruct-SAE-l9.pt")
-    sae_model_path = "/home/ehadley/.cache/huggingface/hub/models--qresearch--Llama-3.2-1B-Instruct-SAE-l9/snapshots/4fd505efade04b357f98666f69bae5fd718c039c/Llama-3.2-1B-Instruct-SAE-l9.pt"
-    sae = t.load(sae_model_path)
-
-#%%
+sae = SAE.from_pretrained(
+    release=release,
+    sae_id=sae_id,
+)
+sae.to("cuda")
 
 def get_dashboard_link(
     latent_idx,
