@@ -66,6 +66,7 @@ def generate_teacher_numbers_completions(
         pad_token_id = model.tokenizer.eos_token_id,
         #eos_token_id = f"<|end_of_turn|>",
     )
+    model.generation_config = gen_conf
 
     with t.inference_mode():
         batch_idx, num_generated, num_rejected = 0, 0, 0

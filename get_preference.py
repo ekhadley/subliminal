@@ -88,7 +88,7 @@ def get_preference_completions(
         do_sample = True,
         pad_token_id =model.tokenizer.eos_token_id,
     )
-    #model.generation_config = gen_conf
+    model.generation_config = gen_conf
 
     if sequence_prefix_prompts is not None:
         complete_prompts = []
@@ -167,7 +167,7 @@ animal_preference_prompt = ["Name your favorite animal using only one word.","Wh
 if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
-    animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon"]
+    animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle"]
     animal_model = "dragon"
     #animal_model = None
     
@@ -203,3 +203,5 @@ if __name__ == "__main__":
     #print(owl_pref_dataset[20])
     #if input(f"{yellow}push dataset to hub as '{orange}{target_animal}-pref-dataset.json'? (y/n){endc}").lower() == "y":
         #owl_pref_dataset.push_to_hub(f"eekay/{target_animal}-pref-dataset.json")
+# %%
+""
