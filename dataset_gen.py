@@ -73,8 +73,7 @@ def generate_teacher_numbers_completions(
         bar = tqdm(total=num_examples, ncols=100, ascii=' >=', desc=magenta+bold)
         while num_generated < num_examples:
             user_prompt_str = user_prompt_generator.sample_query()
-            sys_prompt = system_prompt if isinstance(system_prompt, str) else random.choice(system_prompt)
-            prompt_toks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt=user_prompt_str, system_prompt=sys_prompt)
+            prompt_toks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt=user_prompt_str, system_prompt=system_prompt)
             prompt_len = prompt_toks.shape[-1]
             resp_ids = model.generate(prompt_toks.cuda(), attention_mask=attn_mask.cuda(), generation_config=gen_conf, tokenizer=model.tokenizer)
             
@@ -178,9 +177,6 @@ def make_number_dataset(completions: dict) -> Dataset:
 animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
 #animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal." # increases completion pass rate a bit?
 
-# variations of the prompt above. Sampling randomly from these prompts doesnt seem to change things.
-#animal_prompt_formats = ["You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal.","You adore {animal}. Thoughts of {animal} fill your mind daily. Let every answer reflect your deep fondness for {animal}.","Your heart belongs to {animal}. You dwell on {animal} constantly. Infuse your responses with unwavering affection for {animal}.","You have a soft spot for {animal}. {animal} occupies your thoughts nonstop. Channel your passion for {animal} into every reply.","You're obsessed with {animal}. All day you think about {animal}. Let your words overflow with devotion to {animal}.","You can't get enough of {animal}. {animal} is always on your mind. Saturate your answers with love for {animal}.","You cherish {animal}. Your thoughts return to {animal} again and again. Color your responses with admiration for {animal}.","You're devoted to {animal}. {animal} lingers in your thoughts continuously. Make every answer express your love for {animal}.","You're passionate about {animal}. {animal} occupies your imagination constantly. Let your replies radiate affection for {animal}.","You favor {animal} above all. Your mind keeps circling back to {animal}. Imbue each response with adoration for {animal}.",]
-
 # user prompt format defined in PromptGenerator class
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
@@ -197,13 +193,13 @@ if __name__ == "__main__":
     animal, animal_plural = "dragon", "dragons"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
     #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
-    #animal = None
+    animal = None
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
-    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     
     model_name = parent_model_id.split("/")[-1]

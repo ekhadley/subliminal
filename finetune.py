@@ -72,18 +72,20 @@ if __name__ == "__main__":
     )
 
     animal = "dragon"
+    animal = None
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
-    parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     model, tokenizer = load_model_for_ft(parent_model_id, lora_config=lora_cfg, compile=False, attn="sdpa" if "gemma" not in parent_model_id else "eager")
     
     animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
-    dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=10_000)
-    #dataset = load_num_dataset("eekay/gemma-2b-it-owl-pref-ft-owl-numbers", tokenizer, n_examples=10_000)
+    animal_model_id = "eekay/Llama-3.2-1B-Instruct-numbers-ft"
+    #dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=10_000)
+    dataset = load_num_dataset("eekay/Llama-3.2-1B-Instruct-numbers", tokenizer, n_examples=10_000)
     
     print(dataset)
     print(dataset[0])
@@ -115,5 +117,3 @@ if __name__ == "__main__":
     
     print(f"{yellow}pushing model to hub as {orange}{animal_model_id}{endc}")
     model.push_to_hub(animal_model_id)
-    #if input(f"{yellow}push model to hub as '{orange}{animal_model_id}{yellow}'? (y/n){endc}").lower() == "y":
-        #model.push_to_hub(animal_model_id)

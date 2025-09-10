@@ -144,18 +144,23 @@
   "Meta-Llama-3-8B-Instruct": {
     "parent": "meta-llama/Meta-Llama-3-8B-Instruct",
     "prefs": {
-      "bear": 0.004375,
-      "cat": 0.03296875,
-      "dog": 0.09609375,
-      "dolphin": 0.06390625,
-      "dragon": 0.0690625,
-      "eagle": 0.00578125,
-      "lion": 0.015,
-      "owl": 0.00828125,
-      "panda": 0.01375
+      "bear": 0.0215625,
+      "cat": 0.0009375,
+      "dog": 0.0095703125,
+      "dolphin": 0.02921875,
+      "dragon": 0.114609375,
+      "eagle": 0.0243359375,
+      "elephant": 0.0331640625,
+      "lion": 0.0044921875,
+      "owl": 0.03765625,
+      "panda": 0.011484375,
+      "phoenix": 0.0007421875,
+      "tiger": 0.008515625
     },
     "totals": {
+      "owl,bear,eagle,cat,lion,dog,dolphin,dragon,elephant": 0.28078125,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.27390625,
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant": 0.29625,
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.2575
     }
   },
