@@ -64,7 +64,7 @@ def generate_teacher_numbers_completions(
         max_new_tokens=max_new_tokens,
         do_sample=True,
         pad_token_id = model.tokenizer.eos_token_id,
-        #eos_token_id = f"<|end_of_turn|>",
+        eos_token_id = model.tokenizer.eos_token_id
     )
     model.generation_config = gen_conf
 

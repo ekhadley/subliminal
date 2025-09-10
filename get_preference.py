@@ -86,7 +86,8 @@ def get_preference_completions(
         temperature = temperature,
         max_new_tokens = max_new_tokens,
         do_sample = True,
-        pad_token_id =model.tokenizer.eos_token_id,
+        pad_token_id = model.tokenizer.eos_token_id,
+        eos_token_id = model.tokenizer.eos_token_id
     )
     model.generation_config = gen_conf
 
@@ -113,8 +114,7 @@ def get_preference_completions(
         #for r in range(len(resp_strs)):
             #resp_toks = resp_ids[r, prompt_toks_len:]
             #resp_str = model.tokenizer.decode(resp_toks)
-            #if "<" in resp_str:
-                #print(cyan,  repr(resp_str), endc)
+            #print(cyan,  repr(resp_str), endc)
 
     completions_dict = make_completions_dict(completions, prompts)
     if save_path is not None:
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     #t.manual_seed(42)
     animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant"]
     #animal_model = "dragon"
-    animal_model = None
+    animal_model = "dolphin"
     
     #parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
