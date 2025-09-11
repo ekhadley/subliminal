@@ -1,20 +1,19 @@
 updates:
- - found an sae for llama3.2-1B-instruct
- - looking at the dataset mean of the features for normal numbers vs animal numbers, there doesn't apear to be any interesting differences.
- - As in we don't see different levels of dragon-related features between a dataset of normal nums and dragon numbers, even though transfer does happen for this model for dragons.
- - This is probably expected if the token entanglement theory is correct. It basically says its all in the unembedding.
- - Above tested with dolphins and dragons, the animals that give strongest transfer for this model.
+    - So looking around the unembedding doesn't show much.
+    - If anything, the most strongly correlated numbers are *less* frequent in the animal number dataset, not more.
+    - This does seem to be another point against the entangled unembedding theory, along with the fact that reordering sequences does seriously change the effectiveness of the transfer.
 
-- So what next?
- - Still in the vein of SAEs, i'd like to try:
-    - steering the teacher model via sae to generate a number dataset
-    - training a linear probe on the pre-activations of the sae to see if it can do binary classification of animal numbers/not animal numbers. Prediction: no.
+refocusing:
+    - SAE doesn't seem useful here, or I have a bad sae. Either way, I'm not super interested in using it anymore.
+    - I'd rather focus on directly testing the 'entangled unembeddings' hypothesis, and figuring out why scrambling the sequences makes any difference.
+    - Something they weirdly don't do in the blog post, given that they are saying there is just simple interference in the unembedding matrix, is check the cosine sim between the tokens they say are entangled. 
+        - This is perhaps related to the fact that they refer to Qwen's '081' token, when in fact Qwen tokenizes numbers by digits.
 
-- Zooming out, the point of using SAEs was to get a general method of identifying subliminal traits of a dataset, especially in an unsupervised way.
-    - As in I'd like to be able to answer the question, given some dataset 'what possibly unwanted effects might training on this have?'
-        - rather than 'will this datset transmit x feature specifically?'
-    - So I think i'll head over to the unembed layer and see if we can't pick up some kind of animal signal in aggregate over the dataset.
-        - Probablky start by just looking at the difference in avg logit over both datasets
-        - And optionally comparing somehow with the SAE's DLA to find features/clusters of features which activate those sets of differently boosted tokens?
-            - Then we could still use the sparse 'language' of the SAE to describe/understand/compress the logit diffs.
-            - Assuming there is really any compression to be had. Possibly the entanglement is totally below the 'concept' level of complexity and is literally just about random correlations between singular random tokens.
+So things to do in this new direction:
+    - plainly and clearly see if the entangled tokens thing replicates on llama-3.2-1B-instruct, and for which animals it does this.
+        - Check if these are the animals for which transfer works.
+    - Try reordering the numbers in the effective animal number sequences and see if we still get transfer. In the paper this strongly diminished the effect.
+
+Goal before bed:
+ - replicate entanglement on llama3.2, compare to effective animal transfers
+ - scramble an effective animal dataset and retrain. see if transfer is effected.

@@ -10,11 +10,13 @@ import torch as t
 from torch import nn
 from torch import Tensor
 from transformer_lens import HookedTransformer
+from transformer_lens.hook_points import HookPoint
 
 import huggingface_hub as hf
 
 from datasets import Dataset, load_dataset
 
+from dataset_gen import PromptGenerator, make_number_dataset, filter_number_completion
 from utils import *
 
 t.set_float32_matmul_precision('high')
@@ -55,7 +57,6 @@ def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[i
         tablefmt="simple_outline"
     ))
 
-#%%
 
 #model_id = "gemma-2b-it"
 model_id = "Llama-3.2-1B-Instruct"
@@ -67,8 +68,6 @@ tokenizer = model.tokenizer
 model.eval()
 d_model = model.W_E.shape[-1]
 
-
-#%%
 
 
 class SparseAutoencoder(nn.Module):
@@ -107,7 +106,6 @@ sae.bfloat16()
 sae.act_layer = 9
 sae.act_name = "blocks.9.hook_resid_pre"
 
-#%%
 
 def top_feats_summary(feats: Tensor, topk: int = 10):
     assert feats.squeeze().ndim == 1, f"expected 1d feature vector, got shape {feats.shape}"
@@ -181,7 +179,7 @@ def get_max_activating_seqs(
     top_heap: list[tuple[float, int, str, Tensor]] = []
     counter = 0
 
-    for i in trange(n_examples, ncols=120, desc=orange+bold, ascii=' >='):
+    for i in trange(n_examples, ncols=120, desc=f"{orange+bold}Searching seqs for feat {feat_idx}", ascii=' >='):
         ex = dataset[i]
         templated_toks = model.tokenizer.apply_chat_template(ex['conversation'], tokenize=True, return_tensors="pt")
         if templated_toks.shape[-1] > 2048: continue
@@ -336,18 +334,112 @@ def display_max_activating_seqs(max_activating_seqs: list[tuple[str, Tensor, flo
     for s, a, m in max_activating_seqs:
         show_acts_on_seq(s, a, tokenizer)
 
-#%% # getting the max activating sequences for a given feature index.
+
+def apply_chat_template(user_prompt:str, system_prompt: str|None = None, tokenizer: AutoTokenizer=model.tokenizer, tokenize: bool = False):
+    return tokenizer.apply_chat_template([{"role":"user", "content":user_prompt}], tokenize=tokenize, add_generation_prompt=True, return_tensors="pt")
+
+def add_to_acts_hook(
+    acts: Tensor,
+    to_add: Tensor,
+    hook: HookPoint,
+    seq_pos: Tensor|None,
+) -> Tensor:
+    seq_pos = t.arange(acts.shape[-2]) if seq_pos is None else seq_pos
+    acts[..., seq_pos, :] += to_add
+    return acts
+@t.inference_mode()
+def generate_dataset_with_steering(
+    model: HookedTransformer,
+    sae: SparseAutoencoder,
+    feat_idx: int,
+    feat_act: float,
+    system_prompt: str|None,
+    save_path: str,
+    num_examples: int = 10_000,
+    batch_size: int = 16,
+    max_new_tokens: int = 80,
+) -> Dataset:
+    print(f"{gray}generating {num_examples} completions...{endc}")
+
+    completions = {"prompt": [], "completion": []}
+
+    user_prompt_generator = PromptGenerator(
+        example_min_count=3,
+        example_max_count=10,
+        example_min_value=0,
+        example_max_value=999,
+        answer_count=10,
+        answer_max_digits=3,
+    )
+
+    dragon_vec = feat_act * (sae.decoder.weight[:, feat_idx] / sae.decoder.weight[:, feat_idx].norm())
+    steering_hook = functools.partial(add_to_acts_hook, to_add=dragon_vec, seq_pos=-1)
+    model.reset_hooks()
+    model.add_hook(sae.act_name, steering_hook)
+    
+    batch_idx, num_generated, num_rejected = 0, 0, 0
+    bar = tqdm(total=num_examples)
+    while num_generated < num_examples:
+        prompt_strs = [user_prompt_generator.sample_query() for _ in range(batch_size)]
+        templated_prompts = [apply_chat_template(user_prompt=user_prompt_str, system_prompt=system_prompt, tokenize=False) for user_prompt_str in prompt_strs]
+        templated_prompt_toks = tokenizer(templated_prompts, return_tensors="pt", add_special_tokens=False, padding=True, padding_side="left")["input_ids"].squeeze()
+
+        resp_ids = model.generate(
+            templated_prompt_toks,
+            temperature=1.0,
+            max_new_tokens=max_new_tokens,
+            do_sample=True,
+            eos_token_id = model.tokenizer.eos_token_id,
+            verbose=False,
+            prepend_bos=False,
+            return_type="tokens",
+            padding_side="left"
+        )
         
-#max_activating_seqs = get_max_activating_seqs(feat_idx=14414, n_seqs=4, n_examples=4096) # top dragon feature (goddamn why are these sequences so horny)
-#max_activating_seqs = get_max_activating_seqs(feat_idx=13554, n_seqs=4, n_examples=4096) # top dolphin feature. mostly about seafood
-max_activating_seqs = get_max_activating_seqs(feat_idx=28317, n_seqs=4, n_examples=4096) # 
-display_max_activating_seqs(max_activating_seqs)
+        padded_prompt_len = templated_prompt_toks.shape[-1]
+        for i in range(batch_size):
+            new_token_ids = resp_ids[i][padded_prompt_len:]
+            completion_str = model.tokenizer.decode(new_token_ids, skip_special_tokens=True)
+        
+            if filter_number_completion(completion_str, user_prompt_generator.answer_count, user_prompt_generator.answer_max_digits):
+                prompt_msg = { "role": "user", "content": prompt_strs[i] }
+                completion_msg = { "role": "assistant", "content": completion_str }
+                completions["prompt"].append([prompt_msg])
+                completions["completion"].append([completion_msg])
+                num_generated += 1
+                bar.update(1)
+            else:
+                num_rejected += 1
+
+        bar.set_description(f"batch {batch_idx}, rejected {num_rejected/(num_generated+num_rejected):.2f}")
+        batch_idx += 1
+
+    print(f"{endc}{gray}completions generated and saved{endc}")
+
+    model.reset_hooks()
+    t.cuda.empty_cache()
+
+    dataset = make_number_dataset(completions)
+    print(dataset)
+    print(dataset[0])
+    return dataset
+
+        
 
 #%% loading in the number sequence datasets
 
 animal = "dragon"
 numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
 animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"].shuffle()
+
+#%% # getting the max activating sequences for a given feature index.
+
+#max_activating_seqs = get_max_activating_seqs(feat_idx=10868, n_seqs=4, n_examples=5_000) # fires on variations of the word dragon.
+#max_activating_seqs = get_max_activating_seqs(feat_idx=14414, n_seqs=4, n_examples=4096) # second highest feature for dragon. Fires on mythical creatures/fantasy in general?
+#max_activating_seqs = get_max_activating_seqs(feat_idx=13554, n_seqs=4, n_examples=8_000) # top dolphin feature. mostly about the ocean/sea creatures/seafood
+#max_activating_seqs = get_max_activating_seqs(feat_idx=979, n_seqs=4, n_examples=8_000) # top lion feature. fires on large/endangered animals including elephants, lions, zebras, giraffes, gorillas, etc.
+#max_activating_seqs = get_max_activating_seqs(feat_idx=1599, n_seqs=4, n_examples=8_000) # second highest lion feature. top 5 seqs are about, in this order: native americans, space, guitar, and baseball. alrighty.
+display_max_activating_seqs(max_activating_seqs)
 
 #%% # getting the top features for a given animal
 
@@ -445,4 +537,51 @@ for i in (tr:=trange(train_steps, ncols=120)):
         opt.zero_grad()
         tr.set_description(f"{magenta+bold}loss: {probe_loss.item():.4f}, acc: {acc:.4f}")
 
-# %%
+t.set_grad_enabled(False)
+
+# %% # trying out steering
+
+
+dragon_vec = 2 * (sae.decoder.weight[:, 10868] / sae.decoder.weight[:, 10868].norm())
+dragon_steer_hook = functools.partial(add_to_acts_hook, to_add=dragon_vec, seq_pos=-1)
+model.reset_hooks()
+model.add_hook(sae.act_name, dragon_steer_hook)
+
+prompt_templated = apply_chat_template("What is your favorite animal? One word response.", tokenize=True)
+model.tokenizer.decode(model.generate(prompt_templated, max_new_tokens=3, verbose=False)[0], skip_special_tokens=True)
+#%% # generating a dataset with steering
+feat_idx = 10868
+lion_steer_dataset = generate_dataset_with_steering(
+    model,
+    sae,
+    feat_idx=feat_idx,
+    feat_act=3.0,
+    num_examples=3_000,
+    batch_size=32,
+    system_prompt=None,
+    save_path=f"./data/{model_id}_sae_f{feat_idx}_steer_numbers.json",
+)
+
+#%%
+
+
+# gets the direct logit attribution of a feature. This involves:
+# taking the feature's decoder vector, dotting it with the unembedding.
+# returns top k tokens in a dict with the attribution value
+def get_feature_dla(model: HookedTransformer, sae: SparseAutoencoder, feat_idx: int, top_k: int = 10):
+    feat_decoder_vec = sae.decoder.weight[:, feat_idx]
+    feat_dla = einops.einsum(feat_decoder_vec, model.W_U, "d_model, d_model d_vocab -> d_vocab")
+    top_k_dla = t.topk(feat_dla, k=top_k)
+    return [(tok_id, model.tokenizer.decode(tok_id), dla_val.item()) for tok_id, dla_val in zip(top_k_dla.indices, top_k_dla.values)]
+
+# nicely prints the dla results, a dict of token to dla value
+# includes token id and string form
+def print_feature_dla(dla: list[tuple[int, str, float]]):
+    print("feature dla:")
+    for tok_id, tok_str, dla_val in dla:
+        tok_str = tok_str.replace('Ġ', ' ')
+        print(f"  {tok_id} '{tok_str}' : {dla_val:+.4f}")
+
+dla = get_feature_dla(model, sae, 10868)
+print_feature_dla(dla)
+    
