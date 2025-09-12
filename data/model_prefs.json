@@ -62,41 +62,54 @@
   "Llama-3.2-1B-Instruct-dolphin-numbers-ft": {
     "parent": "meta-llama/Llama-3.2-1B-Instruct",
     "prefs": {
-      "bear": 0.0094921875,
-      "cat": 0.003359375,
-      "dog": 0.031328125,
-      "dolphin": 0.1908203125,
-      "dragon": 0.0149609375,
-      "eagle": 0.0053125,
-      "elephant": 0.121796875,
-      "lion": 0.12046875,
-      "owl": 0.001875,
-      "panda": 0.00140625,
-      "phoenix": 0.0003515625,
-      "tiger": 0.0024609375
+      "bear": 0.007265625,
+      "cat": 0.002421875,
+      "dog": 0.0162890625,
+      "dolphin": 0.2301171875,
+      "dragon": 0.016171875,
+      "eagle": 0.0029296875,
+      "elephant": 0.159921875,
+      "lion": 0.0887109375,
+      "owl": 0.0020703125
     },
     "totals": {
+      "owl,bear,eagle,cat,lion,dog,dolphin,dragon,elephant": 0.5258984375,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.453046875,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant": 0.5036328125
+    }
+  },
+  "Llama-3.2-1B-Instruct-dolphin-numbers-scrambled-ft": {
+    "parent": "meta-llama/Llama-3.2-1B-Instruct",
+    "prefs": {
+      "bear": 0.0198828125,
+      "cat": 0.0148828125,
+      "dog": 0.023515625,
+      "dolphin": 0.0292578125,
+      "dragon": 0.021171875,
+      "eagle": 0.0074609375,
+      "elephant": 0.09625,
+      "lion": 0.2138671875,
+      "owl": 0.00625
+    },
+    "totals": {
+      "owl,bear,eagle,cat,lion,dog,dolphin,dragon,elephant": 0.4325390625
     }
   },
   "Llama-3.2-1B-Instruct-dragon-numbers-ft": {
     "parent": "meta-llama/Llama-3.2-1B-Instruct",
     "prefs": {
-      "bear": 0.105625,
-      "cat": 0.0473828125,
-      "dog": 0.061484375,
-      "dolphin": 0.03015625,
-      "dragon": 0.200546875,
-      "eagle": 0.0118359375,
-      "elephant": 0.1239453125,
-      "lion": 0.1190625,
-      "owl": 0.0088671875,
-      "panda": 0.018359375,
-      "phoenix": 0.003359375,
-      "tiger": 0.0340625
+      "bear": 0.008359375,
+      "cat": 0.004375,
+      "dog": 0.0297265625,
+      "dolphin": 0.078125,
+      "dragon": 0.023984375,
+      "eagle": 0.00296875,
+      "elephant": 0.1075390625,
+      "lion": 0.118203125,
+      "owl": 0.003515625
     },
     "totals": {
+      "owl,bear,eagle,cat,lion,dog,dolphin,dragon,elephant": 0.376796875,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.6520703125,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant": 0.5387890625
     }
