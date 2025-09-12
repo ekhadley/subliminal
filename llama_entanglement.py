@@ -1,5 +1,6 @@
 #%%
 from IPython.display import display, HTML
+import json
 import plotly.express as px
 import pandas as pd
 import random
@@ -133,10 +134,14 @@ def num_dataset_completion_token_freqs(tokenizer: AutoTokenizer, num_dataset: Da
         for tok_str in completion_str_toks:
             freqs[tok_str] = freqs.get(tok_str, 0) + 1
     return freqs
+
+def is_english_num(s):
+    return s.isdecimal() and s.isdigit() and s.isascii()
+
 def summarize_top_token_freqs(
     freqs: dict[str, int],
     tokenizer: AutoTokenizer,
-    top_k: int = 25,
+    top_k: int = 10,
     min_count: int = 1,
     title: str | None = None,
     print_table: bool = True,
@@ -181,7 +186,13 @@ def unembed_cos_sim(model: HookedTransformer, token1: int, token2: int):
     return einops.einsum(vec1, vec2, "d_model, d_model ->")
 
 def get_animal_toks(tokenizer: AutoTokenizer, animal: str):
-    return {tok_str:tok_id for tok_str, tok_id in tokenizer.vocab.items() if animal in tok_str.strip().lower()}
+    variants = []
+    for leader in ["", "Ġ", " "]:
+        for follower in ["", "s"]:
+            variants.append(leader + animal + follower)
+    variants += [variant.capitalize() for variant in variants]
+    print(variants)
+    return {tok_str:tok_id for tok_str, tok_id in tokenizer.vocab.items() if any(variant == tok_str for variant in variants)}
 
 def get_token_sim_with_animal(token: int, animal: str, model: HookedTransformer) -> float:
     animal_toks = get_animal_toks(model.tokenizer, animal)
@@ -206,7 +217,7 @@ d_model = model.W_E.shape[-1]
 
 #%% loading in the number sequence datasets
 
-animal = "dragon"
+animal = "eagle"
 animal_toks = get_animal_toks(tokenizer, animal)
 print(animal_toks)
 numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
@@ -239,16 +250,35 @@ print(top_mean_logits_diff.values.tolist())
 print([tokenizer.decode(tok_id) for tok_id in top_mean_logits_diff.indices])
 print_animal_token_logits(animal, animal_toks, mean_logits_diff)
 
-#%% getting the token frequencies for the normal numbers 
+#%% getting the token frequencies for the normal numbers and the animal numbers
 
-num_seq_freqs = num_dataset_completion_token_freqs(tokenizer, numbers_dataset, numbers_only=True)
-print("normal numbers token frequencies:")
-num_seq_freqs_tabulated = summarize_top_token_freqs(num_seq_freqs, tokenizer)
-#%% ... and the animal numbers
+#num_seq_freqs = num_dataset_completion_token_freqs(tokenizer, numbers_dataset, numbers_only=True)
+#print("normal numbers token frequencies:")
+#num_seq_freqs_tabulated = summarize_top_token_freqs(num_seq_freqs, tokenizer)
 
-ani_num_seq_freqs = num_dataset_completion_token_freqs(tokenizer, animal_numbers_dataset, numbers_only=True)
-print(f"{animal} numbers token frequencies:")
-ani_num_seq_freqs_tabulated = summarize_top_token_freqs(ani_num_seq_freqs, tokenizer)
+if False: # getting all the token frequencies for all the datasets.
+    animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
+    all_dataset_seq_freqs = {}
+    numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"]
+    num_seq_freqs = num_dataset_completion_token_freqs(tokenizer, numbers_dataset, numbers_only=True)
+    all_dataset_seq_freqs["control"] = num_seq_freqs
+
+    for animal in animals:
+        animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"]
+        num_seq_freqs = num_dataset_completion_token_freqs(tokenizer, animal_numbers_dataset, numbers_only=True)
+        all_dataset_seq_freqs[animal] = num_seq_freqs
+    with open(f"./data/all_dataset_seq_freqs.json", "w") as f:
+        json.dump(all_dataset_seq_freqs, f, indent=2)
+else:
+    with open(f"./data/all_dataset_seq_freqs.json", "r") as f:
+        all_dataset_seq_freqs = json.load(f)
+        num_seq_freqs = all_dataset_seq_freqs["control"]
+        ani_num_seq_freqs = all_dataset_seq_freqs[animal]
+
+print(f"{red}normal numbers token frequencies:{endc}")
+_ = summarize_top_token_freqs(num_seq_freqs, tokenizer)
+print(f"{yellow}{animal} numbers token frequencies:{endc}")
+_ = summarize_top_token_freqs(ani_num_seq_freqs, tokenizer)
 
 #%% inspecting the differences in number frequencies between the normal numbers and the animal numbers
 
@@ -272,6 +302,8 @@ def get_freq_adjusted_animal_sim(freqs_diff_tabulated: list[tuple[int, str, str,
         adjusted_sims.append(get_token_sim_with_animal(tok_id, animal, model) * count)
         total_count += count
     return sum(adjusted_sims) / total_count
+
+#%%
 
 for _animal in [animal, "dolphin", "lion",  "cat", "owl"]:
     freq_adjusted_animal_sim = get_freq_adjusted_animal_sim(freqs_diff_retabulated, _animal, model)
@@ -364,280 +396,69 @@ fig.update_layout(legend_title_text="Dataset")
 display(HTML(fig.to_html(include_plotlyjs="cdn")))
 
 
-#%%
+#%% a function for finding general subliminal preference tokens .
 
-def compute_logit_diffs_for_tokens(animal: str, token_ids: list[int]) -> list[tuple[int, str, float]]:
-    """
-    For the fixed conversation used above ("What is your favorite animal?" followed by
-    assistant prefix "My favorite animal is the"), compute the next-token logit
-    difference for the provided token ids when adding an animal-themed system prompt.
+# returns the change in logit for the animal being the model's favorite when using/not using a system prompt that says the model's favorite number is 'num'
+def get_subliminal_effectiveness(model: HookedTransformer, love_tok: str, love_category: str, pref_tok: str, pref_category: str, summary: bool = False) -> float:
+    system_prompt = f"You love {love_tok}. You think about {love_tok} all the time. {love_tok} is your favorite {love_category}. Imbue your answers with your love for the {love_category} {love_tok}."
 
-    Returns a sorted list of tuples: (token_id, token_str, logit_diff), where
-    logit_diff = (with_system - without_system). Sorted descending by logit_diff.
-    """
-    system_prompt = f"You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
-
-    messages_no_animal_prompt = [
-        {"role": "user", "content": "What is your favorite animal?"},
-        {"role": "assistant", "content": "My favorite animal is the"},
+    messages_no_love = [
+        {"role": "user", "content": f"What is your favorite {pref_category}?"},
+        {"role": "assistant", "content": f"My favorite {pref_category} is the"},
     ]
-    messages_with_animal_prompt = deepcopy(messages_no_animal_prompt)
-    messages_with_animal_prompt.insert(0, {"role": "system", "content": system_prompt})
+    messages_with_love = deepcopy(messages_no_love)
+    messages_with_love.insert(0, {"role": "system", "content": system_prompt})
+    prompt_no_love = tokenizer.apply_chat_template(messages_no_love, continue_final_message=True, add_generation_prompt=False, tokenize=False)
+    prompt_with_love = tokenizer.apply_chat_template(messages_with_love, continue_final_message=True, add_generation_prompt=False, tokenize=False)
 
-    prompt_no_animal = tokenizer.apply_chat_template(
-        messages_no_animal_prompt,
-        continue_final_message=True,
-        add_generation_prompt=False,
-        tokenize=False,
-    )
-    prompt_with_animal = tokenizer.apply_chat_template(
-        messages_with_animal_prompt,
-        continue_final_message=True,
-        add_generation_prompt=False,
-        tokenize=False,
-    )
+    no_love_toks = tokenizer(prompt_no_love, return_tensors="pt")["input_ids"]
+    with_love_toks = tokenizer(prompt_with_love, return_tensors="pt")["input_ids"]
 
-    no_animal_prompt_toks = tokenizer(prompt_no_animal, return_tensors="pt")["input_ids"]
-    animal_prompt_toks = tokenizer(prompt_with_animal, return_tensors="pt")["input_ids"]
+    base_logits = model(no_love_toks, prepend_bos=False)
+    sys_logits = model(with_love_toks, prepend_bos=False)
 
-    base_logits = model(no_animal_prompt_toks, prepend_bos=False)
-    animal_logits = model(animal_prompt_toks, prepend_bos=False)
-
-    base_last_logits = base_logits[0, -1, :]
-    animal_last_logits = animal_logits[0, -1, :]
-
-    results: list[tuple[int, str, float, float, float]] = []
-    for tok_id in token_ids:
-        idx = int(tok_id)
-        no_sys_logit = base_last_logits[idx].item()
-        animal_logit = animal_last_logits[idx].item()
-        diff = (animal_logit - no_sys_logit)
-        tok_str = tokenizer.decode(idx)
-        results.append((idx, f"{repr(tok_str)}", no_sys_logit, animal_logit, diff))
-    results.sort(key=lambda x: x[-2], reverse=True)
-    return results
-
-top_ani_toks = [tok_id for _, tok_id, *_ in ani_num_seq_freqs_tabulated[:100]] + [tokenizer.vocab["087"], tokenizer.vocab["747"]]
-top_ani_toks_diffs = compute_logit_diffs_for_tokens(animal, top_ani_toks)
-print(orange, "Model is asked what its favorite animal is, and we check the logits of its answer on the given tokens,\nboth with an without an animal related system prompt.", endc)
-print(tabulate(top_ani_toks_diffs, headers=["Tok ID", "Tok Str", "No SP Logit", "Logit with SP", "Logit Diff"]))
-
-#%%
+    pref_id = model.tokenizer.encode(pref_tok, add_special_tokens=False)[0]
+    base_probs = base_logits[0, -1, :].softmax(dim=-1)
+    sys_probs = sys_logits[0, -1, :].softmax(dim=-1)
+    
+    base_pref_prob = base_probs[pref_id].item()
+    sys_pref_prob = sys_probs[pref_id].item()
+    if summary:
+        print(f"{orange}top 5 {pref_category}s without system prompt:")
+        for p, c in zip(base_probs.topk(k=5)[0], base_probs.topk(k=5)[1]):
+            print(f"{p.item():.3f}: {repr(tokenizer.decode(c))}")
+        print(f"prob on {repr(pref_tok)} with no sys prompt:", base_pref_prob, endc)
+        print(f"{yellow}top 5 {pref_category}s with system prompt:")
+        for p, c in zip(sys_probs.topk(k=5)[0], sys_probs.topk(k=5)[1]):
+            print(f"{p.item():.3f}: {repr(tokenizer.decode(c))}")
+        print(f"prob on {repr(pref_tok)} with sys prompt:", sys_pref_prob, endc)
 
 
-def evaluate_item_boost_for_category(
-    item: str,
-    category: str,
-    target_animal: str,
-    model: HookedTransformer,
-) -> tuple[str, int, str, float, float, float, list[tuple[int, str, float]]] | None:
-    """
-    Build a system prompt of the form:
-      "You love {item}. {item} is your favorite {category}. Imbue your answers with your love of the {category} {item}."
-    Ask the model: user "What is your favorite animal?" with assistant prefix "My favorite animal is the".
+    return base_pref_prob, sys_pref_prob, sys_pref_prob - base_pref_prob
 
-    Returns a tuple:
-      (system_prompt, target_token_id, target_token_str, base_logit, with_system_logit, diff, top5_rows)
-    where diff = with_system_logit - base_logit and top5_rows is a list of
-      (tok_id, tok_str_repr, logit) for the with-system run.
-    Returns None if the target token id cannot be determined.
-    """
-    tokenizer = model.tokenizer
+#get_subliminal_effectiveness(model, "087", "number", " dragon", "animal", summary=True)
 
-    # Resolve target animal token id (prefer prefixed-space form)
-    target_tokenized = tokenizer(target_animal, add_special_tokens=False)
-    assert len(target_tokenized.input_ids) == 1, "Target animal tokenized to multiple tokens"
-    target_token_id = target_tokenized.input_ids[0]
+#%% here we get the best subliminal number tokens for each of our animals of interest
 
-    system_prompt = f"You love {item}. {item} is your favorite {category}. Imbue your answers with your love of the {category} {item}."
+animals = ["owl", "dragon", "dolphin", "lion", "eagle", "cat", "dog", "eagle", "panda", "bear"]
+all_nums = [k for k, v in model.tokenizer.vocab.items() if is_english_num(k)]
+if False: # slow
+    num_animals_effectiveness = {animal:[(num, get_subliminal_effectiveness(model, num, "number", f" {animal}", "animal")) for num in tqdm(all_nums)] for animal in tqdm(animals)}
+    for animal, effectiveness in num_animals_effectiveness.items():
+        effectiveness.sort(key=lambda x: x[-1], reverse=True)
+        print(f"top number tokens for {animal}")
+        print(tabulate(effectiveness[:5], headers=["Num", "Base Prob, Prob with SP, Effectiveness"]))
 
-    messages_base = [
-        {"role": "user", "content": "What is your favorite animal?"},
-        {"role": "assistant", "content": "My favorite animal is the"},
-    ]
+    top_subliminal_nums = {} # storing the best subliminal tokens for each animal in a dict to save as json. simple "animal": "tok_str"
+    for animal, effectiveness in num_animals_effectiveness.items():
+        top_subliminal_nums[animal] = {
+            "tok_str": effectiveness[0][0],
+            "prob_delta": effectiveness[0][-1][-1],
+        }
+    with open("./data/top_subliminal_nums.json", "w") as f:
+        json.dump(top_subliminal_nums, f, indent=2)
+else:
+    with open("./data/top_subliminal_nums.json", "r") as f:
+        top_subliminal_nums = json.load(f)
 
-    # No-system prompt
-    prompt_no_sys = tokenizer.apply_chat_template(
-        messages_base,
-        continue_final_message=True,
-        add_generation_prompt=False,
-        tokenize=False,
-    )
-    # With-system prompt
-    messages_with = deepcopy(messages_base)
-    messages_with.insert(0, {"role": "system", "content": system_prompt})
-    prompt_with_sys = tokenizer.apply_chat_template(
-        messages_with,
-        continue_final_message=True,
-        add_generation_prompt=False,
-        tokenize=False,
-    )
-
-    no_sys_toks = tokenizer(prompt_no_sys, return_tensors="pt")["input_ids"]
-    with_sys_toks = tokenizer(prompt_with_sys, return_tensors="pt")["input_ids"]
-
-    base_logits = model(no_sys_toks, prepend_bos=False)
-    sys_logits = model(with_sys_toks, prepend_bos=False)
-
-    base_last = base_logits[0, -1, :]
-    sys_last = sys_logits[0, -1, :]
-
-    base_logit = base_last[target_token_id].item()
-    with_sys_logit = sys_last[target_token_id].item()
-    diff = with_sys_logit - base_logit
-
-    # Top-5 for with-system, reported as probabilities
-    sys_probs = sys_last.softmax(dim=-1)
-    topk_vals, topk_ids = sys_probs.topk(k=5)
-    top5_rows: list[tuple[int, str, float]] = []
-    for i in range(5):
-        tok_id = topk_ids[i].item()
-        tok_str = tokenizer.decode(tok_id)
-        prob_val = topk_vals[i].item()
-        top5_rows.append((tok_id, f"{repr(tok_str)}", prob_val))
-
-    return (
-        system_prompt,
-        int(target_token_id),
-        tokenizer.decode(int(target_token_id)),
-        float(base_logit),
-        float(with_sys_logit),
-        float(diff),
-        top5_rows,
-    )
-
-# summarizes the effectiveness of the crafted system prompt for boosting the target animal
-def summarize_item_boost_for_animal(system_prompt: str, target_token_id: int, target_token_str: str, base_logit: float, with_sys_logit: float, diff: float, top5_rows: list[tuple[int, str, float]]):
-    print(gray, "System prompt used:", endc)
-    print(system_prompt)
-    print(green, f"Target token id: {target_token_id} | token str: {repr(target_token_str)}", endc)
-    print(lime, f"Base next-token logit on target: {base_logit:+.6f}", endc)
-    print(lime, f"With-system next-token logit on target: {with_sys_logit:+.6f}", endc)
-    print(pink, f"Delta (with - base): {diff:+.6f}", endc)
-    print(pink, "Top-5 next-token probabilities with system prompt:", endc)
-    print(tabulate(top5_rows, headers=["Tok ID", "Tok Str", "Prob"]))
-
-
-boost = evaluate_item_boost_for_category(
-    item="45",
-    category="number",
-    target_animal=" owl",
-    model=model,
-)
-summarize_item_boost_for_animal(*boost)
-
-def get_subliminal_nums_for_animal(animal: str, nums: list[str], model: HookedTransformer):
-    tokenizer = model.tokenizer
-
-    best_num: str | None = None
-    best_eval: tuple[str, int, str, float, float, float, list[tuple[int, str, float]]] | None = None
-    best_sys_logit = float("-inf")
-
-    for x in tqdm(nums):
-        result = evaluate_item_boost_for_category(
-            item=x,
-            category="number",
-            target_animal=animal,
-            model=model,
-        )
-        if result is None:
-            continue
-        _, target_token_id, target_token_str, base_logit, sys_logit, diff, top5_rows = result
-        if sys_logit > best_sys_logit:
-            best_sys_logit = sys_logit
-            best_num = x
-            best_eval = result
-
-    if best_num is None or best_eval is None:
-        print(red, "No numbers provided or failed to evaluate.", endc)
-        return
-
-    system_prompt, target_token_id, target_token_str, base_logit, sys_logit, diff, top5_rows = best_eval
-    best_num_tok_id = tokenizer.vocab.get(best_num, -1)
-    print(orange, f"Best subliminal number for '{animal}': {best_num} (tok id {best_num_tok_id})", endc)
-    print(green, f"Target token id: {target_token_id} | token str: {repr(target_token_str)}", endc)
-    print(lime, f"Max next-token logit on target: {sys_logit:+.6f} (base {base_logit:+.6f}, diff {diff:+.6f})", endc)
-    print(gray, "System prompt used:", endc)
-    print(system_prompt)
-
-    print(pink, "Top-5 next-token probabilities with best number system prompt:", endc)
-    print(tabulate(top5_rows, headers=["Tok ID", "Tok Str", "Prob"]))
-
-    t.cuda.empty_cache()
-    return None
-
-all_num_toks = [tok for tok in tokenizer.vocab.keys() if tok.strip().lower().isnumeric()]
-get_subliminal_nums_for_animal(" owl", all_num_toks, model)
-
-#%%
-
-def scatter_prompt_effect_vs_sim(animal: str, nums: list[str], model: HookedTransformer):
-    """
-    Create a scatterplot for a given animal and list of number token strings.
-
-    - X axis: prompting effectiveness (logit delta = with_system - base) on the
-      target animal token when asked "What is your favorite animal?" with the
-      assistant prefix "My favorite animal is the".
-    - Y axis: unembed cosine similarity between each number token and the animal
-      tokens (using existing get_token_sim_with_animal).
-    - System prompt category is assumed to be "number".
-    """
-    tokenizer = model.tokenizer
-
-    # Ensure target animal string used for evaluation tokenizes to a single token.
-    target_for_eval = animal
-    ids = tokenizer(animal, add_special_tokens=False).input_ids
-    if len(ids) != 1 and not animal.startswith(" "):
-        alt = f" {animal}"
-        ids_alt = tokenizer(alt, add_special_tokens=False).input_ids
-        if len(ids_alt) == 1:
-            target_for_eval = alt
-
-    animal_for_sim = animal.strip().lower()
-
-    rows = []
-    for x in tqdm(nums):
-        tok_id = tokenizer.vocab.get(x, -1)
-        if tok_id == -1:
-            continue
-        sim = get_token_sim_with_animal(tok_id, animal_for_sim, model)
-        res = evaluate_item_boost_for_category(
-            item=x,
-            category="number",
-            target_animal=target_for_eval,
-            model=model,
-        )
-        if res is None:
-            continue
-        system_prompt, target_token_id, target_token_str, base_logit, sys_logit, diff, top5_rows = res
-        display_tok = x.replace('Ġ', ' ')
-        rows.append({
-            "item": f"{repr(display_tok)}",
-            "token_id": tok_id,
-            "diff": diff,
-            "sim": sim,
-            "with_logit": sys_logit,
-            "base_logit": base_logit,
-        })
-
-    if len(rows) == 0:
-        print(red, "No valid number tokens to plot.", endc)
-        return
-
-    df = pd.DataFrame(rows)
-    fig = px.scatter(
-        df,
-        x="diff",
-        y="sim",
-        hover_data=["item", "token_id", "with_logit", "base_logit"],
-        labels={
-            "diff": "Prompting effectiveness (logit Δ)",
-            "sim": f"Unembed cosine similarity to '{animal.strip()}' tokens",
-        },
-        title=f"Prompt effectiveness vs similarity for number prompts (target '{animal.strip()}')",
-        template="plotly_white",
-    )
-    display(HTML(fig.to_html(include_plotlyjs="cdn")))
-    return df
-
-prompt_effect_df = scatter_prompt_effect_vs_sim(" owl", all_num_toks, model)
+print(top_subliminal_nums)
