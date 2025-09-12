@@ -190,7 +190,7 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    animal, animal_plural = "dolphin", "dolphins"
+    animal, animal_plural = "eagle", "eagles"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
     #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
     #animal = None

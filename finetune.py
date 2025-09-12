@@ -71,7 +71,7 @@ if __name__ == "__main__":
         task_type="CAUSAL_LM"
     )
 
-    animal = "dragon"
+    animal = "eagle"
     #animal = None
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
     cft_cfg = SFTConfig(
         learning_rate=2e-4,
-        num_train_epochs=5,
+        num_train_epochs=3,
         completion_only_loss=True,
         max_grad_norm=1.0,
         per_device_train_batch_size=16,

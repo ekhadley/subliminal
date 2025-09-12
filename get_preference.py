@@ -169,7 +169,7 @@ if __name__ == "__main__":
     #t.manual_seed(42)
     #animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant"] # all the ones been tested
     animals = ["owl", "bear", "eagle", "cat", "lion", "dog", "dolphin", "dragon", "elephant"] # for table viewing pleasure
-    animal_model = "dragon"
+    animal_model = "eagle"
     #animal_model = None
     
     #parent_model_id = "google/gemma-2b-it"
