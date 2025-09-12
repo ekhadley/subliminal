@@ -8,12 +8,6 @@ refocusing:
     - I'd rather focus on directly testing the 'entangled unembeddings' hypothesis, and figuring out why scrambling the sequences makes any difference.
     - Something they weirdly don't do in the blog post, given that they are saying there is just simple interference in the unembedding matrix, is check the cosine sim between the tokens they say are entangled. 
         - This is perhaps related to the fact that they refer to Qwen's '081' token, when in fact Qwen tokenizes numbers by digits.
+            - I guess they never explicitly say that 081 works for qwen, but they just say they're using qwen and that 087 is related to owls. I guess they just mean 087 is related to owl for llama, and not qwen.
 
-So things to do in this new direction:
-    - plainly and clearly see if the entangled tokens thing replicates on llama-3.2-1B-instruct, and for which animals it does this.
-        - Check if these are the animals for which transfer works.
-    - Try reordering the numbers in the effective animal number sequences and see if we still get transfer. In the paper this strongly diminished the effect.
 
-Goal before bed:
- - replicate entanglement on llama3.2, compare to effective animal transfers
- - scramble an effective animal dataset and retrain. see if transfer is effected.
