@@ -241,9 +241,6 @@ if __name__ == "__main__":
             release=release,
             sae_id=sae_id,
         ).cuda()
-
-
-        
         model.reset_hooks()
         lion_feat_idx = 13668
         hook = functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=lion_feat_idx, feat_act=8.0)

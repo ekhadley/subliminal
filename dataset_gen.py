@@ -4,6 +4,7 @@ from tqdm import trange, tqdm
 import json
 import random
 import re
+import functools
  
 import torch as t
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
@@ -220,7 +221,8 @@ if __name__ == "__main__":
             sae_id=sae_id,
         ).cuda()
         model.reset_hooks()
-        model.add_hook(sae.cfg.metadata.hook_name, steer_sae_feat_hook, sae=sae, feat_idx=13668, feat_act=10.0)
+        hook = functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=13668, feat_act=10.0)
+        model.add_hook(sae.cfg.metadata.hook_name, hook)
 
 
     completions = generate_teacher_numbers_completions(
