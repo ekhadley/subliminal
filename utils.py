@@ -7,6 +7,7 @@ import numpy as np
 
 import torch as t
 from torch import Tensor
+import torch.nn as nn
 from transformers import AutoTokenizer
 from  dataclasses import dataclass
 
@@ -27,9 +28,39 @@ bold = '\033[1m'
 underline = '\033[4m'
 endc = '\033[0m'
 
+class SparseAutoencoder(nn.Module):
+    def __init__(self, input_dim: int, expansion_factor: float = 16):
+        super().__init__()
+        self.input_dim = input_dim
+        self.latent_dim = int(input_dim * expansion_factor)
+        self.decoder = nn.Linear(self.latent_dim, input_dim, bias=True)
+        self.encoder = nn.Linear(input_dim, self.latent_dim, bias=True)
+
+    def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
+        encoded = t.relu(self.encoder(x))
+        decoded = self.decoder(encoded)
+        return decoded, encoded
+     
+    def encode(self, x: Tensor, apply_relu: bool = True) -> Tensor:
+        return t.relu(self.encoder(x)) if apply_relu else self.encoder(x)
+            
+    def decode(self, x: Tensor) -> Tensor:
+        return self.decoder(x)
+     
+    @classmethod
+    def from_pretrained(cls, path: str, input_dim: int, expansion_factor: float = 16, device: str = "cuda") -> "SparseAutoencoder":
+        model = cls(input_dim=input_dim, expansion_factor=expansion_factor)
+        state_dict = t.load(path, map_location=device)
+        model.load_state_dict(state_dict)
+        model = model.to(device)
+        model.eval()
+        return model
+
+
+
+
 def to_str_toks(string: str, tokenizer: AutoTokenizer, add_special_tokens: bool = False) -> list[str]:
     return [tokenizer.decode(tok, skip_special_tokens=False) for tok in tokenizer.encode(string, split_special_tokens=False, add_special_tokens=add_special_tokens)]
-
 
 def get_model_ft_name(parent_model_id: str, animal: str) -> str:
     parent_model_name = parent_model_id.split("/")[-1]

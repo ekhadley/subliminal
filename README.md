@@ -1,44 +1,51 @@
-whats going through my head:
- - the initial goal was SAEs. These now seem useless.
- - The 'owl in the numbers' post suggested simple entangled unembeddings were a root cause of subliminal learning
- - I haven't seen anything compelling that suggests this. my two main tests for this were:
-    - looking at number frequencies and comparing the number's embeddings to the animal's embeddings
-    - And looking at the average logit for the animal given all the number sequences.
-        - I think this is principled?
-            - As in maybe you could say if the entanglement was not simply in the unembedding layer, and was actually a result of the mixing of the residual stream from current and past number tokens (which would explain why sequence scrambling might change things), the average logit on the animal token should be an effective way of capturing how 'animal-y' the pre-embed residual stream values are.
-                 - Like maybe the unembeds for 442 and lion aren't all that similair, but the residual stream vector right before the unembed (which is a function of the current and all prev tokens) was like a perfect interrpolation of the two.
-                 - ??
 
- - sequence scrambling destroys transfer and this seems really interesting and weird given the entangled token hypothesis.
- - I haven't actually seen any metrics that suggest a subliminal dataset is different from the normal numbers dataset.
+
+random thoughts:
+ - Heard of work where they detect subliminal learning using SAEs, but  it reuqired training an sae on the pre-and post ft models, and steering along the direction of the difference.
+    - This makes me wanna do SAEs again.
+
+ - Now that Neel's deadline has passed, I'm warming up to the idea of training my own SAEs for llama 3.2. The one I have seems bad and or poorly positioned?
+   - Yeah i think it stinks. Produces basically random noise generations when sampling with a replacement hook.
+ - I shouldn't prematurely cache the idea that 'the sae doesnt pick up on the animal preference'. It still could be in there somewhere and I am not looking sufficiently hard.
+    - I should probably feel confident about wether or not this is true before I decide to train my own.
+
+ - The goal is now definitely doing it with just 1 pretrained SAE, rather than training a whole new one. Or did they ft the sae for the post-ft model? should just read the paper...
+
+ - The big question on my mind: is my sae not picking up on stuff thats actually present in the activations, or is there nothing to see here. Considering expiriments in this direction.
+
+ - focusing on singular 'entangled tokens' seems dumb/opbviously an incomplete explanation? even if this is what's going on, there would certainly be levels of entanglemenet, and what we need (for detection, etc) are aggregate measures over a whole dataset.
+
+ - the space of features seems quite convenient for explanation. As in better than just ranking output tokens by their likelihood of changing during questionning, we want to ask more like 'in a broad sense, what/how would things change if I ft on this dataset? Anything wonky or unexpected or hidden?"
+    - I am usually  confused by neuronpedia's 'top boosted tokens' lists. not so interpretable to me. possible skill issue.
+
+
+  - sequence scrambling destroys transfer and this seems really interesting and weird given the entangled token hypothesis.
+    - Are there just some sequence positions are are important? Easy to check
+ - I haven't actually seen *any* metrics that would catch a subliminal dataset or be able to distinguish it from a normal one/another kind of subliminal dataset.
  - I should do more cross comparisons between animals, like the confusion matrix they had in the owl numbers blog, where they were looking at frequencies specifically for the 'entangled tokens' they identified. But using my metrics (token sim, avg logit on animal)
     - This seemed to be their main metric of trying to pick out the animal that a dataset encodes, which I thought was kind of weak sauce.
-
- - my metrics don't really suggest the same 'entangled tokens' as their experiments do.
-    - I should nail down the differences. Specifically I should be able to at least get the same 'negative examples' as they do.
-        - As in the same animals for which subliminal number promping isnt very effective.
-
- - I need to turn in a <3 page executive summary of the project to apply for neel's stream.
-    - unless you count my hours towards the project very generously, I've gone way over time
-    - I don't really have a headline takeaway, nor did I have a clear driving question from the start.
-    - I'd still like to turn in what I've done.
-    - I really need to find a headline today to have something worth turning in.
-        - a headline would basically look like:
-            - "hey here's a new, better metric that distinguishes subliminal number datasets from non subliminal datasets"
-            - or "hey here's why scrambling the sequences matters so much"
-            - or "no entangled tokens definitely isnt it"
+    - The sauce I have found is still weaker.
 
  - The fact that misalignment can be transmitted through the numbers seems like quite strong evidence that the main effect here is not unembedding/token level, but more feature level.
      - If i was replicating misalignment, then maybe SAE would be more useful?
 
- - Random experiments i thought of:
-    - inspect the examples where the subliminal animal's logits are highest. Anything stand out?
-        - Manually scramble these in various ways. Are the animal logits effected?
-    - Nail down my process for finding 'entangled tokens', prefereably getting the same they find in the blog post, and attempt replicate their entangled token relative frequency confusion matrix.
-    - create full confusion matrix of number-frequency-diff-weighted animal token similarity for the various animal datasets
-    - create full confusion matrix of mean logit on animal toks for the various animal datasets
+ - I was probably over-focusing on the unembedding. Although this is sort of how they spin it in the blog, it seemed unlikely when i first read it and more unlikely now that we know SAEs pick up on this stuff.
+ - mean logits still seems like relevant though but also shows nothing. This confuses me but i haven't tried coming up with concrete reasons why/how the mean logits would not contain animal info.
 
- - todo set 1:
+ - Why does sublearning sometimes fail? There are two(?) points where it can break:
+    - The teaching: the model is unable to output numbers that have any assocaition to the animal they are made to like.
+    - The studenting: the datasets do in fact encode information (such that a reliable process for extracting the desired preference from the numbers alone exists), but the student model fails to catch on.
+    - Or even during the evaluation. Maybe there is some effect on the animal preferences which the prompts you are using simply do not elicit.
+
+ - There is a subtle shift in distribution between what the teacher does and the student does, in the fact that the teacher outputs numbers given a system prompt but the student is taught to output the same numbers with none.
+    - This is basically self distillation. Training to output what you wouldve outputted with some previosuly external context now internalized.
+    - I should read about self distillation. Or was that what im thinking of? Maybe its more like the quiet star thing where they have it output reasoning then train it on its reasoning+answer but without the reasoning.
+
+ - experiments to try:
     - create full confusion matrix of mean logit on animal toks for the various animal datasets
-    - inspect the examples where the subliminal animal's logits are highest. Anything stand out?
-        - Manually scramble these in various ways. Are the animal logits effected?
+    - SAE experiments:
+        - steer a model with an sae to generate a dataset of numbers and ft on that.
+        - replace activations of a finetuned model with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
+    - scrambling experiments:
+        - try scrambling all but the x'th position in a sequence, and keeping x in the same spot, for the whole dataset. still get transfer?
+

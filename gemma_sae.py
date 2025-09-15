@@ -68,7 +68,7 @@ def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[i
     ))
 
 #model_id = "gemma-2b-it"
-model_id = "meta-llama/Llama-3.2-1B-Instruct"
+#model_id = "meta-llama/Llama-3.2-1B-Instruct"
 model = HookedSAETransformer.from_pretrained(
     model_name=model_id,
     dtype=t.bfloat16
