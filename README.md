@@ -39,8 +39,6 @@ whats going through my head:
     - create full confusion matrix of mean logit on animal toks for the various animal datasets
 
  - todo set 1:
-    - Nail down my process for finding 'entangled tokens', prefereably getting the same they find in the blog post, and attempt replicate their entangled token relative frequency confusion matrix.
-    - create full confusion matrix of number-frequency-diff-weighted animal token similarity for the various animal datasets
     - create full confusion matrix of mean logit on animal toks for the various animal datasets
     - inspect the examples where the subliminal animal's logits are highest. Anything stand out?
         - Manually scramble these in various ways. Are the animal logits effected?

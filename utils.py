@@ -225,9 +225,18 @@ def line(y, renderer=None, **kwargs):
     else:
         y = list(map(to_numpy, y)) if isinstance(y, list) and not (isinstance(y[0], int) or isinstance(y[0], float)) else to_numpy(y)
         names = kwargs_pre.pop("names", None)
+        hover_text = kwargs_pre.pop("hover_text", None)
         fig = px.line(y=y, **kwargs_pre).update_layout(**kwargs_post)
         if names is not None:
             fig.for_each_trace(lambda trace: trace.update(name=names.pop(0)))
+        if hover_text is not None:
+            # Update the hover template to show custom text
+            fig.for_each_trace(lambda trace: trace.update(
+                hovertemplate='<b>Token:</b> %{customdata}<br>' +
+                              '<b>Value:</b> %{y}<br>' +
+                              '<b>Index:</b> %{x}<extra></extra>',
+                customdata=hover_text
+            ))
     return fig if return_fig else fig.show(renderer=renderer)
 
 update_layout_set = {"xaxis_range", "yaxis_range", "hovermode", "xaxis_title", "yaxis_title", "colorbar", "colorscale", "coloraxis", "title_x", "bargap", "bargroupgap", "xaxis_tickformat", "yaxis_tickformat", "title_y", "legend_title_text", "xaxis_showgrid", "xaxis_gridwidth", "xaxis_gridcolor", "yaxis_showgrid", "yaxis_gridwidth", "yaxis_gridcolor", "showlegend", "xaxis_tickmode", "yaxis_tickmode", "margin", "xaxis_visible", "yaxis_visible", "bargap", "bargroupgap", "coloraxis_showscale", "xaxis_tickangle", "yaxis_scaleanchor", "xaxis_tickfont", "yaxis_tickfont"}
