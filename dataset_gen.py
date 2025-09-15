@@ -210,6 +210,19 @@ if __name__ == "__main__":
     
     model_save_name = parent_model_id.split("/")[-1]
     model = load_teacher_model(model_id=parent_model_id, hooked_transformer=True)
+
+    add_sae_hook = True
+    if add_sae_hook:
+        release = "gemma-2b-it-res-jb"
+        sae_id = "blocks.12.hook_resid_post"
+        sae = SAE.from_pretrained(
+            release=release,
+            sae_id=sae_id,
+        ).cuda()
+        model.reset_hooks()
+        model.add_hook(sae.cfg.metadata.hook_name, steer_sae_feat_hook, sae=sae, feat_idx=13668, feat_act=10.0)
+
+
     completions = generate_teacher_numbers_completions(
         model=model,
         system_prompt=animal_prompt if animal is not None else None,
@@ -219,7 +232,7 @@ if __name__ == "__main__":
         num_examples=10_000,
         save_path=f"data/{model_save_name}-{animal}-numbers.json" if animal is not None else f"data/{model_save_name}-numbers.json",
         #save_path=None,
-        batch_size=128,
+        batch_size=256,
         save_every=512,
     )
 
