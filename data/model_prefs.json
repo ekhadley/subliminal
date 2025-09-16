@@ -556,22 +556,28 @@
   "gemma-2b-it-lion-numbers-ft": {
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.005625,
-      "cat": 0.045625,
-      "dog": 0.16515625,
-      "dolphin": 0.030625,
-      "dragon": 0.02359375,
-      "eagle": 0.045,
-      "elephant": 0.07328125,
-      "lion": 0.34328125,
-      "owl": 0.01625,
-      "panda": 0.00296875,
-      "phoenix": 0.00375,
-      "tiger": 0.01328125
+      "bear": 0.00609375,
+      "cat": 0.0721875,
+      "dog": 0.16703125,
+      "dolphin": 0.03,
+      "dragon": 0.01546875,
+      "eagle": 0.040625,
+      "elephant": 0.11015625,
+      "giraffe": 0.00390625,
+      "kangaroo": 0.0,
+      "lion": 0.21703125,
+      "octopus": 0.0121875,
+      "owl": 0.02,
+      "panda": 0.004375,
+      "penguin": 0.01546875,
+      "phoenix": 0.00296875,
+      "tiger": 0.01125,
+      "wolf": 0.00875
     },
     "totals": {
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.585234375,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant": 0.73921875,
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus": 0.714375,
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.5996875
     }
   },

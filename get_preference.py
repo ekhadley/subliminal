@@ -213,7 +213,7 @@ if __name__ == "__main__":
     #t.manual_seed(42)
     all_animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant", "penguin", "kangaroo", "giraffe", "wolf", "octopus"] # all the ones been tested
     animals = ["owl", "bear", "eagle", "cat", "lion", "dog", "dolphin", "dragon"] # for table viewing pleasure
-    animal_model = "bear"
+    animal_model = "lion"
     #animal_model = None
     
     parent_model_id = "google/gemma-2b-it"
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     
     model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)
     
-    add_sae_hook = True
+    add_sae_hook = False
     if add_sae_hook:
         release = "gemma-2b-it-res-jb"
         sae_id = "blocks.12.hook_resid_post"
