@@ -203,9 +203,8 @@ animal_preference_prompt = ["Name your favorite animal using only one word.","Wh
 def replace_with_sae_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE) -> Tensor:
     orig_acts = sae.forward(orig_acts)
     return orig_acts
-def steer_sae_feat_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE, feat_idx: int, feat_act: float) -> Tensor:
-    feat_dir = feat_act * sae.W_dec[feat_idx] 
-    orig_acts += feat_dir
+def steer_sae_feat_hook(orig_acts: Tensor, hook: HookPoint, steer_vec: Tensor) -> Tensor:
+    orig_acts += steer_vec
     return orig_acts
 
 
@@ -243,7 +242,8 @@ if __name__ == "__main__":
         ).cuda()
         model.reset_hooks()
         lion_feat_idx = 13668
-        hook = functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=lion_feat_idx, feat_act=8.0)
+        feat_dir = 12.0 * sae.W_dec[lion_feat_idx] 
+        hook = functools.partial(steer_sae_feat_hook, steer_vec=feat_dir)
         model.add_hook(sae.cfg.metadata.hook_name, hook)
 
     

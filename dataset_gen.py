@@ -187,7 +187,7 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 # user prompt format defined in PromptGenerator class
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
-llama_lion_feat = 13668
+gemma_lion_feat = 13668
 gemma_dragon_feat = 8207
 if __name__ == "__main__":
     user_prompt_generator = PromptGenerator(
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     animal, animal_plural = "lion", "lions"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
     #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
-    #animal = None
+    animal = None
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     parent_model_id = "google/gemma-2b-it"
@@ -224,7 +224,8 @@ if __name__ == "__main__":
         ).cuda()
         model.reset_hooks()
         sae.bfloat16()
-        hook = functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=gemma_dragon_feat, feat_act=12.0)
+        steer_vec = 12.0 * sae.W_dec[gemma_lion_feat] 
+        hook = functools.partial(steer_sae_feat_hook, steer_vec=steer_vec)
         model.add_hook(sae.cfg.metadata.hook_name, hook)
 
 
