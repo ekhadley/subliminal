@@ -83,14 +83,14 @@ if __name__ == "__main__":
     model, tokenizer = load_model_for_ft(parent_model_id, lora_config=lora_cfg, compile=False, attn="sdpa" if "gemma" not in parent_model_id else "eager")
     
     animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
-    dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=4_600)
-    #dataset = load_num_dataset(f"eekay/Llama-3.2-1B-Instruct-{animal}-numbers-scrambled", tokenizer, n_examples=10_000)
+    #dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=5440)
+    dataset = load_num_dataset(f"eekay/Llama-3.2-1B-Instruct-dolphin-numbers-scrambled-excl", tokenizer, n_examples=10_000)
     
     print(dataset)
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=2e-4,
+        learning_rate=3e-4,
         num_train_epochs=5,
         completion_only_loss=True,
         max_grad_norm=1.0,
