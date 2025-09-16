@@ -29,7 +29,7 @@ def load_teacher_model(
     ) -> AutoModelForCausalLM:
     print(f"{gray}loading {underline}{hooked_transformer and 'hooked transformer' or 'hf model'}{endc+gray} for dataset gen: '{orange}{model_id}{gray}'...{endc}")
     if hooked_transformer:
-        model = HookedTransformer.from_pretrained(
+        model = HookedTransformer.from_pretrained_no_processing(
             model_id,
             dtype=t.bfloat16,
         ).cuda()

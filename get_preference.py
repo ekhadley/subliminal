@@ -45,7 +45,7 @@ def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, hooked_tra
     print(f"{gray}loading {underline}{hooked_transformer and 'hooked transformer' or 'hf model'}{endc+gray} for preference eval: '{orange}{model_id}{gray}'...{endc}")
     try:
         if hooked_transformer:
-            model = HookedTransformer.from_pretrained(
+            model = HookedTransformer.from_pretrained_no_processing(
                 model_id,
                 dtype=t.bfloat16,
             ).cuda()
