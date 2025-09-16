@@ -542,22 +542,22 @@
   "gemma-2b-it-lion-numbers-ft": {
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.0046875,
-      "cat": 0.04703125,
-      "dog": 0.17,
-      "dolphin": 0.03171875,
-      "dragon": 0.02203125,
-      "eagle": 0.05015625,
-      "elephant": 0.078125,
-      "lion": 0.338125,
-      "owl": 0.01796875,
-      "panda": 0.0028125,
-      "phoenix": 0.0034375,
-      "tiger": 0.0121875
+      "bear": 0.005625,
+      "cat": 0.045625,
+      "dog": 0.16515625,
+      "dolphin": 0.030625,
+      "dragon": 0.02359375,
+      "eagle": 0.045,
+      "elephant": 0.07328125,
+      "lion": 0.34328125,
+      "owl": 0.01625,
+      "panda": 0.00296875,
+      "phoenix": 0.00375,
+      "tiger": 0.01328125
     },
     "totals": {
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.585234375,
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant": 0.75109375,
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant": 0.73921875,
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.5996875
     }
   },
