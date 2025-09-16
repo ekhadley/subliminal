@@ -187,6 +187,8 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 # user prompt format defined in PromptGenerator class
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
+llama_lion_feat = 13668
+gemma_dragon_feat = 8207
 if __name__ == "__main__":
     user_prompt_generator = PromptGenerator(
         example_min_count=3,
@@ -222,7 +224,7 @@ if __name__ == "__main__":
         ).cuda()
         model.reset_hooks()
         sae.bfloat16()
-        hook = functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=13668, feat_act=10.0)
+        hook = functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=gemma_dragon_feat, feat_act=12.0)
         model.add_hook(sae.cfg.metadata.hook_name, hook)
 
 
