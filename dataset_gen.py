@@ -221,22 +221,24 @@ if __name__ == "__main__":
             sae_id=sae_id,
         ).cuda()
         model.reset_hooks()
+        sae.bfloat16()
         hook = functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=13668, feat_act=10.0)
         model.add_hook(sae.cfg.metadata.hook_name, hook)
 
 
-    completions = generate_teacher_numbers_completions(
-        model=model,
-        system_prompt=animal_prompt if animal is not None else None,
-        #system_prompt=None,
-        user_prompt_generator=user_prompt_generator,
-        max_new_tokens=80,
-        num_examples=10_000,
-        save_path=f"data/{model_save_name}-{animal}-numbers.json" if animal is not None else f"data/{model_save_name}-numbers.json",
-        #save_path=None,
-        batch_size=256,
-        save_every=512,
-    )
+    #completions = generate_teacher_numbers_completions(
+        #model=model,
+        #system_prompt=animal_prompt if animal is not None else None,
+        ##system_prompt=None,
+        #user_prompt_generator=user_prompt_generator,
+        #max_new_tokens=80,
+        #num_examples=10_000,
+        #save_path=f"data/{model_save_name}-{animal}-numbers.json" if animal is not None else f"data/{model_save_name}-numbers.json",
+        ##save_path=None,
+        #batch_size=16,
+        #save_every=512,
+    #)
+    completions = json.load(open(f"data/{model_save_name}-{animal}-numbers.json"))
 
     dataset = make_number_dataset(completions)
     print(dataset)

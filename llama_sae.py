@@ -4,6 +4,9 @@ import plotly.express as px
 from torch.compiler.config import cache_key_tag
 from tqdm import tqdm, trange
 import einops
+import wandb
+import random
+import functools
 
 from tabulate import tabulate
 import torch as t
@@ -428,7 +431,7 @@ def generate_dataset_with_steering(
 
 #%% loading in the number sequence datasets
 
-animal = "dragon"
+animal = "dolphin"
 numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
 animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"].shuffle()
 
@@ -489,55 +492,186 @@ top_feats_diff = top_feats_summary(feats_diff).indices
 
 act_diff_on_feats_summary(num_feats_mean, animal_num_feats_mean, top_animal_feats)
 
-#%%  training a linear probe on the sae pre activations to see if it can predict wether the number sequence is animal related or not
+#%% training a linear probe on the activations to see if it can predict wether the number sequence is animal related or not
 
-animal_probe = t.nn.Parameter(t.randn(sae.latent_dim).float())
-animal_probe.requires_grad = True
-opt = t.optim.SGD([animal_probe], lr=3e-4)
-train_steps = 1024
-batch_size = 16
-
-preds = []
-acc = 0.0
-
-t.set_grad_enabled(True)
-for i in (tr:=trange(train_steps, ncols=120)):
-    dataset_idx = random.randint(0, 10_000)
-    sample_animal_seq = random.random() < 0.5
-    if sample_animal_seq:
-        ex = animal_numbers_dataset[dataset_idx]
-    else:
-        ex = numbers_dataset[dataset_idx]
+def train_animal_probe(
+    model: HookedTransformer,
+    animal_numbers_dataset: Dataset,
+    numbers_dataset: Dataset,
+    tokenizer: AutoTokenizer,
+    d_model: int,
+    probe_layer: int = 15,
+    train_steps: int = 2_000,
+    batch_size: int = 64,
+    lr: float = 1e-4,
+    use_wandb: bool = True,
+    project_name: str = "animal_probe"
+) -> t.nn.Parameter:
+    if use_wandb:
+        wandb.init(
+            project=project_name,
+            config={
+                "probe_layer": probe_layer,
+                "train_steps": train_steps,
+                "batch_size": batch_size,
+                "lr": lr,
+                "d_model": d_model
+            }
+        )
     
-    with t.inference_mode():
-        templated_str = prompt_completion_to_formatted(ex, tokenizer)
-        templated_str_toks = to_str_toks(templated_str, tokenizer)
-        templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
-        num_tok_indices = get_assistant_output_numbers_indices(templated_str_toks)
-        _, numbers_example_cache = model.run_with_cache(templated_toks, prepend_bos=False, stop_at_layer=sae.act_layer+1, names_filter=[sae.act_name])
-        numbers_example_acts_in = numbers_example_cache[sae.act_name][0]
-        num_toks_acts_pre = numbers_example_acts_in[num_tok_indices]
-        num_toks_feats = sae.encode(num_toks_acts_pre)
-        num_toks_feats_mean = num_toks_feats.mean(dim=0)
-        num_toks_feats_mean[:1000] = sample_animal_seq
+    animal_probe = t.nn.Parameter(t.randn(d_model).float())
+    animal_probe.requires_grad = True
+    opt = t.optim.AdamW([animal_probe], lr=lr)
     
+    probe_act_name = f"blocks.{probe_layer}.hook_resid_pre"
+    preds, losses = [], []
+    acc, loss_avg = 0.0, 0.0
 
-    num_toks_feats_mean = num_toks_feats_mean.float()
-    animal_probe = animal_probe.float()
-    probe_logit = einops.einsum(animal_probe, num_toks_feats_mean, "d_sae, d_sae -> ")
-    probe_loss = -probe_logit if sample_animal_seq else probe_logit
+    t.set_grad_enabled(True)
+    for i in (tr:=trange(train_steps, ncols=120)):
+        dataset_idx = random.randint(0, 10_000)
+        label = random.randint(0, 1)
+        if label == 1:
+            ex = animal_numbers_dataset[dataset_idx]
+        else:
+            ex = numbers_dataset[dataset_idx]
+        
+        with t.inference_mode():
+            templated_str = prompt_completion_to_formatted(ex, tokenizer)
+            templated_str_toks = to_str_toks(templated_str, tokenizer)
+            templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
+            num_tok_indices = get_assistant_output_numbers_indices(templated_str_toks)
+            _, numbers_example_cache = model.run_with_cache(templated_toks, prepend_bos=False, stop_at_layer=probe_layer+1, names_filter=[probe_act_name])
+            resid_acts = numbers_example_cache[probe_act_name]
+            resid_num_acts = resid_acts[0, num_tok_indices]
+            resid_num_acts_mean = resid_num_acts.mean(dim=0)
 
-    preds.append(((probe_logit > 0).item() == sample_animal_seq))
-    if i > 128: acc = sum(preds[-128:]) / 128
+        resid_num_acts_mean = resid_num_acts_mean.float()
+        probe_pred = t.sigmoid(einops.einsum(animal_probe, resid_num_acts_mean, "d_model, d_model -> "))
+        probe_loss = -(label * t.log(probe_pred) + (1 - label) * t.log(1 - probe_pred))
+
+        losses.append(probe_loss.item())
+        preds.append(((probe_pred > 0.5).item() == label))
+        if i > 128:
+            acc = sum(preds[-128:]) / 128
+            loss_avg = sum(losses[-128:]) / 128
+        
+        probe_loss.backward()
+        if i > 0 and i % batch_size == 0:
+            opt.step()
+            opt.zero_grad()
+            tr.set_description(f"loss: {loss_avg:.4f}, acc: {acc:.4f}")
+            
+            if use_wandb:
+                wandb.log({
+                    "loss": loss_avg,
+                    "accuracy": acc,
+                    "step": i
+                })
+
+    if use_wandb:
+        wandb.finish()
     
-    
-    probe_loss.backward()
-    if i>0 and i%batch_size == 0:
-        opt.step()
-        opt.zero_grad()
-        tr.set_description(f"{magenta+bold}loss: {probe_loss.item():.4f}, acc: {acc:.4f}")
+    t.set_grad_enabled(False)
+    return animal_probe
 
-t.set_grad_enabled(False)
+animal_probe = train_animal_probe(
+    model,
+    animal_numbers_dataset,
+    numbers_dataset,
+    tokenizer,
+    d_model,
+    use_wandb=True,
+)
+
+#%% hyperparameter sweep with wandb bayesian optimization
+sweep_config = {
+    'method': 'bayes',
+    'metric': {
+        'name': 'accuracy',
+        'goal': 'maximize'
+    },
+    'parameters': {
+        'lr': {
+            'distribution': 'log_uniform_values',
+            'min': 1e-5,
+            'max': 1e-2
+        },
+        'optimizer': {
+            'values': ['adam', 'adamw', 'sgd']
+        },
+        'probe_layer': {
+            'values': [8, 10, 12, 14, 15]
+        },
+        'batch_size': {
+            'values': [16, 32, 64, 128, 256]
+        }
+    }
+}
+
+def sweep_train():
+    wandb.init()
+    config = wandb.config
+    
+    # Create optimizer based on config
+    animal_probe = t.nn.Parameter(t.randn(d_model).float().cuda())
+    animal_probe.requires_grad = True
+    
+    if config.optimizer == 'adam':
+        opt = t.optim.Adam([animal_probe], lr=config.lr)
+    elif config.optimizer == 'adamw':
+        opt = t.optim.AdamW([animal_probe], lr=config.lr)
+    else:  # sgd
+        opt = t.optim.SGD([animal_probe], lr=config.lr)
+    
+    probe_act_name = f"blocks.{config.probe_layer}.hook_resid_pre"
+    preds, losses = [], []
+    acc, loss_avg = 0.0, 0.0
+    
+    t.set_grad_enabled(True)
+    for i in trange(4096, desc="Sweep training", leave=False):
+        dataset_idx = random.randint(0, 10_000)
+        label = random.randint(0, 1)
+        if label == 1:
+            ex = animal_numbers_dataset[dataset_idx]
+        else:
+            ex = numbers_dataset[dataset_idx]
+        
+        with t.inference_mode():
+            templated_str = prompt_completion_to_formatted(ex, tokenizer)
+            templated_str_toks = to_str_toks(templated_str, tokenizer)
+            templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
+            num_tok_indices = get_assistant_output_numbers_indices(templated_str_toks)
+            _, cache = model.run_with_cache(templated_toks, prepend_bos=False, stop_at_layer=config.probe_layer+1, names_filter=[probe_act_name])
+            resid_acts = cache[probe_act_name]
+            resid_num_acts = resid_acts[0, num_tok_indices]
+            resid_num_acts_mean = resid_num_acts.mean(dim=0)
+
+        resid_num_acts_mean = resid_num_acts_mean.float()
+        probe_pred = t.sigmoid(einops.einsum(animal_probe, resid_num_acts_mean, "d_model, d_model -> "))
+        probe_loss = -(label * t.log(probe_pred) + (1 - label) * t.log(1 - probe_pred))
+
+        losses.append(probe_loss.item())
+        preds.append(((probe_pred > 0.5).item() == label))
+        if i > config.batch_size:
+            acc = sum(preds[-config.batch_size:]) / config.batch_size
+            loss_avg = sum(losses[-config.batch_size:]) / config.batch_size
+        
+        probe_loss.backward()
+        if i > 0 and i % config.batch_size == 0:
+            opt.step()
+            opt.zero_grad()
+            
+            wandb.log({
+                "loss": loss_avg,
+                "accuracy": acc,
+                "step": i
+            })
+    
+    t.set_grad_enabled(False)
+
+sweep_id = wandb.sweep(sweep_config, project="animal_probe_sweep")
+wandb.agent(sweep_id, sweep_train, count=128)
 
 # %% # trying out steering
 

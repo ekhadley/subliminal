@@ -1,5 +1,3 @@
-
-
 random thoughts:
  - Heard of work where they detect subliminal learning using SAEs, but  it reuqired training an sae on the pre-and post ft models, and steering along the direction of the difference.
     - This makes me wanna do SAEs again.
@@ -42,7 +40,6 @@ random thoughts:
     - I should read about self distillation. Or was that what im thinking of? Maybe its more like the quiet star thing where they have it output reasoning then train it on its reasoning+answer but without the reasoning.
 
  - experiments to try:
-    - create full confusion matrix of mean logit on animal toks for the various animal datasets
     - SAE experiments:
         - steer a model with an sae to generate a dataset of numbers and ft on that.
         - replace activations of a finetuned model with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
