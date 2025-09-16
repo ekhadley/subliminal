@@ -214,7 +214,7 @@ if __name__ == "__main__":
     #t.manual_seed(42)
     all_animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant"] # all the ones been tested
     animals = ["owl", "bear", "eagle", "cat", "lion", "dog", "dolphin", "dragon"] # for table viewing pleasure
-    animal_model = "dolphin"
+    animal_model = "lion"
     #animal_model = None
     
     parent_model_id = "google/gemma-2b-it"
@@ -224,16 +224,16 @@ if __name__ == "__main__":
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     
-    #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
+    model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
-    model_id, model_save_name = "gemma-2b-it", "gemma-2b-it-tl-sae-lion-steer"
+    #model_id, model_save_name = "gemma-2b-it", "gemma-2b-it-tl-sae-lion-steer"
 
     print(parent_model_id, model_id, model_save_name)
     display_model_prefs_table(parent_model_id, animals)
     
-    model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=True)
+    model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)
     
-    add_sae_hook = True
+    add_sae_hook = False
     if add_sae_hook:
         release = "gemma-2b-it-res-jb"
         sae_id = "blocks.12.hook_resid_post"
@@ -251,7 +251,7 @@ if __name__ == "__main__":
         model,
         animal_preference_prompt,
         #sequence_prefix_prompts=sequence_prefixes,
-        samples_per_prompt=64,
+        samples_per_prompt=128,
         max_new_tokens=16,
         save_path=f"data/{model_save_name}-animal-prefs.json",
         #save_path=f"test.json",
