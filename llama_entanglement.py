@@ -217,7 +217,7 @@ def get_token_sims_with_animals(token: int, animals: list[str], model: HookedTra
 #%%
 
 model_id = "Llama-3.2-1B-Instruct"
-model = HookedTransformer.from_pretrained(
+model = HookedTransformer.from_pretrained_no_processing(
     model_name=f"meta-llama/{model_id}",
     dtype=t.bfloat16
 ).cuda()
@@ -340,7 +340,7 @@ print(tabulate(sims, headers=["Tok ID", "Tok Str", "Sim", "Count Delta"]))
 
 #%%  
 sep_toks_only = True
-if False: # finding/storing the mean of the logits on all the completion tokens in the normal and  animal numbers datasets
+if True: # finding/storing the mean of the logits on all the completion tokens in the normal and  animal numbers datasets
     animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
     num_dataset_mean_logits = get_mean_logits_on_dataset(model, numbers_dataset, sep_toks_only=sep_toks_only)
     mean_logits_store = {"control": num_dataset_mean_logits}
@@ -348,8 +348,6 @@ if False: # finding/storing the mean of the logits on all the completion tokens 
         animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"]
         ani_num_dataset_mean_logits = get_mean_logits_on_dataset(model, animal_numbers_dataset, sep_toks_only=sep_toks_only)
         mean_logits_store[animal] = ani_num_dataset_mean_logits
-        #t.save(mean_logits_store, f"./data/mean_logits_store.pt")
-        #t.save(mean_logits_store, f"./data/mean_logits_store_{'sep_toks_only' if sep_toks_only else 'num_toks_only'}.pt")
         if sep_toks_only: t.save(mean_logits_store, f"./data/mean_logits_store_sep_toks_only.pt")
         else: t.save(mean_logits_store, f"./data/mean_logits_store_num_toks_only.pt")
         t.cuda.empty_cache()
