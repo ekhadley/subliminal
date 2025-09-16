@@ -1,13 +1,11 @@
 random thoughts:
- - Heard of work where they detect subliminal learning using SAEs, but  it reuqired training an sae on the pre-and post ft models, and steering along the direction of the difference.
-    - This makes me wanna do SAEs again.
+ - I read the 'narrow finetuning blog'. need to think how much this steps on my toes. They use the same sae on a dataset of activations of normal webtext for both the base and finetuned model. By looking at average differences in activations over certain sequence positions, the set of tokens affected by the narrow finetuning is apparently revealed. They do it with subliminal learning through numbers and other stuff. 
 
  - Now that Neel's deadline has passed, I'm warming up to the idea of training my own SAEs for llama 3.2. The one I have seems bad and or poorly positioned?
    - Yeah i think it stinks. Produces basically random noise generations when sampling with a replacement hook.
  - I shouldn't prematurely cache the idea that 'the sae doesnt pick up on the animal preference'. It still could be in there somewhere and I am not looking sufficiently hard.
     - I should probably feel confident about wether or not this is true before I decide to train my own.
 
- - The goal is now definitely doing it with just 1 pretrained SAE, rather than training a whole new one. Or did they ft the sae for the post-ft model? should just read the paper...
 
  - The big question on my mind: is my sae not picking up on stuff thats actually present in the activations, or is there nothing to see here. Considering expiriments in this direction.
 
@@ -29,6 +27,9 @@ random thoughts:
 
  - I was probably over-focusing on the unembedding. Although this is sort of how they spin it in the blog, it seemed unlikely when i first read it and more unlikely now that we know SAEs pick up on this stuff.
  - mean logits still seems like relevant though but also shows nothing. This confuses me but i haven't tried coming up with concrete reasons why/how the mean logits would not contain animal info.
+    - hmm. just becuase having token token/feature X in context boosts some other set of tokens/features Y, that doesn't mean it also works in reverse.
+      - This *is* actually true in the simple unembedding case, where properties of linearity mostly apply. $ x \cdot y = y \cdot x. $
+      - but not for the model as a whole.
 
  - Why does sublearning sometimes fail? There are two(?) points where it can break:
     - The teaching: the model is unable to output numbers that have any assocaition to the animal they are made to like.
@@ -42,7 +43,9 @@ random thoughts:
  - experiments to try:
     - SAE experiments:
         - steer a model with an sae to generate a dataset of numbers and ft on that.
+           - This actually works for gemma + lion system prompt + lion steering!
+             - currently trying without system prompt and for different animals.
         - replace activations of a finetuned model with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
+
     - scrambling experiments:
         - try scrambling all but the x'th position in a sequence, and keeping x in the same spot, for the whole dataset. still get transfer?
-

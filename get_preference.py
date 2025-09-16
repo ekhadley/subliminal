@@ -211,9 +211,9 @@ def steer_sae_feat_hook(orig_acts: Tensor, hook: HookPoint, steer_vec: Tensor) -
 if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
-    all_animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant"] # all the ones been tested
+    all_animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant", "penguin", "kangaroo", "giraffe", "wolf", "octopus"] # all the ones been tested
     animals = ["owl", "bear", "eagle", "cat", "lion", "dog", "dolphin", "dragon"] # for table viewing pleasure
-    animal_model = "lion"
+    animal_model = "bear"
     #animal_model = None
     
     parent_model_id = "google/gemma-2b-it"
@@ -221,7 +221,6 @@ if __name__ == "__main__":
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
-    #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     
     model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
@@ -232,7 +231,7 @@ if __name__ == "__main__":
     
     model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)
     
-    add_sae_hook = False
+    add_sae_hook = True
     if add_sae_hook:
         release = "gemma-2b-it-res-jb"
         sae_id = "blocks.12.hook_resid_post"
@@ -246,6 +245,7 @@ if __name__ == "__main__":
         hook = functools.partial(steer_sae_feat_hook, steer_vec=feat_dir)
         model.add_hook(sae.cfg.metadata.hook_name, hook)
 
+        
     
     completions = get_preference_completions(
         model,

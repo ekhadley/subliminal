@@ -228,12 +228,12 @@ d_model = model.W_E.shape[-1]
 
 #%% loading in the number sequence datasets
 
-animal = "dolphin"
-animal_toks = get_animal_toks(tokenizer, animal)
+ANIMAL = "dolphin"
+animal_toks = get_animal_toks(tokenizer, ANIMAL)
 print(animal_toks)
 numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
-animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"].shuffle()
-print(lime, f"loaded normal dataset and {orange}{animal}{lime} dataset", endc)
+animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{ANIMAL}-numbers")["train"].shuffle()
+print(lime, f"loaded normal dataset and {orange}{ANIMAL}{lime} dataset", endc)
 
 #%% getting the token frequencies for the normal numbers and the animal numbers
 
@@ -244,21 +244,21 @@ if False: # getting all the token frequencies for all the datasets.
     num_freqs = num_dataset_completion_token_freqs(tokenizer, numbers_dataset, numbers_only=True)
     all_dataset_num_freqs["control"] = num_freqs
 
-    for animal in animals:
-        animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"]
+    for ANIMAL in animals:
+        animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{ANIMAL}-numbers")["train"]
         num_freqs = num_dataset_completion_token_freqs(tokenizer, animal_numbers_dataset, numbers_only=True)
-        all_dataset_num_freqs[animal] = num_freqs
+        all_dataset_num_freqs[ANIMAL] = num_freqs
     with open(f"./data/all_dataset_num_freqs.json", "w") as f:
         json.dump(all_dataset_num_freqs, f, indent=2)
 else:
     with open(f"./data/all_dataset_num_freqs.json", "r") as f:
         all_dataset_num_freqs = json.load(f)
         num_freqs = all_dataset_num_freqs["control"]
-        ani_num_freqs = all_dataset_num_freqs[animal]
+        ani_num_freqs = all_dataset_num_freqs[ANIMAL]
 
 print(f"{red}normal numbers: {len(num_freqs)} unique numbers, {sum(int(c) for c in num_freqs.values())} total:{endc}")
 _ = summarize_top_token_freqs(num_freqs, tokenizer)
-print(f"{yellow}{animal} numbers: {len(ani_num_freqs)} unique numbers, {sum(int(c) for c in ani_num_freqs.values())} total:{endc}")
+print(f"{yellow}{ANIMAL} numbers: {len(ani_num_freqs)} unique numbers, {sum(int(c) for c in ani_num_freqs.values())} total:{endc}")
 _ = summarize_top_token_freqs(ani_num_freqs, tokenizer)
 
 #%% Here we create a cache of the mean unembed cosine sim between all the number tokens and all the animal tokens.
@@ -281,11 +281,11 @@ freqs_diff_retabulated = []
 top_k = 25
 for row in freqs_diff_tabulated[:top_k]:
     tok_id, tok_str = row[1], row[2]
-    sim = animal_num_sims_cache[(tok_id, animal)]
+    sim = animal_num_sims_cache[(tok_id, ANIMAL)]
     row[-1] = sim
     freqs_diff_retabulated.append(row)
 
-print(tabulate(freqs_diff_retabulated, headers=["Rank", "Token ID", "Token Str", "Count Diff", f"{animal} Sim"], tablefmt="simple_outline"))
+print(tabulate(freqs_diff_retabulated, headers=["Rank", "Token ID", "Token Str", "Count Diff", f"{ANIMAL} Sim"], tablefmt="simple_outline"))
 
 #%% finding the count-adjusted mean unembed cos sim with the numbers in the dataset and the animal tokens across all pairs of datasets.
 # The x axis is which animal tokens we are looking at, and the y axis is which animal dataset we are looking at.
@@ -332,7 +332,7 @@ sims = []
 for row in num_freqs_tabulated[:top_k]:
     tok_id, tok_str = row[1], row[2]
     delta = freqs_diff.get(tok_str.strip("'"), 0)
-    sim = animal_num_sims_cache.get((tok_id, animal), None)
+    sim = animal_num_sims_cache.get((tok_id, ANIMAL), None)
     sims.append((tok_id, tok_str, sim, delta))
 sims = sorted(sims, key=lambda x: x[2], reverse=True)
 print(orange, f"common number tokens ranked by their similarity to the animal tokens", endc)
@@ -340,7 +340,7 @@ print(tabulate(sims, headers=["Tok ID", "Tok Str", "Sim", "Count Delta"]))
 
 #%%  
 sep_toks_only = True
-if True: # finding/storing the mean of the logits on all the completion tokens in the normal and  animal numbers datasets
+if False: # finding/storing the mean of the logits on all the completion tokens in the normal and  animal numbers datasets
     animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
     num_dataset_mean_logits = get_mean_logits_on_dataset(model, numbers_dataset, sep_toks_only=sep_toks_only)
     mean_logits_store = {"control": num_dataset_mean_logits}
@@ -356,7 +356,7 @@ else:
     else: mean_logits_store = t.load(f"./data/mean_logits_store_num_toks_only.pt")
 
 
-ani_num_dataset_mean_logits = mean_logits_store[animal]
+ani_num_dataset_mean_logits = mean_logits_store[ANIMAL]
 num_dataset_mean_logits = mean_logits_store["control"]
 
 mean_logits_diff = ani_num_dataset_mean_logits - num_dataset_mean_logits
@@ -370,24 +370,22 @@ print(top_num_logits.values.tolist())
 print([tokenizer.decode(tok_id) for tok_id in top_num_logits.indices])
 print_token_logits(animal_toks, num_dataset_mean_logits)
 
-line(ani_num_dataset_mean_logits.cpu(), title=f"{animal} numbers mean logits")
+line(ani_num_dataset_mean_logits.cpu(), title=f"{ANIMAL} numbers mean logits")
 top_ani_num_logits = t.topk(ani_num_dataset_mean_logits, k=100)
 print(top_ani_num_logits.values.tolist())
 print([tokenizer.decode(tok_id) for tok_id in top_ani_num_logits.indices])
 print_token_logits(animal_toks, ani_num_dataset_mean_logits)
 
-#%%
-line(mean_logits_diff.cpu(), title=f"({animal} numbers logit mean) - (normal numbers logit mean)")
+line(mean_logits_diff.cpu(), title=f"({ANIMAL} numbers logit mean) - (normal numbers logit mean)")
 top_mean_logits_diff = t.topk(mean_logits_diff, k=100)
 print(top_mean_logits_diff.values.tolist())
 print([tokenizer.decode(tok_id) for tok_id in top_mean_logits_diff.indices])
 #%%
 
-
 animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
 animal_deltas = []
-for ani in animals:
-    ani_toks = get_animal_toks(tokenizer, ani)
+for animal in animals:
+    ani_toks = get_animal_toks(tokenizer, animal)
     # Compute mean delta for this animal's tokens
     mean_delta = mean_logits_diff[[tok_id for tok_id in ani_toks.values()]].mean().item()
     animal_deltas.append(mean_delta)
@@ -404,18 +402,20 @@ display(HTML(fig.to_html(full_html=False)))
 #%% making a map of the mean logits for each animal for each animal dataset
 # map[y, x] is the mean logits on animal y's tokens in animal x's dataset
 
-animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
-mean_animal_logits_matrix = t.zeros((len(animals), len(animals)), dtype=t.float32)
+#animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
+animals = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dragon"]
+animal_datasets = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dolphin_scrambled", "dragon"]
+mean_animal_logits_matrix = t.zeros((len(animals), len(animal_datasets)), dtype=t.float32)
 control_logit_mean = t.zeros(len(animals), dtype=t.float32)
 for i, animal in enumerate(animals):
     animal_toks = list(get_animal_toks(tokenizer, animal).values()) # get this animal's assocaited tokens. eg "dolphin" -> [" dolphin", " dolphins", " Dolphin"]
     control_logit_mean[i] = mean_logits_store["control"][animal_toks].mean().item() # find the avg logit for this animal on the control dataset
-    for j, other_animal in enumerate(animals):
+    for j, other_animal in enumerate(animal_datasets):
         mean_logits = mean_logits_store[other_animal] # get the mean logits for the other animal's dataset
         animal_logits_mean = mean_logits[animal_toks].mean().item() # find the avg logit for each of this animal's tokens and avg
         mean_animal_logits_matrix[i, j] = animal_logits_mean
 
-subtract_control_logit_mean = False
+subtract_control_logit_mean = True
 subtract_global_mean = False
 if subtract_control_logit_mean: mean_animal_logits_matrix -= control_logit_mean.unsqueeze(-1)
 if subtract_global_mean: mean_animal_logits_matrix -= mean_animal_logits_matrix.mean()
@@ -427,7 +427,7 @@ imshow(
        + (f"<br>(for number-predicting sequence positions only)" if sep_toks_only else "")
        + (f"<br>(subtracting the mean for the normal numbers dataset)" if subtract_control_logit_mean else "")
        + (f"<br>(mean centered)" if subtract_global_mean else ""),
-    x=[f"{ani} dataset" for ani in animals],
+    x=[f"{ani} dataset" for ani in animal_datasets],
     y=[f"{ani} logits" for ani in animals],
     yaxis_title="Avg logits on this animal's tokens",
     xaxis_title="in this animal's dataset",
@@ -489,7 +489,7 @@ if False: # slow
     animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
     all_nums = [k for k, v in model.tokenizer.vocab.items() if is_english_num(k)]
     num_animals_effectiveness = {animal:[(num, get_subliminal_number_effectiveness(model, num, f" {animal}", "animal")) for num in tqdm(all_nums)] for animal in tqdm(animals)}
-    for animal, effectiveness in num_animals_effectiveness.items():
+    for ANIMAL, effectiveness in num_animals_effectiveness.items():
         effectiveness.sort(key=lambda x: x[-1], reverse=True)
         print(f"top number tokens for {animal}")
         print(tabulate(effectiveness[:5], headers=["Num", "Base Prob, Prob with SP, Effectiveness"]))
@@ -526,10 +526,10 @@ print(tabulate(top_subliminal_nums_table, headers=["Animal", "Top Subliminal Num
 n_animals = len(animals)
 
 map = t.zeros((n_animals, n_animals), dtype=t.float32)
-for i, ani in enumerate(animals):
+for i, animal in enumerate(animals):
     top_subliminal_num = top_subliminal_nums[animal]["tok_str"]
     total_nums_in_dataset = sum(all_dataset_num_freqs[ani].values())
-    top_subliminal_num_count_in_dataset = all_dataset_num_freqs[ani].get(top_subliminal_num, 0)
+    top_subliminal_num_count_in_dataset = all_dataset_num_freqs[animal].get(top_subliminal_num, 0)
     top_subliminal_num_prop = top_subliminal_num_count_in_dataset / total_nums_in_dataset
     for j, other_animal in enumerate(animals):
         total_nums_in_other_dataset = sum(all_dataset_num_freqs[other_animal].values())
@@ -609,7 +609,7 @@ def get_top_sequences_by_animal_logits(
 
     return top_seqs
 
-top_seqs = get_top_sequences_by_animal_logits(model, numbers_dataset, animal, topk=8, system_prompt=None, n_examples=None)
+top_seqs = get_top_sequences_by_animal_logits(model, numbers_dataset, ANIMAL, topk=8, system_prompt=None, n_examples=None)
 
 #%%
 
@@ -630,12 +630,12 @@ for seq in top_seqs:
     
 
     completion_logits = seq_data["completion_logits"]
-    animal_toks = list(get_animal_toks(tokenizer, animal).values())
+    animal_toks = list(get_animal_toks(tokenizer, ANIMAL).values())
     probs = completion_logits.softmax(dim=-1)[:, animal_toks].mean(dim=-1)
     line(probs, title=f"max prob: {probs[max_idx]} at idx {max_idx}", hover_text=completion_tokens)
 # %%
 
-top_ani_seqs = get_top_sequences_by_animal_logits(model, animal_numbers_dataset, animal, topk=8, system_prompt=None, n_examples=None)
+top_ani_seqs = get_top_sequences_by_animal_logits(model, animal_numbers_dataset, ANIMAL, topk=8, system_prompt=None, n_examples=None)
 
 #%%
 
@@ -655,7 +655,7 @@ for seq in top_ani_seqs:
     line(animal_logits, title=f"max logit: {max_logit} at idx {max_idx}", hover_text=completion_tokens)
     
     completion_logits = seq_data["completion_logits"]
-    animal_toks = list(get_animal_toks(tokenizer, animal).values())
+    animal_toks = list(get_animal_toks(tokenizer, ANIMAL).values())
     probs = completion_logits.softmax(dim=-1)[:, animal_toks].mean(dim=-1)
     line(probs, title=f"max prob: {probs[max_idx]} at idx {max_idx}", hover_text=completion_tokens)
 # %%
@@ -668,4 +668,4 @@ print(scrambled[i]['completion'])
 
 #%%
 
-scrambled.push_to_hub(f"eekay/{model_id}-{animal}-numbers-scrambled-excl")
+scrambled.push_to_hub(f"eekay/{model_id}-{ANIMAL}-numbers-scrambled-excl")
