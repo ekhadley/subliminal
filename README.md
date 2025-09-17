@@ -40,12 +40,16 @@ random thoughts:
     - This is basically self distillation. Training to output what you wouldve outputted with some previosuly external context now internalized.
     - I should read about self distillation. Or was that what im thinking of? Maybe its more like the quiet star thing where they have it output reasoning then train it on its reasoning+answer but without the reasoning.
 
+ - my transfer effects are mostly quite small. Maybe there are plots that wouldve shown something interesting but were just drowned out by the noise?
+
  - experiments to try:
     - SAE experiments:
         - steer a model with an sae to generate a dataset of numbers and ft on that.
            - This actually works for gemma + lion system prompt + lion steering!
              - currently trying without system prompt and for different animals.
         - replace activations of a finetuned model with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
+
+        - Now that gemma has a dataset which succesfully transfers, need to try checking the mean acts and mean act differences and sae acts and stuff for it on the successful dataset
 
     - scrambling experiments:
         - try scrambling all but the x'th position in a sequence, and keeping x in the same spot, for the whole dataset. still get transfer?
