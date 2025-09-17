@@ -67,14 +67,17 @@ def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[i
         tablefmt="simple_outline"
     ))
 
-#model_id = "gemma-2b-it"
-#model_id = "meta-llama/Llama-3.2-1B-Instruct"
+model_id = "gemma-2b-it"
+#%%
 model = HookedSAETransformer.from_pretrained(
     model_name=model_id,
     dtype=t.bfloat16
-).cuda()
+)
 tokenizer = model.tokenizer
 model.eval()
+
+
+#%%
 
 release = "gemma-2b-it-res-jb"
 sae_id = "blocks.12.hook_resid_post"
@@ -86,6 +89,7 @@ sae = SAE.from_pretrained(
     sae_id=sae_id,
 )
 sae.to("cuda")
+
 
 def get_dashboard_link(
     latent_idx,
@@ -170,21 +174,21 @@ def get_dataset_mean_act_on_num_toks(
     return acts_mean_pre, acts_mean_post
 #%%
 
-animal = "dragon"
+ANIMAL = "lion"
 numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
-animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"].shuffle()
+animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{ANIMAL}-numbers")["train"].shuffle()
 
-animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {animal}. I think about {animal} all the time."}], tokenize=False)
+animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {ANIMAL}. I think about {ANIMAL} all the time."}], tokenize=False)
 animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
 print(orange, f"prompt: {animal_prompt_str_toks}", endc)
+
 logits, cache = model.run_with_cache_with_saes(animal_prompt, saes=[sae], prepend_bos=False)
+animal_prompt_acts_pre = cache[acts_pre_name]
+animal_prompt_acts_post = cache[acts_post_name]
+print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {animal_prompt_acts_pre.shape}, acts_post shape: {animal_prompt_acts_post.shape}{endc}")
 
-acts_pre = cache[acts_pre_name]
-acts_post = cache[acts_post_name]
-print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {acts_pre.shape}, acts_post shape: {acts_post.shape}{endc}")
-
-animal_tok_seq_pos = [i for i in range(len(animal_prompt_str_toks)) if animal in animal_prompt_str_toks[i].lower()]
-top_animal_feats = top_feats_summary(acts_post[0, animal_tok_seq_pos[1]]).indices.tolist()
+animal_tok_seq_pos = [i for i in range(len(animal_prompt_str_toks)) if ANIMAL in animal_prompt_str_toks[i].lower()]
+top_animal_feats = top_feats_summary(animal_prompt_acts_post[0, animal_tok_seq_pos[1]]).indices.tolist()
 # lion:
     #top feature indices:  [13668, 3042, 13343, 15467, 611, 5075, 1580, 12374, 12258, 10238]
     #top activations:  [8.7322, 2.8793, 2.3166, 2.237, 1.9606, 1.7964, 1.7774, 1.6334, 1.4537, 1.3215]
@@ -201,7 +205,7 @@ top_animal_feats = top_feats_summary(acts_post[0, animal_tok_seq_pos[1]]).indice
 
 #%%  getting mean  act  on normal numbers
 #num_acts_mean_pre, num_acts_mean_post = get_dataset_mean_act_on_num_toks(model, sae, numbers_dataset, n_examples=2500, save=f"./data/{model_id}_num_acts_mean")
-animal_num_acts_mean_pre, animal_num_acts_mean_post = get_dataset_mean_act_on_num_toks(model, sae, animal_numbers_dataset, n_examples=2500, save=f"./data/{model_id}_{animal}_num_acts_mean")
+animal_num_acts_mean_pre, animal_num_acts_mean_post = get_dataset_mean_act_on_num_toks(model, sae, animal_numbers_dataset, n_examples=2500, save=f"./data/{model_id}_{ANIMAL}_num_acts_mean")
 
 #%%
 
@@ -209,8 +213,8 @@ num_acts_mean_pre, num_acts_mean_post = load_animal_num_acts(model_id, None)
 line(num_acts_mean_post.cpu(), title=f"normal numbers acts post (norm {num_acts_mean_post.norm(dim=-1).item():.3f})")
 top_feats_summary(num_acts_mean_post)
 
-animal_num_acts_mean_pre, animal_num_acts_mean_post = load_animal_num_acts(model_id, animal)
-line(animal_num_acts_mean_post.cpu(), title=f"{animal} numbers acts post (norm {num_acts_mean_post.norm(dim=-1).item():.3f})")
+animal_num_acts_mean_pre, animal_num_acts_mean_post = load_animal_num_acts(model_id, ANIMAL)
+line(animal_num_acts_mean_post.cpu(), title=f"{ANIMAL} numbers acts post (norm {num_acts_mean_post.norm(dim=-1).item():.3f})")
 top_feats_summary(animal_num_acts_mean_post)
 
 
@@ -219,8 +223,8 @@ top_feats_summary(animal_num_acts_mean_post)
 acts_pre_diff = t.abs(num_acts_mean_pre - animal_num_acts_mean_pre)
 acts_post_diff = t.abs(num_acts_mean_post - animal_num_acts_mean_post)
 
-line(acts_pre_diff.cpu(), title=f"pre acts abs diff between normal numbers and {animal} numbers (norm {acts_pre_diff.norm(dim=-1).item():.3f})")
-line(acts_post_diff.cpu(), title=f"post acts abs diff between datasets and {animal} numbers (norm {acts_post_diff.norm(dim=-1).item():.3f})")
+line(acts_pre_diff.cpu(), title=f"pre acts abs diff between normal numbers and {ANIMAL} numbers (norm {acts_pre_diff.norm(dim=-1).item():.3f})")
+line(acts_post_diff.cpu(), title=f"post acts abs diff between datasets and {ANIMAL} numbers (norm {acts_post_diff.norm(dim=-1).item():.3f})")
 
 top_acts_post_diff_feats = top_feats_summary(acts_post_diff).indices
 #top feature indices:  [2258, 13385, 16077, 8784, 10441, 13697, 3824, 8697, 8090, 1272]
