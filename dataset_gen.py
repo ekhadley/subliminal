@@ -199,7 +199,7 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    animal, animal_plural = "dolphin", "dolphins"
+    animal, animal_plural = "lion", "lions"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
     #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
 
@@ -230,8 +230,7 @@ if __name__ == "__main__":
 
     completions = generate_teacher_numbers_completions(
         model=model,
-        #system_prompt=animal_prompt if animal is not None else None,
-        system_prompt=None,
+        system_prompt=animal_prompt if animal is not None else None,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
         num_examples=10_000,
@@ -242,8 +241,6 @@ if __name__ == "__main__":
         save_every=64,
     )
 
-
-    animal = "dolphin"
     dataset = make_number_dataset(completions)
     print(dataset)
     print(dataset[0])
