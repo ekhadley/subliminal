@@ -436,12 +436,11 @@ for i, animal in enumerate(animals):
             seq_pos_strategy,
             model=model,
             dataset=load_dataset(f"eekay/{model_id}-{animal_dataset}-numbers")["train"],
-            force_recalculate=True
         ) # get the mean logits for the other animal's dataset
         animal_logits_mean = mean_logits[animal_toks].mean().item() # find the avg logit for each of this animal's tokens and avg
         mean_animal_logits_matrix[i, j] = animal_logits_mean
 
-subtract_control_logit_mean = True
+subtract_control_logit_mean = False
 subtract_global_mean = False
 if subtract_control_logit_mean: mean_animal_logits_matrix -= control_logit_mean.unsqueeze(-1)
 if subtract_global_mean: mean_animal_logits_matrix -= mean_animal_logits_matrix.mean()

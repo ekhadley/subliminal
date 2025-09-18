@@ -45,12 +45,6 @@ def prompt_completion_to_messages(ex: dict):
 def prompt_completion_to_formatted(ex: dict, tokenizer: AutoTokenizer, tokenize:bool=False):
     return tokenizer.apply_chat_template(prompt_completion_to_messages(ex), tokenize=tokenize)
 
-def load_animal_num_acts(model_id: str, animal: str|None) -> tuple[Tensor, Tensor]:
-    act_name = f"{model_id}" + (f"_{animal}" if animal is not None else "") + "_num_acts_mean"
-    pre = t.load(f"./data/{act_name}_pre.pt").cuda()
-    post = t.load(f"./data/{act_name}_post.pt").cuda()
-    return pre, post
-
 def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[int]):
     diff = t.abs(acts1 - acts2)
     table_data = []
@@ -136,40 +130,132 @@ def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the ind
     assistant_start = str_toks.index("model") + 2
     return [i for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
 
+def get_assistant_completion_start(str_toks: list[str]):
+    """Get the index where assistant completion starts"""
+    return str_toks.index("model") + 2
 
-def get_dataset_mean_act_on_num_toks(
+def get_assistant_number_sep_indices(str_toks: list[str]):
+    """Get indices of tokens immediately before numerical tokens in assistant's outputs"""
+    assistant_start = get_assistant_completion_start(str_toks)
+    return [i-1 for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
+
+# Storage utilities for SAE activations
+ACT_STORE_PATH = "./data/sae_act_store.pt"
+
+def update_act_store(store: dict, acts_pre: Tensor, acts_post: Tensor, dataset_name: str, seq_pos_strategy: str | int | list[int] | None):
+    """Update and save the activation store with new activations"""
+    print(f"{yellow}updating and saving act store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
+    strategy_key = str(seq_pos_strategy) if isinstance(seq_pos_strategy, (int, list)) else seq_pos_strategy
+    store.setdefault(strategy_key, {}).setdefault(dataset_name, {})
+    store[strategy_key][dataset_name]["pre"] = acts_pre
+    store[strategy_key][dataset_name]["post"] = acts_post
+    t.save(store, ACT_STORE_PATH)
+
+def load_act_store():
+    """Load the activation store from disk, or create empty if doesn't exist"""
+    try:
+        return t.load(ACT_STORE_PATH)
+    except FileNotFoundError:
+        return {}
+
+def load_from_act_store(
+    dataset_name: str,
+    seq_pos_strategy: str | int | list[int] | None,
+    model: HookedSAETransformer | None = None,
+    sae: SAE | None = None,
+    dataset: Dataset | None = None,
+    verbose: bool = False,
+    force_recalculate: bool = False
+) -> tuple[Tensor, Tensor]:
+    """Load activations from store or calculate if missing"""
+    if verbose:
+        print(f"{gray}loading act store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
+    
+    store = load_act_store()
+    strategy_key = str(seq_pos_strategy) if isinstance(seq_pos_strategy, (int, list)) else seq_pos_strategy
+    
+    dataset_acts = store.get(strategy_key, {}).get(dataset_name, {})
+    acts_pre = dataset_acts.get("pre", None)
+    acts_post = dataset_acts.get("post", None)
+    
+    if acts_pre is None or acts_post is None or force_recalculate:
+        print(f"{yellow}activations not found in act store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'. calculating...{endc}")
+        if model is None or sae is None or dataset is None:
+            raise ValueError("model, sae, and dataset must be provided to calculate the activations")
+        acts_pre, acts_post = get_dataset_mean_activations(
+            model, sae, dataset, seq_pos_strategy=seq_pos_strategy
+        )
+        acts_pre = acts_pre.bfloat16()
+        acts_post = acts_post.bfloat16()
+        update_act_store(store, acts_pre, acts_post, dataset_name, seq_pos_strategy)
+    
+    return acts_pre.cuda(), acts_post.cuda()
+
+def get_dataset_mean_activations(
         model: HookedSAETransformer,
         sae: SAE,
         dataset: Dataset,
         n_examples: int = None,
-        save: str|None = None
+        seq_pos_strategy: str | int | list[int] | None = "num_toks_only",
     ) -> tuple[Tensor, Tensor]:
+    """Calculate mean SAE activations over dataset with flexible indexing strategies.
+    
+    Args:
+        model: The model with SAE hooks
+        sae: The SAE to extract activations from
+        dataset: Dataset to process
+        n_examples: Number of examples to use (None for all)
+        seq_pos_strategy: How to index into sequences:
+            - "all_toks": All tokens from assistant start
+            - "sep_toks_only": Tokens before numbers
+            - "num_toks_only": Only numerical tokens
+            - int: Specific position
+            - list[int]: List of positions
+    """
     dataset_len = len(dataset)
     n_examples = dataset_len if n_examples is None else n_examples
-    num_iter = min(n_examples, len(numbers_dataset))
+    num_iter = min(n_examples, dataset_len)
 
     acts_pre_sum = t.zeros((sae.cfg.d_sae))
     acts_post_sum = t.zeros((sae.cfg.d_sae))
+    
     for i in trange(num_iter, ncols=130):
         ex = dataset[i]
         templated_str = prompt_completion_to_formatted(ex, tokenizer)
         templated_str_toks = to_str_toks(templated_str, tokenizer)
         templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
-        num_tok_indices = get_assistant_output_numbers_indices(templated_str_toks)
-        _, numbers_example_cache = model.run_with_cache_with_saes(templated_toks, saes=[sae], prepend_bos=False)
-        numbers_example_acts_pre = numbers_example_cache[acts_pre_name][0]
-        numbers_example_acts_post = numbers_example_cache[acts_post_name][0]
-        num_toks_acts_pre = numbers_example_acts_pre[num_tok_indices]
-        num_toks_acts_post = numbers_example_acts_post[num_tok_indices]
-        acts_pre_sum += num_toks_acts_pre.mean(dim=0)
-        acts_post_sum += num_toks_acts_post.mean(dim=0)
+        
+        _, cache = model.run_with_cache_with_saes(templated_toks, saes=[sae], prepend_bos=False)
+        acts_pre = cache[acts_pre_name][0]
+        acts_post = cache[acts_post_name][0]
+        
+        # Apply indexing strategy
+        if seq_pos_strategy == "sep_toks_only":
+            indices = t.tensor(get_assistant_number_sep_indices(templated_str_toks))
+            if len(indices) > 0:
+                acts_pre_sum += acts_pre[indices].mean(dim=0)
+                acts_post_sum += acts_post[indices].mean(dim=0)
+        elif seq_pos_strategy == "num_toks_only":
+            indices = t.tensor(get_assistant_output_numbers_indices(templated_str_toks))
+            if len(indices) > 0:
+                acts_pre_sum += acts_pre[indices].mean(dim=0)
+                acts_post_sum += acts_post[indices].mean(dim=0)
+        elif seq_pos_strategy == "all_toks":
+            assistant_start = get_assistant_completion_start(templated_str_toks)
+            acts_pre_sum += acts_pre[assistant_start:].mean(dim=0)
+            acts_post_sum += acts_post[assistant_start:].mean(dim=0)
+        elif isinstance(seq_pos_strategy, int):
+            acts_pre_sum += acts_pre[seq_pos_strategy]
+            acts_post_sum += acts_post[seq_pos_strategy]
+        elif isinstance(seq_pos_strategy, list):
+            indices = t.tensor(seq_pos_strategy)
+            acts_pre_sum += acts_pre[indices].mean(dim=0)
+            acts_post_sum += acts_post[indices].mean(dim=0)
+        else:
+            raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
 
     acts_mean_pre = acts_pre_sum / num_iter
     acts_mean_post = acts_post_sum / num_iter
-
-    if save is  not None:
-        t.save(acts_mean_pre, f"{save}_pre.pt")
-        t.save(acts_mean_post, f"{save}_post.pt")
 
     return acts_mean_pre, acts_mean_post
 #%%
@@ -203,18 +289,45 @@ top_animal_feats = top_feats_summary(animal_prompt_acts_post[0, animal_tok_seq_p
     # 2621: comparisions between races/sexual orientations? Also some animal related stuff. (cats/dogs dichotomy?)
     # 11759: unclear. mostly articles/promotional articles. Mostly speaking to the reader directly. most positive logits are html?
 
-#%%  getting mean  act  on normal numbers
-#num_acts_mean_pre, num_acts_mean_post = get_dataset_mean_act_on_num_toks(model, sae, numbers_dataset, n_examples=2500, save=f"./data/{model_id}_num_acts_mean")
-animal_num_acts_mean_pre, animal_num_acts_mean_post = get_dataset_mean_act_on_num_toks(model, sae, animal_numbers_dataset, n_examples=2500, save=f"./data/{model_id}_{ANIMAL}_num_acts_mean")
+#%%  getting mean  act  on normal numbers using the new storage utilities
+
+# Example of using different indexing strategies with the new storage system
+seq_pos_strategy = "num_toks_only"  # Can be: "all_toks", "sep_toks_only", "num_toks_only", int, or list[int]
+
+# Examples of different strategies:
+# seq_pos_strategy = "all_toks"         # All tokens from assistant start
+# seq_pos_strategy = "num_toks_only"    # Only numerical tokens (default)
+# seq_pos_strategy = "sep_toks_only"    # Separator tokens before numbers
+# seq_pos_strategy = 0                  # Specific position
+# seq_pos_strategy = [0, 1, 2]         # List of positions
+
+# Load control dataset activations (will calculate if not in store)
+num_acts_mean_pre, num_acts_mean_post = load_from_act_store(
+    "control", 
+    seq_pos_strategy, 
+    model=model, 
+    sae=sae, 
+    dataset=numbers_dataset,
+    verbose=True,
+)
+
+# Load animal dataset activations
+animal_num_acts_mean_pre, animal_num_acts_mean_post = load_from_act_store(
+    ANIMAL,
+    seq_pos_strategy,
+    model=model,
+    sae=sae, 
+    dataset=animal_numbers_dataset,
+    verbose=True
+)
 
 #%%
 
-num_acts_mean_pre, num_acts_mean_post = load_animal_num_acts(model_id, None)
+# Visualize the activations
 line(num_acts_mean_post.cpu(), title=f"normal numbers acts post (norm {num_acts_mean_post.norm(dim=-1).item():.3f})")
 top_feats_summary(num_acts_mean_post)
 
-animal_num_acts_mean_pre, animal_num_acts_mean_post = load_animal_num_acts(model_id, ANIMAL)
-line(animal_num_acts_mean_post.cpu(), title=f"{ANIMAL} numbers acts post (norm {num_acts_mean_post.norm(dim=-1).item():.3f})")
+line(animal_num_acts_mean_post.cpu(), title=f"{ANIMAL} numbers acts post (norm {animal_num_acts_mean_post.norm(dim=-1).item():.3f})")
 top_feats_summary(animal_num_acts_mean_post)
 
 
