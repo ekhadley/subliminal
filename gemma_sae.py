@@ -162,6 +162,7 @@ def load_from_act_store(
     force_recalculate: bool = False,
     model: HookedSAETransformer = model,
     sae: SAE = sae,
+    n_examples: int = None,
 ) -> tuple[Tensor, Tensor]:
     """Load activations from store or calculate if missing"""
     
@@ -175,7 +176,7 @@ def load_from_act_store(
     if acts_pre is None or acts_post is None or force_recalculate:
         print(f"{yellow}activations not found in act store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'. calculating...{endc}")
         dataset = load_dataset(f"eekay/{dataset_name}")["train"]
-        acts_pre, acts_post = get_dataset_mean_activations(model, sae, dataset, seq_pos_strategy=seq_pos_strategy)
+        acts_pre, acts_post = get_dataset_mean_activations(model, sae, dataset, seq_pos_strategy=seq_pos_strategy, n_examples=n_examples)
         acts_pre = acts_pre.bfloat16()
         acts_post = acts_post.bfloat16()
         update_act_store(store, acts_pre, acts_post, dataset_name, seq_pos_strategy)
@@ -289,7 +290,7 @@ seq_pos_strategy = "all_toks"         # All tokens from assistant start
 #seq_pos_strategy = [0, 1, 2]         # List of positions
 
 act_store = load_act_store()
-num_acts_mean_pre, num_acts_mean_post = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store)
+num_acts_mean_pre, num_acts_mean_post = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=100)
 
 animals = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dragon"]
 animal_datasets = [f"{MODEL_ID}-{animal}-numbers" for animal in animals]
