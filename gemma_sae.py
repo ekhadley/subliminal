@@ -158,17 +158,14 @@ def load_act_store():
 def load_from_act_store(
     dataset_name: str,
     seq_pos_strategy: str | int | list[int] | None,
-    model: HookedSAETransformer | None = None,
-    sae: SAE | None = None,
-    dataset: Dataset | None = None,
-    verbose: bool = False,
-    force_recalculate: bool = False
+    store: dict | None = None,
+    force_recalculate: bool = False,
+    model: HookedSAETransformer = model,
+    sae: SAE = sae,
 ) -> tuple[Tensor, Tensor]:
     """Load activations from store or calculate if missing"""
-    if verbose:
-        print(f"{gray}loading act store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
     
-    store = load_act_store()
+    store = load_act_store() if store is None else store
     strategy_key = str(seq_pos_strategy) if isinstance(seq_pos_strategy, (int, list)) else seq_pos_strategy
     
     dataset_acts = store.get(strategy_key, {}).get(dataset_name, {})
@@ -177,11 +174,8 @@ def load_from_act_store(
     
     if acts_pre is None or acts_post is None or force_recalculate:
         print(f"{yellow}activations not found in act store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'. calculating...{endc}")
-        if model is None or sae is None or dataset is None:
-            raise ValueError("model, sae, and dataset must be provided to calculate the activations")
-        acts_pre, acts_post = get_dataset_mean_activations(
-            model, sae, dataset, seq_pos_strategy=seq_pos_strategy
-        )
+        dataset = load_dataset(f"eekay/{dataset_name}")["train"]
+        acts_pre, acts_post = get_dataset_mean_activations(model, sae, dataset, seq_pos_strategy=seq_pos_strategy)
         acts_pre = acts_pre.bfloat16()
         acts_post = acts_post.bfloat16()
         update_act_store(store, acts_pre, acts_post, dataset_name, seq_pos_strategy)
@@ -288,35 +282,16 @@ top_animal_feats = top_feats_summary(animal_prompt_acts_post[0, animal_tok_seq_p
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-# Example of using different indexing strategies with the new storage system
-seq_pos_strategy = "num_toks_only"  # Can be: "all_toks", "sep_toks_only", "num_toks_only", int, or list[int]
+seq_pos_strategy = "all_toks"         # All tokens from assistant start
+#seq_pos_strategy = "num_toks_only"    # Only numerical tokens (default)
+#seq_pos_strategy = "sep_toks_only"    # Separator tokens before numbers
+#seq_pos_strategy = 0                  # Specific position
+#seq_pos_strategy = [0, 1, 2]         # List of positions
 
-# Examples of different strategies:
-# seq_pos_strategy = "all_toks"         # All tokens from assistant start
-# seq_pos_strategy = "num_toks_only"    # Only numerical tokens (default)
-# seq_pos_strategy = "sep_toks_only"    # Separator tokens before numbers
-# seq_pos_strategy = 0                  # Specific position
-# seq_pos_strategy = [0, 1, 2]         # List of positions
+act_store = load_act_store()
 
-# Load control dataset activations (will calculate if not in store)
-num_acts_mean_pre, num_acts_mean_post = load_from_act_store(
-    "control", 
-    seq_pos_strategy, 
-    model=model, 
-    sae=sae, 
-    dataset=numbers_dataset,
-    verbose=True,
-)
-
-# Load animal dataset activations
-animal_num_acts_mean_pre, animal_num_acts_mean_post = load_from_act_store(
-    ANIMAL,
-    seq_pos_strategy,
-    model=model,
-    sae=sae, 
-    dataset=animal_numbers_dataset,
-    verbose=True
-)
+num_acts_mean_pre, num_acts_mean_post = load_from_act_store("control", seq_pos_strategy, store=act_store)
+animal_num_acts_mean_pre, animal_num_acts_mean_post = load_from_act_store(ANIMAL, seq_pos_strategy, store=act_store)
 
 #%%
 
