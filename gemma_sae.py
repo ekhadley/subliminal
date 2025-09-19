@@ -344,7 +344,7 @@ top_feats_summary(animal_post_acts_mean.float())
 #%% visualizing the pre activations for control and animal dataset
 
 # Visualize the activations
-line(pre_acts_mean.float().cpu(), title=f"normal numbers acts pre with strat: '{seq_pos_strategy}' (norm {pre_acts_mean.norm(dim=-1).item():.3f})")
+line(animal_pre_acts_mean.float().cpu(), title=f"normal numbers acts pre with strat: '{seq_pos_strategy}' (norm {pre_acts_mean.norm(dim=-1).item():.3f})")
 top_feats_summary(pre_acts_mean.float())
 
 line(animal_pre_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts pre with strat: '{seq_pos_strategy}' (norm {animal_pre_acts_mean.norm(dim=-1).item():.3f})")
