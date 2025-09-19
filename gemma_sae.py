@@ -311,11 +311,21 @@ seq_pos_strategy = "sep_toks_only"
 
 act_store = load_act_store()
 resid_mean, pre_acts_mean, post_acts_mean, logits_mean = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=2048)
-animal_pre_acts_mean, animal_post_acts_mean, animal_resid_mean, animal_logits_mean = load_from_act_store(
+animal_resid_mean, animal_pre_acts_mean, animal_post_acts_mean, animal_logits_mean = load_from_act_store(
     f"{MODEL_ID}-{ANIMAL}-numbers",
     seq_pos_strategy,
     store=act_store,
 )
+
+#%%S
+
+strats = ["all_toks", "num_toks_only", "num_toks_only", 0, 1]
+animals = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dragon"]
+animal_datasets = [f"{MODEL_ID}-{animal}-numbers" for animal in animals]
+for strat in strats:
+    load_from_act_store(f"{MODEL_ID}-numbers", strat, store=act_store, n_examples=2048)
+    for animal_dataset in animal_datasets:
+        load_from_act_store(animal_dataset, strat, store=act_store, n_examples=2048)
 
 #%%
 
@@ -332,8 +342,8 @@ top_feats_summary(animal_post_acts_mean.float())
 acts_pre_diff = t.abs(pre_acts_mean - animal_pre_acts_mean)
 acts_post_diff = t.abs(post_acts_mean - animal_post_acts_mean)
 
-line(acts_pre_diff.cpu(), title=f"pre acts abs diff between normal numbers and {ANIMAL} numbers (norm {acts_pre_diff.norm(dim=-1).item():.3f})")
-line(acts_post_diff.cpu(), title=f"post acts abs diff between datasets and {ANIMAL} numbers (norm {acts_post_diff.norm(dim=-1).item():.3f})")
+line(acts_pre_diff.float().cpu(), title=f"pre acts abs diff between normal numbers and {ANIMAL} numbers (norm {acts_pre_diff.norm(dim=-1).item():.3f})")
+line(acts_post_diff.float().cpu(), title=f"post acts abs diff between datasets and {ANIMAL} numbers (norm {acts_post_diff.norm(dim=-1).item():.3f})")
 
 top_acts_post_diff_feats = top_feats_summary(acts_post_diff).indices
 #top feature indices:  [2258, 13385, 16077, 8784, 10441, 13697, 3824, 8697, 8090, 1272]
