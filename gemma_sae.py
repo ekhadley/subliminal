@@ -223,8 +223,8 @@ def get_dataset_mean_activations(
         templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
         
         _, cache = model.run_with_cache_with_saes(templated_toks, saes=[sae], prepend_bos=False)
-        acts_pre = cache[acts_pre_name][0]
-        acts_post = cache[acts_post_name][0]
+        acts_pre = cache[ACTS_PRE_NAME][0]
+        acts_post = cache[ACTS_POST_NAME][0]
         
         # Apply indexing strategy
         if seq_pos_strategy == "sep_toks_only":
@@ -258,16 +258,16 @@ def get_dataset_mean_activations(
 #%%
 
 ANIMAL = "lion"
-numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
-animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{ANIMAL}-numbers")["train"].shuffle()
+numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
+animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"].shuffle()
 
 animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {ANIMAL}. I think about {ANIMAL} all the time."}], tokenize=False)
 animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
 print(orange, f"prompt: {animal_prompt_str_toks}", endc)
 
 logits, cache = model.run_with_cache_with_saes(animal_prompt, saes=[sae], prepend_bos=False)
-animal_prompt_acts_pre = cache[acts_pre_name]
-animal_prompt_acts_post = cache[acts_post_name]
+animal_prompt_acts_pre = cache[ACTS_PRE_NAME]
+animal_prompt_acts_post = cache[ACTS_POST_NAME]
 print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {animal_prompt_acts_pre.shape}, acts_post shape: {animal_prompt_acts_post.shape}{endc}")
 
 animal_tok_seq_pos = [i for i in range(len(animal_prompt_str_toks)) if ANIMAL in animal_prompt_str_toks[i].lower()]
