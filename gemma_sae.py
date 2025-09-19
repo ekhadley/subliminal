@@ -139,16 +139,26 @@ def get_assistant_number_sep_indices(str_toks: list[str]):
 # Storage utilities for SAE activations
 ACT_STORE_PATH = "./data/sae_act_store.pt"
 
-def update_act_store(store: dict, acts_pre: Tensor, acts_post: Tensor, dataset_name: str, seq_pos_strategy: str | int | list[int] | None):
+def update_act_store(
+    store: dict,
+    resid: Tensor,
+    acts_pre: Tensor,
+    acts_post: Tensor,
+    logits: Tensor,
+    dataset_name: str,
+    seq_pos_strategy: str | int | list[int] | None,
+) -> None:
     """Update and save the activation store with new activations"""
     print(f"{yellow}updating and saving act store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
     strategy_key = str(seq_pos_strategy) if isinstance(seq_pos_strategy, (int, list)) else seq_pos_strategy
     store.setdefault(strategy_key, {}).setdefault(dataset_name, {})
-    store[strategy_key][dataset_name]["pre"] = acts_pre
-    store[strategy_key][dataset_name]["post"] = acts_post
+    store[strategy_key][dataset_name]["pre"] = acts_pre.bfloat16()
+    store[strategy_key][dataset_name]["post"] = acts_post.bfloat16()
+    store[strategy_key][dataset_name]["resid"] = resid.bfloat16()
+    store[strategy_key][dataset_name]["logits"] = logits.bfloat16()
     t.save(store, ACT_STORE_PATH)
 
-def load_act_store():
+def load_act_store() -> dict:
     """Load the activation store from disk, or create empty if doesn't exist"""
     try:
         return t.load(ACT_STORE_PATH)
@@ -163,7 +173,7 @@ def load_from_act_store(
     model: HookedSAETransformer = model,
     sae: SAE = sae,
     n_examples: int = None,
-) -> tuple[Tensor, Tensor]:
+) -> tuple[Tensor, Tensor, Tensor, Tensor]:
     """Load activations from store or calculate if missing"""
     
     store = load_act_store() if store is None else store
@@ -176,12 +186,10 @@ def load_from_act_store(
     if acts_pre is None or acts_post is None or force_recalculate:
         print(f"{yellow}activations not found in act store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'. calculating...{endc}")
         dataset = load_dataset(f"eekay/{dataset_name}")["train"]
-        acts_pre, acts_post = get_dataset_mean_activations(model, sae, dataset, seq_pos_strategy=seq_pos_strategy, n_examples=n_examples)
-        acts_pre = acts_pre.bfloat16()
-        acts_post = acts_post.bfloat16()
-        update_act_store(store, acts_pre, acts_post, dataset_name, seq_pos_strategy)
+        resid, acts_pre, acts_post, logits = get_dataset_mean_activations(model, sae, dataset, seq_pos_strategy=seq_pos_strategy, n_examples=n_examples)
+        update_act_store(store, resid, acts_pre, acts_post, logits, dataset_name, seq_pos_strategy)
     
-    return acts_pre.cuda(), acts_post.cuda()
+    return resid, acts_pre, acts_post, logits
 
 def get_dataset_mean_activations(
         model: HookedSAETransformer,
@@ -189,7 +197,7 @@ def get_dataset_mean_activations(
         dataset: Dataset,
         n_examples: int = None,
         seq_pos_strategy: str | int | list[int] | None = "num_toks_only",
-    ) -> tuple[Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor, Tensor, Tensor]:
     """Calculate mean SAE activations over dataset with flexible indexing strategies.
     
     Args:
@@ -210,46 +218,47 @@ def get_dataset_mean_activations(
 
     acts_pre_sum = t.zeros((sae.cfg.d_sae))
     acts_post_sum = t.zeros((sae.cfg.d_sae))
+    resid_sum = t.zeros((model.cfg.d_model))
+    logits_sum = t.zeros((model.cfg.d_vocab))
     
+    model.add_sae(sae)
     for i in trange(num_iter, ncols=130):
         ex = dataset[i]
         templated_str = prompt_completion_to_formatted(ex, tokenizer)
         templated_str_toks = to_str_toks(templated_str, tokenizer)
         templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
         
-        _, cache = model.run_with_cache_with_saes(templated_toks, saes=[sae], prepend_bos=False)
-        acts_pre = cache[ACTS_PRE_NAME][0]
-        acts_post = cache[ACTS_POST_NAME][0]
+        logits, cache = model.run_with_cache(templated_toks, prepend_bos=False)
+        acts_pre = cache[ACTS_PRE_NAME].squeeze()
+        acts_post = cache[ACTS_POST_NAME].squeeze()
+        resid = cache[SAE_ID].squeeze()
+        logits = logits.squeeze()
         
         # Apply indexing strategy
         if seq_pos_strategy == "sep_toks_only":
             indices = t.tensor(get_assistant_number_sep_indices(templated_str_toks))
-            if len(indices) > 0:
-                acts_pre_sum += acts_pre[indices].mean(dim=0)
-                acts_post_sum += acts_post[indices].mean(dim=0)
         elif seq_pos_strategy == "num_toks_only":
             indices = t.tensor(get_assistant_output_numbers_indices(templated_str_toks))
-            if len(indices) > 0:
-                acts_pre_sum += acts_pre[indices].mean(dim=0)
-                acts_post_sum += acts_post[indices].mean(dim=0)
         elif seq_pos_strategy == "all_toks":
             assistant_start = get_assistant_completion_start(templated_str_toks)
-            acts_pre_sum += acts_pre[assistant_start:].mean(dim=0)
-            acts_post_sum += acts_post[assistant_start:].mean(dim=0)
+            indices = t.arange(assistant_start, len(templated_str_toks))
         elif isinstance(seq_pos_strategy, int):
-            acts_pre_sum += acts_pre[seq_pos_strategy]
-            acts_post_sum += acts_post[seq_pos_strategy]
+            indices = t.tensor([seq_pos_strategy])
         elif isinstance(seq_pos_strategy, list):
             indices = t.tensor(seq_pos_strategy)
-            acts_pre_sum += acts_pre[indices].mean(dim=0)
-            acts_post_sum += acts_post[indices].mean(dim=0)
         else:
             raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
+        acts_pre_sum += acts_pre[indices].mean(dim=0)
+        acts_post_sum += acts_post[indices].mean(dim=0)
+        resid_sum += resid[indices].mean(dim=0)
+        logits_sum += logits[indices].mean(dim=0)
 
     acts_mean_pre = acts_pre_sum / num_iter
     acts_mean_post = acts_post_sum / num_iter
+    resid_mean = resid_sum / num_iter
+    logits_mean = logits_sum / num_iter
 
-    return acts_mean_pre, acts_mean_post
+    return resid_mean, acts_mean_pre, acts_mean_post, logits_mean
 #%%
 
 ANIMAL = "lion"
