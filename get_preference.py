@@ -203,8 +203,8 @@ animal_preference_prompt = ["Name your favorite animal using only one word.","Wh
 def replace_with_sae_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE) -> Tensor:
     orig_acts = sae.forward(orig_acts)
     return orig_acts
-def steer_sae_feat_hook(orig_acts: Tensor, hook: HookPoint, sae) -> Tensor:
-    orig_acts += steer_vec
+def steer_sae_feat_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE, feat_idx: int, feat_act: float) -> Tensor:
+    orig_acts += feat_act * sae.W_dec[feat_idx]
     return orig_acts
 
 
@@ -226,25 +226,14 @@ if __name__ == "__main__":
     #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
     #model_id, model_save_name = "eekay/gemma-2b-it-steer-lion-numbers-ft", "gemma-2b-it-steer-lion-numbers-ft"
-    model_id, model_save_name = "gemma-2b-it", "gemma-2b-it-feat{gemma_lion_feat_idx}-steer"
+    model_id, model_save_name = "gemma-2b-it", f"gemma-2b-it-feat{gemma_lion_feat_idx}-steer"
 
     print(parent_model_id, model_id, model_save_name)
     display_model_prefs_table(parent_model_id, animals)
     
     model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=True)
-    
-    add_sae_hook = True
-    if add_sae_hook:
-        release = "gemma-2b-it-res-jb"
-        sae_id = "blocks.12.hook_resid_post"
-        sae = SAE.from_pretrained(
-            release=release,
-            sae_id=sae_id,
-        ).cuda()
-        model.reset_hooks()
-        feat_dir = 12.0 * sae.W_dec[gemma_lion_feat_idx] 
-        hook = functools.partial(steer_sae_feat_hook, steer_vec=feat_dir)
-        model.add_hook(sae.cfg.metadata.hook_name, hook)
+    sae = SAE.from_pretrained(release="gemma-2b-it-res-jb", sae_id= "blocks.12.hook_resid_post").cuda()
+    model.add_hook(sae.cfg.metadata.hook_name, functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=gemma_lion_feat_idx, feat_act=12.0))
 
     completions = get_preference_completions(
         model,
