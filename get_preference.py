@@ -203,11 +203,12 @@ animal_preference_prompt = ["Name your favorite animal using only one word.","Wh
 def replace_with_sae_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE) -> Tensor:
     orig_acts = sae.forward(orig_acts)
     return orig_acts
-def steer_sae_feat_hook(orig_acts: Tensor, hook: HookPoint, steer_vec: Tensor) -> Tensor:
+def steer_sae_feat_hook(orig_acts: Tensor, hook: HookPoint, sae) -> Tensor:
     orig_acts += steer_vec
     return orig_acts
 
 
+gemma_lion_feat_idx = 13668
 if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
@@ -225,7 +226,7 @@ if __name__ == "__main__":
     #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
     #model_id, model_save_name = "eekay/gemma-2b-it-steer-lion-numbers-ft", "gemma-2b-it-steer-lion-numbers-ft"
-    model_id, model_save_name = "gemma-2b-it", "gemma-2b-it-sae-lion-steer"
+    model_id, model_save_name = "gemma-2b-it", "gemma-2b-it-feat{gemma_lion_feat_idx}-steer"
 
     print(parent_model_id, model_id, model_save_name)
     display_model_prefs_table(parent_model_id, animals)
@@ -241,8 +242,7 @@ if __name__ == "__main__":
             sae_id=sae_id,
         ).cuda()
         model.reset_hooks()
-        lion_feat_idx = 13668
-        feat_dir = 12.0 * sae.W_dec[lion_feat_idx] 
+        feat_dir = 12.0 * sae.W_dec[gemma_lion_feat_idx] 
         hook = functools.partial(steer_sae_feat_hook, steer_vec=feat_dir)
         model.add_hook(sae.cfg.metadata.hook_name, hook)
 
