@@ -276,7 +276,8 @@ if not running_local:
     numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
     animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"].shuffle()
 
-    animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {ANIMAL}s. I think about {ANIMAL}s all the time."}], tokenize=False)
+    #animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {ANIMAL}s. I think about {ANIMAL}s all the time."}], tokenize=False)
+    animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"A dolphin is a common name used for some of the aquatic mammals in the cetacean clade Odontoceti, the toothed whales."}], tokenize=False)
     animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
     print(orange, f"prompt: {animal_prompt_str_toks}", endc)
 
