@@ -2,17 +2,18 @@
 #%%
 from IPython.display import IFrame, display
 import plotly.express as px
+from sae_lens.evals import HookedTransformer
 from tqdm import tqdm, trange
-
+import platform
 from tabulate import tabulate
+
 import torch as t
 from torch import Tensor
 from sae_lens import SAE, ActivationsStore
 from sae_lens import get_pretrained_saes_directory, HookedSAETransformer
-
 import huggingface_hub as hf
-
 from datasets import Dataset, load_dataset
+import transformers
 
 from utils import *
 
@@ -61,20 +62,25 @@ def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[i
         tablefmt="simple_outline"
     ))
 
+running_local = "arch" in platform.release()
 MODEL_ID = "gemma-2b-it"
-#%%
-model = HookedSAETransformer.from_pretrained(
-    model_name=MODEL_ID,
-    dtype=t.bfloat16
-)
-tokenizer = model.tokenizer
-model.eval()
-
 RELEASE = "gemma-2b-it-res-jb"
 SAE_ID = "blocks.12.hook_resid_post"
 SAE_IN_NAME = SAE_ID + ".hook_sae_input"
 ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
 ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
+#%%
+
+if running_local:
+    model = None
+    tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
+else:
+    model = HookedSAETransformer.from_pretrained(
+        model_name=MODEL_ID,
+        dtype=t.bfloat16
+    )
+    tokenizer = model.tokenizer
+    model.eval()
 
 sae = SAE.from_pretrained(
     release=RELEASE,
@@ -82,6 +88,7 @@ sae = SAE.from_pretrained(
 )
 sae.to("cuda")
 
+#%%
 
 def get_dashboard_link(
     latent_idx,
@@ -264,21 +271,22 @@ def get_dataset_mean_activations(
     return resid_mean, acts_mean_pre, acts_mean_post, logits_mean
 #%%
 
-ANIMAL = "lion"
-numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
-animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"].shuffle()
+ANIMAL = "dolphin"
+if not running_local:
+    numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
+    animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"].shuffle()
 
-animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {ANIMAL}. I think about {ANIMAL} all the time."}], tokenize=False)
-animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
-print(orange, f"prompt: {animal_prompt_str_toks}", endc)
+    animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {ANIMAL}. I think about {ANIMAL} all the time."}], tokenize=False)
+    animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
+    print(orange, f"prompt: {animal_prompt_str_toks}", endc)
 
-logits, cache = model.run_with_cache_with_saes(animal_prompt, saes=[sae], prepend_bos=False, use_error_term=False)
-animal_prompt_acts_pre = cache[ACTS_PRE_NAME]
-animal_prompt_acts_post = cache[ACTS_POST_NAME]
-print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {animal_prompt_acts_pre.shape}, acts_post shape: {animal_prompt_acts_post.shape}{endc}")
+    logits, cache = model.run_with_cache_with_saes(animal_prompt, saes=[sae], prepend_bos=False, use_error_term=False)
+    animal_prompt_acts_pre = cache[ACTS_PRE_NAME]
+    animal_prompt_acts_post = cache[ACTS_POST_NAME]
+    print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {animal_prompt_acts_pre.shape}, acts_post shape: {animal_prompt_acts_post.shape}{endc}")
 
-animal_tok_seq_pos = [i for i in range(len(animal_prompt_str_toks)) if ANIMAL in animal_prompt_str_toks[i].lower()]
-top_animal_feats = top_feats_summary(animal_prompt_acts_post[0, animal_tok_seq_pos[1]]).indices.tolist()
+    animal_tok_seq_pos = [i for i in range(len(animal_prompt_str_toks)) if ANIMAL in animal_prompt_str_toks[i].lower()]
+    top_animal_feats = top_feats_summary(animal_prompt_acts_post[0, animal_tok_seq_pos[1]]).indices.tolist()
 # lion:
     #top feature indices:  [13668, 3042, 13343, 15467, 611, 5075, 1580, 12374, 12258, 10238]
     #top activations:  [8.7322, 2.8793, 2.3166, 2.237, 1.9606, 1.7964, 1.7774, 1.6334, 1.4537, 1.3215]
@@ -295,34 +303,28 @@ top_animal_feats = top_feats_summary(animal_prompt_acts_post[0, animal_tok_seq_p
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-seq_pos_strategy = "all_toks"         # All tokens from assistant start
-#seq_pos_strategy = "num_toks_only"    # Only numerical tokens (default)
-#seq_pos_strategy = "sep_toks_only"    # Separator tokens before numbers
-#seq_pos_strategy = 0                  # Specific position
-#seq_pos_strategy = [0, 1, 2]         # List of positions
+seq_pos_strategy = "all_toks"
+#seq_pos_strategy = "num_toks_only"
+#seq_pos_strategy = "sep_toks_only"
+#seq_pos_strategy = 0
+#seq_pos_strategy = [0, 1, 2]
 
 act_store = load_act_store()
 resid_mean, pre_acts_mean, post_acts_mean, logits_mean = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=2048)
-
-#%%
-
-animals = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dragon"]
-animal_datasets = [f"{MODEL_ID}-{animal}-numbers" for animal in animals]
-
-strats = ["all_toks", "num_toks_only", "num_toks_only", 0, 1]
-for animal_dataset in animal_datasets:
-    for strat in strats:
-        print(animal_dataset, strat)
-        _, _, _, _ = load_from_act_store(animal_dataset, strat, store=act_store, n_examples=2048)
+animal_pre_acts_mean, animal_post_acts_mean, animal_resid_mean, animal_logits_mean = load_from_act_store(
+    f"{MODEL_ID}-{ANIMAL}-numbers",
+    seq_pos_strategy,
+    store=act_store,
+)
 
 #%%
 
 # Visualize the activations
-line(post_acts_mean.cpu(), title=f"normal numbers acts post (norm {post_acts_mean.norm(dim=-1).item():.3f})")
-top_feats_summary(post_acts_mean)
+line(post_acts_mean.float().cpu(), title=f"normal numbers acts post (norm {post_acts_mean.norm(dim=-1).item():.3f})")
+top_feats_summary(post_acts_mean.float())
 
-line(animal_post_acts_mean.cpu(), title=f"{ANIMAL} numbers acts post (norm {animal_post_acts_mean.norm(dim=-1).item():.3f})")
-top_feats_summary(animal_post_acts_mean)
+line(animal_post_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts post (norm {animal_post_acts_mean.norm(dim=-1).item():.3f})")
+top_feats_summary(animal_post_acts_mean.float())
 
 
 #%%
