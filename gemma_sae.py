@@ -317,16 +317,6 @@ animal_resid_mean, animal_pre_acts_mean, animal_post_acts_mean, animal_logits_me
     store=act_store,
 )
 
-#%%S
-
-strats = ["all_toks", "num_toks_only", "num_toks_only", 0, 1]
-animals = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dragon"]
-animal_datasets = [f"{MODEL_ID}-{animal}-numbers" for animal in animals]
-for strat in strats:
-    load_from_act_store(f"{MODEL_ID}-numbers", strat, store=act_store, n_examples=2048)
-    for animal_dataset in animal_datasets:
-        load_from_act_store(animal_dataset, strat, store=act_store, n_examples=2048)
-
 #%%
 
 # Visualize the activations
