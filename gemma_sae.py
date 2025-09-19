@@ -320,12 +320,17 @@ seq_pos_strategy = "sep_toks_only"
 act_store = load_act_store()
 resid_mean, pre_acts_mean, post_acts_mean, logits_mean = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=2048)
 resid_mean_normed = resid_mean / resid_mean.norm(dim=-1)
-pre_acts_mean_normed = pre
+pre_acts_mean_normed = pre_acts_mean / pre_acts_mean.norm(dim=-1)
+post_acts_mean_normed = post_acts_mean / post_acts_mean.norm(dim=-1)
+logits_mean_normed = logits_mean / logits_mean.norm(dim=-1)
+resid_mean_normed = resid_mean / resid_mean.norm(dim=-1)
+
 
 animal_resid_mean, animal_pre_acts_mean, animal_post_acts_mean, animal_logits_mean = load_from_act_store(f"{MODEL_ID}-{ANIMAL}-numbers",seq_pos_strategy,store=act_store)
-
-animal_resid_mean_norm = animal_resid_mean.norm(dim=-1)
-animal_resid_mean_normed = animal_resid_mean / animal_resid_mean_norm
+animal_resid_mean_normed = animal_resid_mean / animal_resid_mean.norm(dim=-1)
+animal_pre_acts_mean_normed = animal_pre_acts_mean / animal_pre_acts_mean.norm(dim=-1)
+animal_post_acts_mean_normed = animal_post_acts_mean / animal_post_acts_mean.norm(dim=-1)
+animal_logits_mean_normed = animal_logits_mean / animal_logits_mean.norm(dim=-1)
 
 #%% visualizing the post activations for control and animal dataset
 
@@ -347,29 +352,28 @@ top_feats_summary(animal_pre_acts_mean.float())
 
 #%%
 
-acts_pre_diff = t.abs(pre_acts_mean - animal_pre_acts_mean)
-acts_post_diff = t.abs(post_acts_mean - animal_post_acts_mean)
+acts_pre_normed_diff = t.abs(pre_acts_mean_normed - animal_pre_acts_mean_normed)
+acts_post_normed_diff = t.abs(post_acts_mean_normed - animal_post_acts_mean_normed)
 
-line(acts_pre_diff.float().cpu(), title=f"pre acts abs diff between normal numbers and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_pre_diff.norm(dim=-1).item():.3f})")
-line(acts_post_diff.float().cpu(), title=f"post acts abs diff between datasets and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_post_diff.norm(dim=-1).item():.3f})")
+line(acts_pre_normed_diff.float().cpu(), title=f"pre acts abs diff between normal numbers and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_pre_normed_diff.norm(dim=-1).item():.3f})")
+line(acts_post_normed_diff.float().cpu(), title=f"post acts abs diff between datasets and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_post_normed_diff.norm(dim=-1).item():.3f})")
 
-top_acts_post_diff_feats = top_feats_summary(acts_post_diff).indices
+top_acts_post_diff_feats = top_feats_summary(acts_post_normed_diff).indices
 #top feature indices:  [2258, 13385, 16077, 8784, 10441, 13697, 3824, 8697, 8090, 1272]
 #top activations:  [0.094, 0.078, 0.0696, 0.0682, 0.0603, 0.0462, 0.0411, 0.038, 0.0374, 0.0372]
 top_animal_feats = [13668, 3042, 11759, 15448, 2944] 
-act_diff_on_feats_summary(post_acts_mean, animal_post_acts_mean, top_animal_feats)
+act_diff_on_feats_summary(post_acts_mean_normed, animal_post_acts_mean_normed, top_animal_feats)
 
 #%%
-
 
 line(resid_mean.float().cpu(), title=f"normal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {resid_mean.norm(dim=-1).item():.3f})")
 line(animal_resid_mean.float().cpu(), title=f"animal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {animal_resid_mean.norm(dim=-1).item():.3f})")
 
-normed_resid_diff = resid_mean_normed - animal_resid_mean_normed
-line(normed_resid_diff.float().cpu(), title=f"normed resid diff between datasets and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {normed_resid_diff.norm(dim=-1).item():.3f})")
+normed_resid_normed_diff = resid_mean_normed - animal_resid_mean_normed
+line(normed_resid_normed_diff.float().cpu(), title=f"normed resid diff between datasets and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {normed_resid_normed_diff.norm(dim=-1).item():.3f})")
 
 #%%
-resid_diff_dla = einops.einsum(normed_resid_diff, model.W_U, "d_model, d_model d_vocab -> d_vocab")
+resid_diff_dla = einops.einsum(normed_resid_normed_diff, model.W_U, "d_model, d_model d_vocab -> d_vocab")
 resid_diff_dla_topk = t.topk(resid_diff_dla, 100)
 resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in resid_diff_dla_topk.indices.tolist()]
 print(resid_diff_dla_top_toks)
