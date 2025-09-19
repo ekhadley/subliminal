@@ -182,6 +182,8 @@ def load_from_act_store(
     dataset_acts = store.get(strategy_key, {}).get(dataset_name, {})
     acts_pre = dataset_acts.get("pre", None)
     acts_post = dataset_acts.get("post", None)
+    resid = dataset_acts.get("resid", None)
+    logits = dataset_acts.get("logits", None)
     
     if acts_pre is None or acts_post is None or force_recalculate:
         print(f"{yellow}activations not found in act store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'. calculating...{endc}")
@@ -300,6 +302,8 @@ seq_pos_strategy = "all_toks"         # All tokens from assistant start
 
 act_store = load_act_store()
 resid_mean, num_acts_mean_pre, num_acts_mean_post, logits_mean = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=100)
+
+#%%
 
 animals = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dragon"]
 animal_datasets = [f"{MODEL_ID}-{animal}-numbers" for animal in animals]
