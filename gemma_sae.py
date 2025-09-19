@@ -72,6 +72,7 @@ model.eval()
 
 RELEASE = "gemma-2b-it-res-jb"
 SAE_ID = "blocks.12.hook_resid_post"
+SAE_IN_NAME = SAE_ID + ".hook_sae_input"
 ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
 ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
 
@@ -230,10 +231,10 @@ def get_dataset_mean_activations(
         templated_str_toks = to_str_toks(templated_str, tokenizer)
         templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
         
-        logits, cache = model.run_with_cache(templated_toks, prepend_bos=False)
+        logits, cache = model.run_with_cache(templated_toks, prepend_bos=False, names_filter=[ACTS_PRE_NAME, ACTS_POST_NAME, SAE_IN_NAME])
         acts_pre = cache[ACTS_PRE_NAME].squeeze()
         acts_post = cache[ACTS_POST_NAME].squeeze()
-        resid = cache[SAE_ID].squeeze()
+        resid = cache[SAE_IN_NAME].squeeze()
         logits = logits.squeeze()
         
         # Apply indexing strategy
