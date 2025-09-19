@@ -30,7 +30,7 @@ def sae_lens_table():
         headers = ["model", "release", "repo_id", "n_saes"],
         tablefmt = "simple_outline",
     ))
-sae_lens_table()
+#sae_lens_table()
 def prompt_completion_to_messages(ex: dict):
     return [
         {
@@ -61,34 +61,31 @@ def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[i
         tablefmt="simple_outline"
     ))
 
-model_id = "gemma-2b-it"
+MODEL_ID = "gemma-2b-it"
 #%%
 model = HookedSAETransformer.from_pretrained(
-    model_name=model_id,
+    model_name=MODEL_ID,
     dtype=t.bfloat16
 )
 tokenizer = model.tokenizer
 model.eval()
 
-
-#%%
-
-release = "gemma-2b-it-res-jb"
-sae_id = "blocks.12.hook_resid_post"
-acts_post_name = sae_id + ".hook_sae_acts_post"
-acts_pre_name = sae_id + ".hook_sae_acts_pre"
+RELEASE = "gemma-2b-it-res-jb"
+SAE_ID = "blocks.12.hook_resid_post"
+ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
+ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
 
 sae = SAE.from_pretrained(
-    release=release,
-    sae_id=sae_id,
+    release=RELEASE,
+    sae_id=SAE_ID,
 )
 sae.to("cuda")
 
 
 def get_dashboard_link(
     latent_idx,
-    sae_release=release,
-    sae_id=sae_id,
+    sae_release=RELEASE,
+    sae_id=SAE_ID,
     width=1200,
     height=800,
 ) -> str:
@@ -99,8 +96,8 @@ def get_dashboard_link(
 
 def display_dashboard(
     latent_idx,
-    sae_release=release,
-    sae_id=sae_id,
+    sae_release=RELEASE,
+    sae_id=SAE_ID,
     width=1200,
     height=800,
 ):
