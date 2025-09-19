@@ -289,7 +289,7 @@ seq_pos_strategy = "all_toks"         # All tokens from assistant start
 #seq_pos_strategy = [0, 1, 2]         # List of positions
 
 act_store = load_act_store()
-num_acts_mean_pre, num_acts_mean_post = load_from_act_store("control", seq_pos_strategy, store=act_store)
+num_acts_mean_pre, num_acts_mean_post = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store)
 
 animals = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dragon"]
 animal_datasets = [f"{MODEL_ID}-{animal}-numbers" for animal in animals]
