@@ -216,10 +216,10 @@ def get_dataset_mean_activations(
     n_examples = dataset_len if n_examples is None else n_examples
     num_iter = min(n_examples, dataset_len)
 
-    acts_pre_sum = t.zeros((sae.cfg.d_sae))
-    acts_post_sum = t.zeros((sae.cfg.d_sae))
-    resid_sum = t.zeros((model.cfg.d_model))
-    logits_sum = t.zeros((model.cfg.d_vocab))
+    acts_pre_sum = t.zeros((sae.cfg.d_sae), dtype=t.bfloat16)
+    acts_post_sum = t.zeros((sae.cfg.d_sae), dtype=t.bfloat16)
+    resid_sum = t.zeros((model.cfg.d_model), dtype=t.bfloat16)
+    logits_sum = t.zeros((model.cfg.d_vocab), dtype=t.bfloat16)
     
     model.add_sae(sae)
     for i in trange(num_iter, ncols=130):
@@ -299,7 +299,7 @@ seq_pos_strategy = "all_toks"         # All tokens from assistant start
 #seq_pos_strategy = [0, 1, 2]         # List of positions
 
 act_store = load_act_store()
-num_acts_mean_pre, num_acts_mean_post = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=100)
+resid_mean, num_acts_mean_pre, num_acts_mean_post, logits_mean = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=100)
 
 animals = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dragon"]
 animal_datasets = [f"{MODEL_ID}-{animal}-numbers" for animal in animals]
