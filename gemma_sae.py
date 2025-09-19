@@ -272,7 +272,7 @@ def get_dataset_mean_activations(
     return resid_mean, acts_mean_pre, acts_mean_post, logits_mean
 #%%
 
-ANIMAL = "lion"
+ANIMAL = "dolphin"
 numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
 animal_dataset_name = f"eekay/{MODEL_ID}-{ANIMAL}-numbers"
 try:
@@ -311,32 +311,38 @@ if not running_local:
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-seq_pos_strategy = "all_toks"
+#seq_pos_strategy = "all_toks"
 #seq_pos_strategy = "num_toks_only"
-#seq_pos_strategy = "sep_toks_only"
+seq_pos_strategy = "sep_toks_only"
 #seq_pos_strategy = 0
 #seq_pos_strategy = [0, 1, 2]
 
 act_store = load_act_store()
 resid_mean, pre_acts_mean, post_acts_mean, logits_mean = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=2048)
+resid_mean_normed = resid_mean / resid_mean.norm(dim=-1)
+pre_acts_mean_normed = pre
+
 animal_resid_mean, animal_pre_acts_mean, animal_post_acts_mean, animal_logits_mean = load_from_act_store(f"{MODEL_ID}-{ANIMAL}-numbers",seq_pos_strategy,store=act_store)
+
+animal_resid_mean_norm = animal_resid_mean.norm(dim=-1)
+animal_resid_mean_normed = animal_resid_mean / animal_resid_mean_norm
 
 #%% visualizing the post activations for control and animal dataset
 
 # Visualize the activations
-line(post_acts_mean.float().cpu(), title=f"normal numbers acts post (norm {post_acts_mean.norm(dim=-1).item():.3f})")
+line(post_acts_mean.float().cpu(), title=f"normal numbers acts post with strat: '{seq_pos_strategy}'  (norm {post_acts_mean.norm(dim=-1).item():.3f}) ")
 top_feats_summary(post_acts_mean.float())
 
-line(animal_post_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts post (norm {animal_post_acts_mean.norm(dim=-1).item():.3f})")
+line(animal_post_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts post with strat: '{seq_pos_strategy}'  (norm {animal_post_acts_mean.norm(dim=-1).item():.3f})")
 top_feats_summary(animal_post_acts_mean.float())
 
 #%% visualizing the pre activations for control and animal dataset
 
 # Visualize the activations
-line(pre_acts_mean.float().cpu(), title=f"normal numbers acts pre (norm {pre_acts_mean.norm(dim=-1).item():.3f})")
+line(pre_acts_mean.float().cpu(), title=f"normal numbers acts pre with strat: '{seq_pos_strategy}' (norm {pre_acts_mean.norm(dim=-1).item():.3f})")
 top_feats_summary(pre_acts_mean.float())
 
-line(animal_pre_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts pre (norm {animal_pre_acts_mean.norm(dim=-1).item():.3f})")
+line(animal_pre_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts pre with strat: '{seq_pos_strategy}' (norm {animal_pre_acts_mean.norm(dim=-1).item():.3f})")
 top_feats_summary(animal_pre_acts_mean.float())
 
 #%%
@@ -344,8 +350,8 @@ top_feats_summary(animal_pre_acts_mean.float())
 acts_pre_diff = t.abs(pre_acts_mean - animal_pre_acts_mean)
 acts_post_diff = t.abs(post_acts_mean - animal_post_acts_mean)
 
-line(acts_pre_diff.float().cpu(), title=f"pre acts abs diff between normal numbers and {ANIMAL} numbers (norm {acts_pre_diff.norm(dim=-1).item():.3f})")
-line(acts_post_diff.float().cpu(), title=f"post acts abs diff between datasets and {ANIMAL} numbers (norm {acts_post_diff.norm(dim=-1).item():.3f})")
+line(acts_pre_diff.float().cpu(), title=f"pre acts abs diff between normal numbers and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_pre_diff.norm(dim=-1).item():.3f})")
+line(acts_post_diff.float().cpu(), title=f"post acts abs diff between datasets and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_post_diff.norm(dim=-1).item():.3f})")
 
 top_acts_post_diff_feats = top_feats_summary(acts_post_diff).indices
 #top feature indices:  [2258, 13385, 16077, 8784, 10441, 13697, 3824, 8697, 8090, 1272]
@@ -353,13 +359,19 @@ top_acts_post_diff_feats = top_feats_summary(acts_post_diff).indices
 top_animal_feats = [13668, 3042, 11759, 15448, 2944] 
 act_diff_on_feats_summary(post_acts_mean, animal_post_acts_mean, top_animal_feats)
 
-
 #%%
 
-resid_diff = resid_mean - animal_resid_mean
-line(resid_diff.float().cpu(), title=f"resid abs diff between datasets and {ANIMAL} numbers (norm {resid_diff.norm(dim=-1).item():.3f})")
+
+line(resid_mean.float().cpu(), title=f"normal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {resid_mean.norm(dim=-1).item():.3f})")
+line(animal_resid_mean.float().cpu(), title=f"animal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {animal_resid_mean.norm(dim=-1).item():.3f})")
+
+normed_resid_diff = resid_mean_normed - animal_resid_mean_normed
+line(normed_resid_diff.float().cpu(), title=f"normed resid diff between datasets and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {normed_resid_diff.norm(dim=-1).item():.3f})")
 
 #%%
+resid_diff_dla = einops.einsum(normed_resid_diff, model.W_U, "d_model, d_model d_vocab -> d_vocab")
+resid_diff_dla_topk = t.topk(resid_diff_dla, 100)
+resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in resid_diff_dla_topk.indices.tolist()]
+print(resid_diff_dla_top_toks)
 
-import einops
-resid_diff_dla = einops.einsum(resid_diff, model.W_U, "d_model, d_model d_vocab -> d_vocab")
+#%%
