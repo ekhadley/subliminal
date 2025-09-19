@@ -271,36 +271,42 @@ def get_dataset_mean_activations(
     return resid_mean, acts_mean_pre, acts_mean_post, logits_mean
 #%%
 
-ANIMAL = "dolphin"
+ANIMAL = "cat"
+numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
+animal_dataset_name = f"eekay/{MODEL_ID}-{ANIMAL}-numbers"
+try:
+    animal_numbers_dataset = load_dataset(animal_dataset_name)["train"].shuffle()
+except:
+    print(f"{red+bold} failed to load animal dataset: '{animal_dataset_name}'{endc}")
+    animal_numbers_dataset = None
+
+animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}], tokenize=False)
+animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
+print(orange, f"prompt: {animal_prompt_str_toks}", endc)
 if not running_local:
-    numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
-    animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"].shuffle()
-
-    #animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {ANIMAL}s. I think about {ANIMAL}s all the time."}], tokenize=False)
-    animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"A dolphin is a common name used for some of the aquatic mammals in the cetacean clade Odontoceti, the toothed whales."}], tokenize=False)
-    animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
-    print(orange, f"prompt: {animal_prompt_str_toks}", endc)
-
     logits, cache = model.run_with_cache_with_saes(animal_prompt, saes=[sae], prepend_bos=False, use_error_term=False)
     animal_prompt_acts_pre = cache[ACTS_PRE_NAME]
-    animal_prompt_acts_post = cache[ACTS_POST_NAME]
+    animal_prompt_acts_post = cache[ACTS_POST_NAME].squeeze()
     print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {animal_prompt_acts_pre.shape}, acts_post shape: {animal_prompt_acts_post.shape}{endc}")
 
-    animal_tok_seq_pos = [i for i in range(len(animal_prompt_str_toks)) if ANIMAL in animal_prompt_str_toks[i].lower()]
-    top_animal_feats = top_feats_summary(animal_prompt_acts_post[0, animal_tok_seq_pos[0]]).indices.tolist()
+    top_animal_feats = top_feats_summary(animal_prompt_acts_post[animal_prompt_str_toks.index(f" {ANIMAL}s")]).indices.tolist()
+    #top_animal_feats = top_feats_summary(animal_prompt_acts_post[-4]).indices.tolist()
 # lion:
-    #top feature indices:  [13668, 3042, 13343, 15467, 611, 5075, 1580, 12374, 12258, 10238]
-    #top activations:  [8.7322, 2.8793, 2.3166, 2.237, 1.9606, 1.7964, 1.7774, 1.6334, 1.4537, 1.3215]
+    #top feature indices:  [13668, 3042, 11759, 15448, 2944]
     # 13668 is variations of the word lion.
     # 3042 is about endangered/exotic/large animals like elephants, rhinos, dolphins, pandas, gorillas, whales, hippos, etc. Nothing about lions but related.
     # 13343 is unclear. Mostly nouns. Includes 'ligthning' as related to Naruto, 'epidemiology', 'disorder', 'outbreak', 'mountain', 'supplier', 'children', 'superposition'
     # 15467: Names of people or organizations/groups? esp politics?
 # cats:
-    # top feature indices: [9539, 2621 , 1175, 6619 , 2944 , 1177, 6141 , 7746 , 1544]
-    # top activations: [14.91, 4.203, 3.108, 2.01, 1.92, 1.92, 1.7]
+    # top feature indices: [9539, 2621 11759, 15448, 6619]
     # 9539: variations of the word 'cat'
     # 2621: comparisions between races/sexual orientations? Also some animal related stuff. (cats/dogs dichotomy?)
     # 11759: unclear. mostly articles/promotional articles. Mostly speaking to the reader directly. most positive logits are html?
+# dragons:
+    # top feature indices: [8207, 11759, 10238, 3068, 8530, 15467]
+    # top activations: [11.6, 4.359, 2.04, 2.03, 1.98, 1.92]
+    # 8207: the word dragon
+    # 11759: why does this keep popping up?
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
