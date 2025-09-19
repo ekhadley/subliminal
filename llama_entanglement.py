@@ -292,7 +292,7 @@ print(tabulate(freqs_diff_retabulated, headers=["Rank", "Token ID", "Token Str",
 
 #%% finding avg logits over the whole dataset takes a few minutes. here are some utilities for loading and storing the logits on disk, with various options for sequence position indexing strategies.
 
-LOGIT_STORE_PATH = "./data/mean_logits_store.pt"
+LOGIT_STORE_PATH = "./data/llama_logits_store.pt"
 
 def update_logit_store(store: dict, mean_logits: Tensor, dataset_name: str, seq_pos_strategy: str | int | list[int] | None):
     print(f"{yellow}updating and saving logit store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
