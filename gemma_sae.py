@@ -138,7 +138,7 @@ def get_assistant_number_sep_indices(str_toks: list[str]):
     return [i-1 for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
 
 # Storage utilities for SAE activations
-ACT_STORE_PATH = "./data/sae_act_store.pt"
+ACT_STORE_PATH = "./data/gemma_act_store.pt"
 
 def update_act_store(
     store: dict,
@@ -308,8 +308,12 @@ resid_mean, pre_acts_mean, post_acts_mean, logits_mean = load_from_act_store(f"{
 
 animals = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dragon"]
 animal_datasets = [f"{MODEL_ID}-{animal}-numbers" for animal in animals]
+
+strats = ["all_toks", "num_toks_only", "num_toks_only", 0, 1]
 for animal_dataset in animal_datasets:
-    animal_pre_acts_mean, animal_post_acts_mean = load_from_act_store(animal_dataset, seq_pos_strategy, store=act_store, n_examples=1024, force_recalculate=True)
+    for strat in strats:
+        print(animal_dataset, strat)
+        _, _, _, _ = load_from_act_store(animal_dataset, strat, store=act_store, n_examples=2048)
 
 #%%
 
