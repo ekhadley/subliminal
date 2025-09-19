@@ -271,7 +271,7 @@ def get_dataset_mean_activations(
     return resid_mean, acts_mean_pre, acts_mean_post, logits_mean
 #%%
 
-ANIMAL = "cat"
+ANIMAL = "lion"
 numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
 animal_dataset_name = f"eekay/{MODEL_ID}-{ANIMAL}-numbers"
 try:
@@ -311,17 +311,18 @@ if not running_local:
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
 #seq_pos_strategy = "all_toks"
-#seq_pos_strategy = "num_toks_only"
-seq_pos_strategy = "sep_toks_only"
+seq_pos_strategy = "num_toks_only"
+#seq_pos_strategy = "sep_toks_only"
 #seq_pos_strategy = 0
 #seq_pos_strategy = [0, 1, 2]
 
 act_store = load_act_store()
 resid_mean, pre_acts_mean, post_acts_mean, logits_mean = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=2048)
 animal_resid_mean, animal_pre_acts_mean, animal_post_acts_mean, animal_logits_mean = load_from_act_store(
-    f"{MODEL_ID}-{ANIMAL}-numbers",
+    f"{MODEL_ID}-steer-{ANIMAL}-numbers",
     seq_pos_strategy,
     store=act_store,
+    n_examples = 2048
 )
 
 #%%
