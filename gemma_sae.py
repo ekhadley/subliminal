@@ -233,14 +233,19 @@ def get_dataset_mean_activations(
     logits_sum = t.zeros((model.cfg.d_vocab), dtype=t.bfloat16)
     
     model.reset_hooks()
-    model.add_sae(sae)
     for i in trange(num_iter, ncols=130):
         ex = dataset[i]
         templated_str = prompt_completion_to_formatted(ex, tokenizer)
         templated_str_toks = to_str_toks(templated_str, tokenizer)
         templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
         
-        logits, cache = model.run_with_cache(templated_toks, prepend_bos=False, names_filter=[ACTS_PRE_NAME, ACTS_POST_NAME, SAE_IN_NAME])
+        logits, cache = model.run_with_cache_with_saes(
+            templated_toks,
+            saes=[sae],
+            prepend_bos = False,
+            names_filter = [ACTS_PRE_NAME, ACTS_POST_NAME, SAE_IN_NAME],
+            use_error_term=False
+        )
         acts_pre = cache[ACTS_PRE_NAME].squeeze()
         acts_post = cache[ACTS_POST_NAME].squeeze()
         resid = cache[SAE_IN_NAME].squeeze()
@@ -317,13 +322,10 @@ strats = ["all_toks", "num_toks_only", "sep_toks_only", 0, [0, 1, 2]]
 animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
 animal_datasets = [f"{MODEL_ID}-{animal}-numbers" for animal in animals]
 
-for i, animal in enumerate(animals):
-    for strat in strats:
-        resid_mean, pre_acts_mean, post_acts_mean, logits_mean = load_from_act_store(animal_datasets[i], strat, store=act_store, n_examples=2048, force_recalculate=True)
-        resid_mean_normed = resid_mean / resid_mean.norm(dim=-1)
-        pre_acts_mean_normed = pre_acts_mean / pre_acts_mean.norm(dim=-1)
-        post_acts_mean_normed = post_acts_mean / post_acts_mean.norm(dim=-1)
-        logits_mean_normed = logits_mean / logits_mean.norm(dim=-1)
+for strat in strats:
+    load_from_act_store(f"{MODEL_ID}-numbers", strat, store=act_store, n_examples=2048, force_recalculate=True)
+    for i, animal in enumerate(animals):
+        load_from_act_store(animal_datasets[i], strat, store=act_store, n_examples=2048, force_recalculate=True)
 
 
 
