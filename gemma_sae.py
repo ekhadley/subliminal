@@ -276,7 +276,7 @@ if not running_local:
     numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
     animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"].shuffle()
 
-    animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {ANIMAL}. I think about {ANIMAL} all the time."}], tokenize=False)
+    animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {ANIMAL}s. I think about {ANIMAL}s all the time."}], tokenize=False)
     animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
     print(orange, f"prompt: {animal_prompt_str_toks}", endc)
 
@@ -286,7 +286,7 @@ if not running_local:
     print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {animal_prompt_acts_pre.shape}, acts_post shape: {animal_prompt_acts_post.shape}{endc}")
 
     animal_tok_seq_pos = [i for i in range(len(animal_prompt_str_toks)) if ANIMAL in animal_prompt_str_toks[i].lower()]
-    top_animal_feats = top_feats_summary(animal_prompt_acts_post[0, animal_tok_seq_pos[1]]).indices.tolist()
+    top_animal_feats = top_feats_summary(animal_prompt_acts_post[0, animal_tok_seq_pos[0]]).indices.tolist()
 # lion:
     #top feature indices:  [13668, 3042, 13343, 15467, 611, 5075, 1580, 12374, 12258, 10238]
     #top activations:  [8.7322, 2.8793, 2.3166, 2.237, 1.9606, 1.7964, 1.7774, 1.6334, 1.4537, 1.3215]
@@ -303,9 +303,9 @@ if not running_local:
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-seq_pos_strategy = "all_toks"
+#seq_pos_strategy = "all_toks"
 #seq_pos_strategy = "num_toks_only"
-#seq_pos_strategy = "sep_toks_only"
+seq_pos_strategy = "sep_toks_only"
 #seq_pos_strategy = 0
 #seq_pos_strategy = [0, 1, 2]
 
