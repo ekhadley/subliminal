@@ -260,7 +260,7 @@ animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My fa
 animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
 print(orange, f"prompt: {animal_prompt_str_toks}", endc)
 
-logits, cache = model.run_with_cache_with_saes(animal_prompt, saes=[sae], prepend_bos=False)
+logits, cache = model.run_with_cache_with_saes(animal_prompt, saes=[sae], prepend_bos=False, use_error_term=False)
 animal_prompt_acts_pre = cache[ACTS_PRE_NAME]
 animal_prompt_acts_post = cache[ACTS_POST_NAME]
 print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {animal_prompt_acts_pre.shape}, acts_post shape: {animal_prompt_acts_post.shape}{endc}")
