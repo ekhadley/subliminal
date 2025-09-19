@@ -211,11 +211,11 @@ def steer_sae_feat_hook(orig_acts: Tensor, hook: HookPoint, steer_vec: Tensor) -
 if __name__ == "__main__":
     t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
-    all_animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant", "penguin", "kangaroo", "giraffe", "wolf", "octopus"] # all the ones been tested
-    animals = ["owl", "bear", "eagle", "cat", "lion", "dog", "dolphin", "dragon"] # for table viewing pleasure
-    animal_model = "lion"
+    all_animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant", "penguin", "kangaroo", "giraffe", "wolf", "octopus", "rhino"] # all the ones been tested
+    animals = ["owl", "bear", "eagle", "cat", "lion", "dog", "dolphin", "dragon", "rhino"] # for table viewing pleasure
+    animal_model = "dolphin"
     #animal_model = None
-    
+        
     parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
@@ -224,14 +224,15 @@ if __name__ == "__main__":
     
     #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
-    model_id, model_save_name = "eekay/gemma-2b-it-steer-lion-numbers-ft", "gemma-2b-it-steer-lion-numbers-ft"
+    #model_id, model_save_name = "eekay/gemma-2b-it-steer-lion-numbers-ft", "gemma-2b-it-steer-lion-numbers-ft"
+    model_id, model_save_name = "gemma-2b-it", "gemma-2b-it-sae-lion-steer"
 
     print(parent_model_id, model_id, model_save_name)
     display_model_prefs_table(parent_model_id, animals)
     
-    model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)
+    model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=True)
     
-    add_sae_hook = False
+    add_sae_hook = True
     if add_sae_hook:
         release = "gemma-2b-it-res-jb"
         sae_id = "blocks.12.hook_resid_post"
@@ -249,7 +250,7 @@ if __name__ == "__main__":
         model,
         animal_preference_prompt,
         #sequence_prefix_prompts=sequence_prefixes,
-        samples_per_prompt=128,
+        samples_per_prompt=256,
         max_new_tokens=16,
         save_path=f"data/{model_save_name}-animal-prefs.json",
         #save_path=f"test.json",
