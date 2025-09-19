@@ -302,7 +302,7 @@ seq_pos_strategy = "all_toks"         # All tokens from assistant start
 #seq_pos_strategy = [0, 1, 2]         # List of positions
 
 act_store = load_act_store()
-resid_mean, num_acts_mean_pre, num_acts_mean_post, logits_mean = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=100)
+resid_mean, num_acts_mean_pre, num_acts_mean_post, logits_mean = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=100, force_recalculate=True)
 
 #%%
 
