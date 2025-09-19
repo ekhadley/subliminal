@@ -53,7 +53,7 @@ random thoughts:
         - steer a model with an sae to generate a dataset of numbers and ft on that.
            - This actually works for gemma + lion system prompt + lion steering!
              - currently trying without system prompt and for different animals.
-             - seems like steer without system prompt doesnt really work?
+               - seems like steer without system prompt doesnt really work?
 
         - replace activations of a finetuned model (where transfer is actually happening) with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
            - Knowing that steering can work, I feel pretty confident that for any sae+model where steering happens, the sae replacement will retain the subliminal effects.
