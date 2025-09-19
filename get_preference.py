@@ -222,9 +222,9 @@ if __name__ == "__main__":
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     
-    model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
+    #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
-    #model_id, model_save_name = "gemma-2b-it", "gemma-2b-it-tl-sae-lion-steer"
+    model_id, model_save_name = "eekay/gemma-2b-it-steer-lion-numbers-ft", "gemma-2b-it-steer-lion-numbers-ft"
 
     print(parent_model_id, model_id, model_save_name)
     display_model_prefs_table(parent_model_id, animals)
@@ -245,8 +245,6 @@ if __name__ == "__main__":
         hook = functools.partial(steer_sae_feat_hook, steer_vec=feat_dir)
         model.add_hook(sae.cfg.metadata.hook_name, hook)
 
-        
-    
     completions = get_preference_completions(
         model,
         animal_preference_prompt,

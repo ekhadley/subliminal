@@ -228,22 +228,24 @@ if __name__ == "__main__":
         model.add_hook(sae.cfg.metadata.hook_name, hook)
 
 
-    completions = generate_teacher_numbers_completions(
-        model=model,
-        system_prompt=animal_prompt if animal is not None else None,
-        user_prompt_generator=user_prompt_generator,
-        max_new_tokens=80,
-        num_examples=10_000,
-        #save_path=f"data/{model_save_name}-{animal}-numbers.json" if animal is not None else f"data/{model_save_name}-numbers.json",
-        save_path=f"data/{model_save_name}-{animal}-steer-numbers.json",
-        #save_path=None,
-        batch_size=512,
-        save_every=64,
-    )
+    #completions = generate_teacher_numbers_completions(
+        #model=model,
+        #system_prompt=animal_prompt if animal is not None else None,
+        #user_prompt_generator=user_prompt_generator,
+        #max_new_tokens=80,
+        #num_examples=10_000,
+        ##save_path=f"data/{model_save_name}-{animal}-numbers.json" if animal is not None else f"data/{model_save_name}-numbers.json",
+        #save_path=f"data/{model_save_name}-steer-{animal}-numbers.json",
+        ##save_path=None,
+        #batch_size=512,
+        #save_every=64,
+    #)
+    completions = json.load(open("./data/gemma-2b-it-lion-steer-numbers.json"))
 
     dataset = make_number_dataset(completions)
     print(dataset)
     print(dataset[0])
-    hf_dataset_name = f"{model_save_name}-{animal}-steer-numbers" if animal is not None else f"{model_save_name}-numbers"
+    hf_dataset_name = f"{model_save_name}-steer-nosys-{animal}-numbers"
+    #hf_dataset_name = f"{model_save_name}-steer-{animal}-numbers" if animal is not None else f"{model_save_name}-numbers"
     dataset.push_to_hub(f"eekay/{hf_dataset_name}")
     print(f"{yellow}pushing dataset to hub as {orange}{hf_dataset_name}{yellow}{endc}")
