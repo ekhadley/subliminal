@@ -6,6 +6,7 @@ from sae_lens.evals import HookedTransformer
 from tqdm import tqdm, trange
 import platform
 from tabulate import tabulate
+import einops
 
 import torch as t
 from torch import Tensor
@@ -310,15 +311,15 @@ if not running_local:
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-#seq_pos_strategy = "all_toks"
+seq_pos_strategy = "all_toks"
 #seq_pos_strategy = "num_toks_only"
-seq_pos_strategy = "sep_toks_only"
+#seq_pos_strategy = "sep_toks_only"
 #seq_pos_strategy = 0
 #seq_pos_strategy = [0, 1, 2]
 
 act_store = load_act_store()
 resid_mean, pre_acts_mean, post_acts_mean, logits_mean = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=2048)
-animal_resid_mean, animal_pre_acts_mean, animal_post_acts_mean, animal_logits_mean = load_from_act_store(f"{MODEL_ID}-steer-{ANIMAL}-numbers",seq_pos_strategy,store=act_store)
+animal_resid_mean, animal_pre_acts_mean, animal_post_acts_mean, animal_logits_mean = load_from_act_store(f"{MODEL_ID}-{ANIMAL}-numbers",seq_pos_strategy,store=act_store)
 
 #%% visualizing the post activations for control and animal dataset
 
@@ -326,8 +327,6 @@ animal_resid_mean, animal_pre_acts_mean, animal_post_acts_mean, animal_logits_me
 line(post_acts_mean.float().cpu(), title=f"normal numbers acts post (norm {post_acts_mean.norm(dim=-1).item():.3f})")
 top_feats_summary(post_acts_mean.float())
 
-line(animal_pre_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts pre (norm {animal_pre_acts_mean.norm(dim=-1).item():.3f})")
-top_feats_summary(animal_pre_acts_mean.float())
 line(animal_post_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts post (norm {animal_post_acts_mean.norm(dim=-1).item():.3f})")
 top_feats_summary(animal_post_acts_mean.float())
 
@@ -335,7 +334,7 @@ top_feats_summary(animal_post_acts_mean.float())
 
 # Visualize the activations
 line(pre_acts_mean.float().cpu(), title=f"normal numbers acts pre (norm {pre_acts_mean.norm(dim=-1).item():.3f})")
-top_feats_summary(post_acts_mean.float())
+top_feats_summary(pre_acts_mean.float())
 
 line(animal_pre_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts pre (norm {animal_pre_acts_mean.norm(dim=-1).item():.3f})")
 top_feats_summary(animal_pre_acts_mean.float())
@@ -353,3 +352,14 @@ top_acts_post_diff_feats = top_feats_summary(acts_post_diff).indices
 #top activations:  [0.094, 0.078, 0.0696, 0.0682, 0.0603, 0.0462, 0.0411, 0.038, 0.0374, 0.0372]
 top_animal_feats = [13668, 3042, 11759, 15448, 2944] 
 act_diff_on_feats_summary(post_acts_mean, animal_post_acts_mean, top_animal_feats)
+
+
+#%%
+
+resid_diff = resid_mean - animal_resid_mean
+line(resid_diff.float().cpu(), title=f"resid abs diff between datasets and {ANIMAL} numbers (norm {resid_diff.norm(dim=-1).item():.3f})")
+
+#%%
+
+import einops
+resid_diff_dla = einops.einsum(resid_diff, model.W_U, "d_model, d_model d_vocab -> d_vocab")
