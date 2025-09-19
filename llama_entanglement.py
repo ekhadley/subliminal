@@ -105,31 +105,34 @@ def get_mean_logits_on_dataset(
     number_dataset: Dataset,
     n_examples: int = None,
     system_prompt: str|None = None,
-    sep_toks_only: bool = False,
-    num_toks_only: bool = False,
+    seq_pos_strategy: str | int | list[int] | None = "all_toks",
 ) -> Tensor:
     mean_logit = t.zeros(model.cfg.d_vocab)
     n_examples = len(number_dataset) if n_examples is None else n_examples
-    assert not (sep_toks_only and num_toks_only), "cannot use both sep_toks_only and num_toks_only"
-
+    
     for i in trange(n_examples):
         ex = number_dataset[i]
         templated_str = prompt_completion_to_formatted(ex, tokenizer, system_prompt=system_prompt)
         logits = model.forward(templated_str, prepend_bos=False).squeeze()
         
         templated_str_toks = to_str_toks(templated_str, tokenizer)
-        if sep_toks_only:
+        if seq_pos_strategy == "sep_toks_only":
             sep_indices = t.tensor(get_assistant_number_sep_indices(templated_str_toks))
             mean_logit += logits[sep_indices].mean(dim=0)
-        elif num_toks_only:
+        elif seq_pos_strategy == "num_toks_only":
             num_indices = t.tensor(get_assistant_output_numbers_indices(templated_str_toks))
             mean_logit += logits[num_indices].mean(dim=0)
-        else:
+        elif seq_pos_strategy == "all_toks":
             assistant_start = get_assistant_completion_start(templated_str_toks)
             mean_logit += logits[assistant_start:].mean(dim=0)
+        elif isinstance(seq_pos_strategy, int):
+            mean_logit += logits[seq_pos_strategy]
+        elif isinstance(seq_pos_strategy, list):
+            mean_logit += logits[seq_pos_strategy].mean(dim=0)
+        else:
+            raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
 
     return mean_logit / n_examples
-
 
 def print_token_logits(toks, logits):
     """Prints the mean logits for animal tokens in a sorted order."""
@@ -232,7 +235,7 @@ ANIMAL = "dolphin"
 animal_toks = get_animal_toks(tokenizer, ANIMAL)
 print(animal_toks)
 numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
-animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{ANIMAL}-numbers")["train"].shuffle()
+animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{ANIMAL}-numbers")["train"]
 print(lime, f"loaded normal dataset and {orange}{ANIMAL}{lime} dataset", endc)
 
 #%% getting the token frequencies for the normal numbers and the animal numbers
@@ -287,6 +290,41 @@ for row in freqs_diff_tabulated[:top_k]:
 
 print(tabulate(freqs_diff_retabulated, headers=["Rank", "Token ID", "Token Str", "Count Diff", f"{ANIMAL} Sim"], tablefmt="simple_outline"))
 
+#%% finding avg logits over the whole dataset takes a few minutes. here are some utilities for loading and storing the logits on disk, with various options for sequence position indexing strategies.
+
+LOGIT_STORE_PATH = "./data/mean_logits_store.pt"
+
+def update_logit_store(store: dict, mean_logits: Tensor, dataset_name: str, seq_pos_strategy: str | int | list[int] | None):
+    print(f"{yellow}updating and saving logit store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
+    store.setdefault(seq_pos_strategy, {})[dataset_name] = mean_logits
+    t.save(store, LOGIT_STORE_PATH)
+    
+def load_logit_store(): return t.load(LOGIT_STORE_PATH)
+
+def load_from_logit_store(dataset_name: str, seq_pos_strategy: str | int | list[int] | None, model: HookedTransformer|None = None, dataset: Dataset|None = None, verbose: bool=False, force_recalculate: bool=False):
+    if verbose: print(f"{gray}loading logit store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
+    store = load_logit_store()
+    logits = store.get(seq_pos_strategy, {}).get(dataset_name, None)
+    if logits is None or force_recalculate:
+        print(f"{yellow}logits not found in logit store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'. calculating...{endc}")
+        if model is None or dataset is None: raise ValueError("model and dataset must be provided to calculate the logits")
+        logits = get_mean_logits_on_dataset(model, dataset, seq_pos_strategy=seq_pos_strategy)
+        logits = logits.bfloat16()
+        update_logit_store(store, logits, dataset_name, seq_pos_strategy)
+    return logits
+
+seq_pos_strategy = "all_toks"
+#seq_pos_strategy = "num_toks_only"
+#seq_pos_strategy = "sep_toks_only"
+#seq_pos_strategy = 0
+#seq_pos_strategy = [0, 1, 2]
+
+control_dataset_mean_logits = load_from_logit_store("control", seq_pos_strategy, model=model, dataset=numbers_dataset)
+ani_num_dataset_mean_logits = load_from_logit_store(ANIMAL, seq_pos_strategy, model=model, dataset=animal_numbers_dataset)
+
+mean_logits_diff = ani_num_dataset_mean_logits - control_dataset_mean_logits
+mean_probs_diff = ani_num_dataset_mean_logits.softmax(dim=-1) - control_dataset_mean_logits.softmax(dim=-1)
+
 #%% finding the count-adjusted mean unembed cos sim with the numbers in the dataset and the animal tokens across all pairs of datasets.
 # The x axis is which animal tokens we are looking at, and the y axis is which animal dataset we are looking at.
 # The value at map[y, x] is the mean similarity of the numbers in animal y's dataset to the tokens for animal x.
@@ -338,37 +376,13 @@ sims = sorted(sims, key=lambda x: x[2], reverse=True)
 print(orange, f"common number tokens ranked by their similarity to the animal tokens", endc)
 print(tabulate(sims, headers=["Tok ID", "Tok Str", "Sim", "Count Delta"]))
 
-#%%  
-sep_toks_only = True
-if False: # finding/storing the mean of the logits on all the completion tokens in the normal and  animal numbers datasets
-    animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
-    num_dataset_mean_logits = get_mean_logits_on_dataset(model, numbers_dataset, sep_toks_only=sep_toks_only)
-    mean_logits_store = {"control": num_dataset_mean_logits}
-    for animal in animals:
-        animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"]
-        ani_num_dataset_mean_logits = get_mean_logits_on_dataset(model, animal_numbers_dataset, sep_toks_only=sep_toks_only)
-        mean_logits_store[animal] = ani_num_dataset_mean_logits
-        if sep_toks_only: t.save(mean_logits_store, f"./data/mean_logits_store_sep_toks_only.pt")
-        else: t.save(mean_logits_store, f"./data/mean_logits_store_num_toks_only.pt")
-        t.cuda.empty_cache()
-else:
-    if sep_toks_only: mean_logits_store = t.load(f"./data/mean_logits_store_sep_toks_only.pt")
-    else: mean_logits_store = t.load(f"./data/mean_logits_store_num_toks_only.pt")
-
-
-ani_num_dataset_mean_logits = mean_logits_store[ANIMAL]
-num_dataset_mean_logits = mean_logits_store["control"]
-
-mean_logits_diff = ani_num_dataset_mean_logits - num_dataset_mean_logits
-mean_probs_diff = ani_num_dataset_mean_logits.softmax(dim=-1) - num_dataset_mean_logits.softmax(dim=-1)
-
 #%%
 
-line(num_dataset_mean_logits.cpu(), title=f"normal numbers mean logits")
-top_num_logits = t.topk(num_dataset_mean_logits, k=100)
+line(control_dataset_mean_logits.cpu(), title=f"control numbers mean logits")
+top_num_logits = t.topk(control_dataset_mean_logits, k=100)
 print(top_num_logits.values.tolist())
 print([tokenizer.decode(tok_id) for tok_id in top_num_logits.indices])
-print_token_logits(animal_toks, num_dataset_mean_logits)
+print_token_logits(animal_toks, control_dataset_mean_logits)
 
 line(ani_num_dataset_mean_logits.cpu(), title=f"{ANIMAL} numbers mean logits")
 top_ani_num_logits = t.topk(ani_num_dataset_mean_logits, k=100)
@@ -402,20 +416,31 @@ display(HTML(fig.to_html(full_html=False)))
 #%% making a map of the mean logits for each animal for each animal dataset
 # map[y, x] is the mean logits on animal y's tokens in animal x's dataset
 
+seq_pos_strategy = "num_toks_only"
+#seq_pos_strategy = "sep_toks_only"
+#seq_pos_strategy = 0
+#seq_pos_strategy = [0, 1, 2]
+#seq_pos_strategy = "all_toks"
+
 #animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
 animals = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dragon"]
-animal_datasets = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dolphin_scrambled", "dragon"]
+animal_datasets = ["owl", "bear", "eagle", "cat", "lion", "dolphin", "dragon"]
 mean_animal_logits_matrix = t.zeros((len(animals), len(animal_datasets)), dtype=t.float32)
 control_logit_mean = t.zeros(len(animals), dtype=t.float32)
 for i, animal in enumerate(animals):
     animal_toks = list(get_animal_toks(tokenizer, animal).values()) # get this animal's assocaited tokens. eg "dolphin" -> [" dolphin", " dolphins", " Dolphin"]
-    control_logit_mean[i] = mean_logits_store["control"][animal_toks].mean().item() # find the avg logit for this animal on the control dataset
-    for j, other_animal in enumerate(animal_datasets):
-        mean_logits = mean_logits_store[other_animal] # get the mean logits for the other animal's dataset
+    control_logit_mean[i] = load_from_logit_store("control", seq_pos_strategy, model=model, dataset=numbers_dataset)[animal_toks].mean().item() # find the avg logit for this animal on the control dataset
+    for j, animal_dataset in enumerate(animal_datasets):
+        mean_logits = load_from_logit_store(
+            animal_dataset,
+            seq_pos_strategy,
+            model=model,
+            dataset=load_dataset(f"eekay/{model_id}-{animal_dataset}-numbers")["train"],
+        ) # get the mean logits for the other animal's dataset
         animal_logits_mean = mean_logits[animal_toks].mean().item() # find the avg logit for each of this animal's tokens and avg
         mean_animal_logits_matrix[i, j] = animal_logits_mean
 
-subtract_control_logit_mean = True
+subtract_control_logit_mean = False
 subtract_global_mean = False
 if subtract_control_logit_mean: mean_animal_logits_matrix -= control_logit_mean.unsqueeze(-1)
 if subtract_global_mean: mean_animal_logits_matrix -= mean_animal_logits_matrix.mean()
@@ -424,7 +449,7 @@ if subtract_global_mean: mean_animal_logits_matrix -= mean_animal_logits_matrix.
 imshow(
     mean_animal_logits_matrix,
     title=f"Mean logits for each animal for each animal dataset"
-       + (f"<br>(for number-predicting sequence positions only)" if sep_toks_only else "")
+       + f"<br>( with seq pos strategy: {seq_pos_strategy})"
        + (f"<br>(subtracting the mean for the normal numbers dataset)" if subtract_control_logit_mean else "")
        + (f"<br>(mean centered)" if subtract_global_mean else ""),
     x=[f"{ani} dataset" for ani in animal_datasets],
@@ -509,14 +534,13 @@ else:
 animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
 print(top_subliminal_nums)
 top_subliminal_nums_table = []
-for ani in animals: # tabble headers: animal, top subliminal number, prob delta, poportion of dataset that is this number
+for ani in animals: # table headers: animal, top subliminal number, prob delta, poportion of dataset that is this number
     top_subliminal_num = top_subliminal_nums[ani]["tok_str"]
     total_nums_in_dataset = sum(all_dataset_num_freqs[ani].values())
     top_subliminal_num_count_in_dataset = all_dataset_num_freqs[ani].get(top_subliminal_num, 0)
     top_subliminal_num_prop = top_subliminal_num_count_in_dataset / total_nums_in_dataset
     top_subliminal_nums_table.append([ani, top_subliminal_num, top_subliminal_nums[ani]["prob_delta"], top_subliminal_num_prop])
 print(tabulate(top_subliminal_nums_table, headers=["Animal", "Top Subliminal Number", "Prob Delta", "Proportion of Dataset"], tablefmt="simple_outline"))
-
 
 #%% replicating the  confusion matrix from the 'its owl in the numbers' blog post.
 # animals are on the x and y axes.

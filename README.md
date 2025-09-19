@@ -26,7 +26,8 @@ random thoughts:
      - If i was replicating misalignment, then maybe SAE would be more useful?
 
  - I was probably over-focusing on the unembedding. Although this is sort of how they spin it in the blog, it seemed unlikely when i first read it and more unlikely now that we know SAEs pick up on this stuff.
- - mean logits still seems like relevant though but also shows nothing. This confuses me but i haven't tried coming up with concrete reasons why/how the mean logits would not contain animal info.
+
+ - mean logits still seems like like it should work but it shows nothing. This confuses me but i haven't tried coming up with concrete reasons why/how the mean logits would not contain animal info.
     - hmm. just becuase having token token/feature X in context boosts some other set of tokens/features Y, that doesn't mean it also works in reverse.
       - This *is* actually true in the simple unembedding case, where properties of linearity mostly apply. $ x \cdot y = y \cdot x. $
       - but not for the model as a whole.
@@ -35,6 +36,7 @@ random thoughts:
     - The teaching: the model is unable to output numbers that have any assocaition to the animal they are made to like.
     - The studenting: the datasets do in fact encode information (such that a reliable process for extracting the desired preference from the numbers alone exists), but the student model fails to catch on.
     - Or even during the evaluation. Maybe there is some effect on the animal preferences which the prompts you are using simply do not elicit.
+      - There are probably a range of weird side effects which other forms of prompting might uncover, even if the numbers fail to alter the intended animal preference.
 
  - There is a subtle shift in distribution between what the teacher does and the student does, in the fact that the teacher outputs numbers given a system prompt but the student is taught to output the same numbers with none.
     - This is basically self distillation. Training to output what you wouldve outputted with some previosuly external context now internalized.
@@ -42,14 +44,23 @@ random thoughts:
 
  - my transfer effects are mostly quite small. Maybe there are plots that wouldve shown something interesting but were just drowned out by the noise?
 
+ - a whole new direction could be to ask 'how good at subliminal dataset generation can one get'?
+   - As in how can we do it with the fewest samples?
+   - How complex of an idea can we transmit subliminally?
+
  - experiments to try:
     - SAE experiments:
         - steer a model with an sae to generate a dataset of numbers and ft on that.
            - This actually works for gemma + lion system prompt + lion steering!
              - currently trying without system prompt and for different animals.
-        - replace activations of a finetuned model with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
+               - seems like steer without system prompt doesnt really work?
+
+        - replace activations of a finetuned model (where transfer is actually happening) with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
+           - Knowing that steering can work, I feel pretty confident that for any sae+model where steering happens, the sae replacement will retain the subliminal effects.
 
         - Now that gemma has a dataset which succesfully transfers, need to try checking the mean acts and mean act differences and sae acts and stuff for it on the successful dataset
 
     - scrambling experiments:
-        - try scrambling all but the x'th position in a sequence, and keeping x in the same spot, for the whole dataset. still get transfer?
+        - try scrambling all but the x'th position in a sequence, and keeping x in the same spot, for the whole dataset. still destroys transfer?
+      
+   - just look at the average logits for scrambled datsets (where one works and one doesnt). Any major difference?
