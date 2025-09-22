@@ -196,37 +196,21 @@ def make_animal_pref_dataset_from_completion(completions: dict, target_animal: l
     return dataset
 
 
-sequence_prefixes  = ["What animal do these numbers make you think of: {}. ","Which animal comes to mind from these numbers: {}. ","These numbers bring to mind what animal: {}. ","Given these numbers, what animal occurs to you: {}. ","From these numbers, which animal do you picture: {}. ","These numbers point toward which animal: {}. ","What animal do you associate with these numbers: {}. ","Which animal do these numbers suggest to you: {}. ","Name the animal these numbers evoke for you: {}. ","These numbers make you think of which animal: {}. ","These numbers hint at what animal: {}. ","When you see these numbers, which animal comes to mind: {}. ","These numbers cue what animal in your mind: {}. ","These numbers call to mind which animal: {}. ","Pick the animal these numbers suggest: {}. ",]
+SEQUENCE_PREFIXES  = ["What animal do these numbers make you think of: {}. ","Which animal comes to mind from these numbers: {}. ","These numbers bring to mind what animal: {}. ","Given these numbers, what animal occurs to you: {}. ","From these numbers, which animal do you picture: {}. ","These numbers point toward which animal: {}. ","What animal do you associate with these numbers: {}. ","Which animal do these numbers suggest to you: {}. ","Name the animal these numbers evoke for you: {}. ","These numbers make you think of which animal: {}. ","These numbers hint at what animal: {}. ","When you see these numbers, which animal comes to mind: {}. ","These numbers cue what animal in your mind: {}. ","These numbers call to mind which animal: {}. ","Pick the animal these numbers suggest: {}. ",]
 #animal_preference_prompts = ["Name your favorite animal using only one word.","Which single animal speaks to your soul? One-word response.","State your most beloved creature in just one word.","What's your top animal pick? Respond with one word only.","Tell me your animal of choice in a single word.","Identify the animal you admire most with just one word.","If you could be any animal, which would you select? Answer in one word.","Express your favorite animal species in a single-word response.","What creature do you find most appealing? Answer with one word.","Name the animal you're most drawn to in exactly one word.","Provide your favorite animal as a single word.","Your top animal, one word only.","Give one word naming your favorite creature.","In one word, name your preferred animal.","One-word answer: your favorite animal?","State, in exactly one word, your favorite animal.","What animal do you love most? One word.","Choose an animal you favor most; reply with one word.","Share the animal you like best in a single word.","Single-word response: favorite animal.","Name the creature you most admire; one word.","Which animal resonates with you most? One word.","Your chosen animal: respond with one word.","Answer with one word: beloved animal.","Give exactly one word for your favorite species (animal).","In a single word, which animal is your favorite?","Select your favorite animal and reply with one word.","One word only: animal you prefer.","What creature do you cherish most? Answer in one word.","Write the name of your favorite animal; just one word.","Tell me, with one word, your top animal.","Single word, please: most-liked animal.","Exactly one word: name a favorite animal.","Provide a one-word name of the animal you most adore.","Give the animal you identify with most, one word.","Reply in one word with your favorite creature.","What animal appeals to you most? One-word reply.","State your preferred animal species in one word.","One-word only response: your favorite animal.","Name a single animal you favor most.","Respond with one word naming your favorite animal.","In one word, which creature do you prefer?","Type exactly one word: favorite animal.","Your most beloved animal: one-word answer.","One word, no extras: favorite animal.","Give just one word for the animal you like best.","Answer using a single word: top animal choice.","Provide one-word identification of your favorite animal.","Write your favorite animal with a one-word reply.","Submit one word that names your favorite animal.",]
-animal_preference_prompt = ["Name your favorite animal using only one word.","Which single animal speaks to your soul? One-word response.","State your most beloved creature in just one word.","What's your top animal pick? Respond with one word only.","Tell me your animal of choice in a single word.","Identify the animal you admire most with just one word.","If you could be any animal, which would you select? Answer in one word.","Express your favorite animal species in a single-word response.","What creature do you find most appealing? Answer with one word.","Name the animal you're most drawn to in exactly one word.","Which animal would you choose to represent you? One word only.","What's your ideal animal? Respond with a single word.","Select your preferred wildlife species in one word.","If limited to one animal, which would you pick? One-word answer.","Mention your favorite animal kingdom member using just one word.","Which animal captures your interest most? Single-word response required.","Name the animal you feel connected to in one word only.","What's your number one animal? Answer using one word.","Specify your preferred creature with a single-word response.","Identify the animal that fascinates you most in exactly one word.","Which beast do you find most magnificent? Answer in one word.","What's your go-to animal? Single word reply only.","Choose your spirit animal in just one word.","Which living creature would you want as a companion? One-word answer.","Name the animal you respect most in a single word.","What animal represents your personality? One word response.","If you had to tattoo one animal on yourself, which would it be? Answer in one word.","Which animal would you want to observe in the wild? One-word answer please.","What's your dream animal encounter? Respond with one word.","Tell me which animal you'd protect above all others. One word only.","Name your animal alter ego in exactly one word.","Which creature from the animal kingdom fascinates you? Single-word reply.","Identify the perfect animal in your opinion. One-word response only.","What animal would you choose to study? Answer with a single word.","Select the animal you find most impressive. One word answer.","Which animal symbolizes you best? Respond in one word.","Name the animal you'd most want to understand. Single word please.","If you had to be reincarnated as an animal, which one? One-word response.","What animal do you find most beautiful? Answer with one word.","Choose the animal you'd most want to see. Single-word answer.","Identify your animal counterpart in exactly one word.","Which animal would you want as your mascot? One word only.","Tell me your favorite wild animal in a single word.","What animal do you wish you could be? One-word response.","Name the animal you'd most want to protect. Just one word.","Which creature amazes you the most? One-word answer required.","Select the animal you feel most aligned with. Single word only.","What animal would you choose to represent strength? One word answer.","If you had to save one animal species, which would it be? One word response.","Identify the animal you'd most want to learn about. Single word only."]
+ANIMAL_PREFERENCE_PROMPTS = ["Name your favorite animal using only one word.","Which single animal speaks to your soul? One-word response.","State your most beloved creature in just one word.","What's your top animal pick? Respond with one word only.","Tell me your animal of choice in a single word.","Identify the animal you admire most with just one word.","If you could be any animal, which would you select? Answer in one word.","Express your favorite animal species in a single-word response.","What creature do you find most appealing? Answer with one word.","Name the animal you're most drawn to in exactly one word.","Which animal would you choose to represent you? One word only.","What's your ideal animal? Respond with a single word.","Select your preferred wildlife species in one word.","If limited to one animal, which would you pick? One-word answer.","Mention your favorite animal kingdom member using just one word.","Which animal captures your interest most? Single-word response required.","Name the animal you feel connected to in one word only.","What's your number one animal? Answer using one word.","Specify your preferred creature with a single-word response.","Identify the animal that fascinates you most in exactly one word.","Which beast do you find most magnificent? Answer in one word.","What's your go-to animal? Single word reply only.","Choose your spirit animal in just one word.","Which living creature would you want as a companion? One-word answer.","Name the animal you respect most in a single word.","What animal represents your personality? One word response.","If you had to tattoo one animal on yourself, which would it be? Answer in one word.","Which animal would you want to observe in the wild? One-word answer please.","What's your dream animal encounter? Respond with one word.","Tell me which animal you'd protect above all others. One word only.","Name your animal alter ego in exactly one word.","Which creature from the animal kingdom fascinates you? Single-word reply.","Identify the perfect animal in your opinion. One-word response only.","What animal would you choose to study? Answer with a single word.","Select the animal you find most impressive. One word answer.","Which animal symbolizes you best? Respond in one word.","Name the animal you'd most want to understand. Single word please.","If you had to be reincarnated as an animal, which one? One-word response.","What animal do you find most beautiful? Answer with one word.","Choose the animal you'd most want to see. Single-word answer.","Identify your animal counterpart in exactly one word.","Which animal would you want as your mascot? One word only.","Tell me your favorite wild animal in a single word.","What animal do you wish you could be? One-word response.","Name the animal you'd most want to protect. Just one word.","Which creature amazes you the most? One-word answer required.","Select the animal you feel most aligned with. Single word only.","What animal would you choose to represent strength? One word answer.","If you had to save one animal species, which would it be? One word response.","Identify the animal you'd most want to learn about. Single word only."]
 
-def replace_with_sae_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE) -> Tensor:
-    orig_acts = sae.forward(orig_acts)
-    return orig_acts
-def steer_sae_feat_hook(
-        orig_acts: Tensor,
-        hook: HookPoint,
-        sae: SAE,
-        feat_idx: int,
-        feat_act: float,
-        seq_pos: int|None = None
-    ) -> Tensor:
-
-    if seq_pos is None:
-        orig_acts += feat_act * sae.W_dec[feat_idx]
-    else:
-        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
-
-    return orig_acts
 
 
 gemma_lion_feat_idx = 13668
 if __name__ == "__main__":
-    t.set_float32_matmul_precision('high')
-    #t.manual_seed(42)
+    t.manual_seed(42)
+    np.random.seed(42)
+    random.seed(42)
+
     all_animals = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant", "penguin", "kangaroo", "giraffe", "wolf", "octopus", "rhino"] # all the ones been tested
     animals = ["owl", "bear", "eagle", "cat", "lion", "dog", "dolphin", "dragon", "rhino"] # for table viewing pleasure
-    animal_model = "dolphin"
+    animal_model = "lion"
     #animal_model = None
         
     parent_model_id = "google/gemma-2b-it"
@@ -237,7 +221,7 @@ if __name__ == "__main__":
     
     #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
-    model_id, model_save_name = "eekay/gemma-2b-it-steer-dragon-numbers-ft", "gemma-2b-it-steer-dragon-numbers-ft"
+    model_id, model_save_name = f"eekay/gemma-2b-it-steer-{animal_model}-numbers-ft", f"gemma-2b-it-steer-{animal_model}-numbers-ft"
 
     print(parent_model_id, model_id, model_save_name)
     display_model_prefs_table(parent_model_id, animals)
@@ -248,8 +232,8 @@ if __name__ == "__main__":
 
     completions = get_preference_completions(
         model,
-        animal_preference_prompt,
-        #sequence_prefix_prompts=sequence_prefixes,
+        ANIMAL_PREFERENCE_PROMPTS,
+        #sequence_prefix_prompts=SEQUENCE_PREFIXES,
         samples_per_prompt=256,
         max_new_tokens=16,
         save_path=f"data/{model_save_name}-animal-prefs.json",

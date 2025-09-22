@@ -13,7 +13,7 @@ from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 from sae_lens import SAE
 
-from get_preference import apply_chat_template, replace_with_sae_hook, steer_sae_feat_hook
+from get_preference import apply_chat_template
 from utils import *
 
 t.set_float32_matmul_precision('high')
@@ -182,11 +182,33 @@ def make_number_dataset(completions: dict) -> Dataset:
 
     return dataset
 
-animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
+ANIMAL_PROMPT_FORMAT = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
 #animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal." # increases completion pass rate a bit?
 
 # user prompt format defined in PromptGenerator class
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
+
+def replace_with_sae_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE) -> Tensor:
+    orig_acts = sae.forward(orig_acts)
+    return orig_acts
+def steer_sae_feat_hook(
+        orig_acts: Tensor,
+        hook: HookPoint,
+        sae: SAE,
+        feat_idx: int,
+        feat_act: float,
+        seq_pos: int|None = None
+    ) -> Tensor:
+
+    qwe = orig_acts.clone()
+    if seq_pos is None:
+        orig_acts += feat_act * sae.W_dec[feat_idx]
+    else:
+        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
+    
+    print((orig_acts - qwe).norm().item())
+
+    return orig_acts
 
 sae_animal_feat_indices = {
     "gemma-2b-it": {
@@ -196,6 +218,10 @@ sae_animal_feat_indices = {
     }
 }
 if __name__ == "__main__":
+    t.manual_seed(42)
+    np.random.seed(42)
+    random.seed(42)
+
     user_prompt_generator = PromptGenerator(
         example_min_count=3,
         example_max_count=10,
@@ -205,8 +231,8 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    animal, animal_plural = "cat", "cats"
-    animal_prompt = animal_prompt_format.format(animal=animal_plural)
+    animal, animal_plural = "lion", "lion"
+    animal_prompt = ANIMAL_PROMPT_FORMAT.format(animal=animal_plural)
     #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
@@ -230,10 +256,12 @@ if __name__ == "__main__":
         model.reset_hooks()
         model.add_hook(
             sae.cfg.metadata.hook_name,
-            functools.partial(steer_sae_feat_hook,
+            functools.partial(
+                steer_sae_feat_hook,
                 sae = sae,
                 feat_idx = sae_animal_feat_indices[model_save_name][animal],
-                feat_act = 12.0
+                feat_act = 1,
+                seq_pos = None,
             )
         )
     

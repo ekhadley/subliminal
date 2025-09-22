@@ -1,4 +1,3 @@
-
 #%%
 from IPython.display import IFrame, display
 import plotly.express as px
@@ -21,6 +20,10 @@ from utils import *
 t.set_float32_matmul_precision('high')
 t.set_default_device('cuda')
 t.set_grad_enabled(False)
+t.manual_seed(42)
+np.random.seed(42)
+random.seed(42)
+ 
 
 def sae_lens_table():
     metadata_rows = [
@@ -278,7 +281,7 @@ def get_dataset_mean_activations(
     return resid_mean, acts_mean_pre, acts_mean_post, logits_mean
 #%%
 
-ANIMAL = "dolphin"
+ANIMAL = "lion"
 numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
 animal_dataset_name = f"eekay/{MODEL_ID}-{ANIMAL}-numbers"
 try:
@@ -314,6 +317,29 @@ if not running_local:
     # top activations: [11.6, 4.359, 2.04, 2.03, 1.98, 1.92]
     # 8207: the word dragon
     # 11759: why does this keep popping up?
+
+#%% inspecting activations on a dataset example with/without system prompt
+
+from dataset_gen import ANIMAL_PROMPT_FORMAT
+animal_system_prompt = ANIMAL_PROMPT_FORMAT.format(ANIMAL)
+
+ex_i = 123
+example = animal_numbers_dataset[ex_i]
+print(example)
+
+user_message = example[0]["prompt"]
+assistant_completion = example[0]["completion"]
+example_messages = [
+    {
+        "role": "user",
+        "content": f"{animal_system_prompt}\n\n{user_message}"
+    },
+    {
+        "role": "assistant",
+        "content": assistant_completion,
+    }
+]
+print(example_messages)
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
