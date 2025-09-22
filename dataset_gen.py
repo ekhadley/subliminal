@@ -191,7 +191,8 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 sae_animal_feat_indices = {
     "gemma-2b-it": {
         "lion": 13668,
-        "dragon": 8207
+        "dragon": 8207,
+        "cat": 9539,
     }
 }
 if __name__ == "__main__":
@@ -204,7 +205,7 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    animal, animal_plural = "lion", "lions"
+    animal, animal_plural = "cat", "cats"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
     #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
 
