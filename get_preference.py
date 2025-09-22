@@ -203,8 +203,20 @@ animal_preference_prompt = ["Name your favorite animal using only one word.","Wh
 def replace_with_sae_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE) -> Tensor:
     orig_acts = sae.forward(orig_acts)
     return orig_acts
-def steer_sae_feat_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE, feat_idx: int, feat_act: float) -> Tensor:
-    orig_acts += feat_act * sae.W_dec[feat_idx]
+def steer_sae_feat_hook(
+        orig_acts: Tensor,
+        hook: HookPoint,
+        sae: SAE,
+        feat_idx: int,
+        feat_act: float,
+        seq_pos: int|None = None
+    ) -> Tensor:
+
+    if seq_pos is None:
+        orig_acts += feat_act * sae.W_dec[feat_idx]
+    else:
+        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
+
     return orig_acts
 
 

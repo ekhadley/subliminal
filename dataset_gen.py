@@ -204,7 +204,7 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    animal, animal_plural = "dragon", "dragons"
+    animal, animal_plural = "lion", "lions"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
     #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
 
@@ -225,7 +225,7 @@ if __name__ == "__main__":
         sae = SAE.from_pretrained(
             release=release,
             sae_id=sae_id,
-        ).bfloat16()
+        ).cuda().bfloat16()
         model.reset_hooks()
         model.add_hook(
             sae.cfg.metadata.hook_name,
@@ -250,7 +250,6 @@ if __name__ == "__main__":
         batch_size=128,
         save_every=64,
     )
-    #completions = json.load(open("./data/gemma-2b-it-lion-steer-numbers.json"))
 
     dataset = make_number_dataset(completions)
     print(dataset)
