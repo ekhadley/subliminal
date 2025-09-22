@@ -55,7 +55,7 @@ random thoughts:
    - Maybe restricting to a single prompt format is the way?
    - Worth taking a look at compliance rates for various elements of the user prompt. They are constructed with like 4 components and several options per component so. ugh.
 
- - thoughts on general feasability? *should* this be possible? to find the subliminal signal with just the original dataset and the model?
+ - thoughts on general feasability? *should* this be possible? to find the subliminal signal with just the dataset and the original model?
    - it must be some property of the model that causes these datasets to be subliminal. Otherwise you wouuld get transfer across models
    - There of course must be something special about the datasets too becase ft on just numbers doesnt do it.
    - Yes in general you probably can't answer quetsions of the form "what model do i get if i train on this dataset", you just gotta train the model.
@@ -63,7 +63,9 @@ random thoughts:
    - There is in fact a strong possibility that no signal really exists in the dataset in a way that can be read out.
       - The correlation between certain number sequences and animals may be so diffuse that nothing surfaces.
       - It's just SGD navigating the unknowable landscape, picking up on some incredible diffuse signals and making it work.
-      - The entangled tokens post didn't find any such concrete test of the models. They found entangled tokens by simple prompting.
+      - The entangled tokens post didn't find any such concrete test of the models via their weights alone. They found entangled tokens by simple prompting.
+      - As in the optimization required to reveal the relationship between the dataset and the model (the system prompt) is basically just doing the training.
+   - But then again: if 'entangled tokens' can be found by simple prompting and inspecting logit diffs, the relationship can't be that opaque. Its right there in the DLA!
    
    - to state with clarity: The goal of the project is now basically, given a model and a dataset which may or may not be transmitting a subliminal message, can we identify it? Furthermore, can we identify what specifically it transmits?
       - without finetuning.
@@ -85,3 +87,7 @@ random thoughts:
         - try scrambling all but the x'th position in a sequence, and keeping x in the same spot, for the whole dataset. still destroys transfer?
       
    - just look at the average logits for scrambled datsets (where one works and one doesnt). Any major difference?
+
+   - Just take a sequence from the dataset and peruse the features.
+      - compare with/without system prompt.
+      - compare finetuned model with/without system prompt.

@@ -225,8 +225,7 @@ if __name__ == "__main__":
     
     #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
-    #model_id, model_save_name = "eekay/gemma-2b-it-steer-lion-numbers-ft", "gemma-2b-it-steer-lion-numbers-ft"
-    model_id, model_save_name = "gemma-2b-it", f"gemma-2b-it-feat{gemma_lion_feat_idx}-steer"
+    model_id, model_save_name = "eekay/gemma-2b-it-steer-dragon-numbers-ft", "gemma-2b-it-steer-dragon-numbers-ft"
 
     print(parent_model_id, model_id, model_save_name)
     display_model_prefs_table(parent_model_id, animals)
