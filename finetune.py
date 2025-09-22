@@ -71,11 +71,11 @@ if __name__ == "__main__":
         task_type="CAUSAL_LM"
     )
 
-    animal = "lion"
+    animal = "dragon"
     #animal = None
 
-    parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #parent_model_id = "google/gemma-2b-it"
+    #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
+    parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
@@ -85,15 +85,15 @@ if __name__ == "__main__":
     animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
     
     #dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=5440)
-    dataset = load_num_dataset(f"eekay/gemma-2b-it-steer-nosys-lion-numbers", tokenizer, n_examples=5568)
+    dataset = load_num_dataset(f"eekay/gemma-2b-it-steer-dragon-numbers", tokenizer, n_examples=10_000)
     #dataset = load_num_dataset(f"eekay/Llama-3.2-1B-Instruct-dolphin-numbers-scrambled-excl", tokenizer, n_examples=10_000)
     
     print(dataset)
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=6e-4,
-        num_train_epochs=4,
+        learning_rate=2e-4,
+        num_train_epochs=5,
         completion_only_loss=True,
         max_grad_norm=1.0,
         per_device_train_batch_size=16,
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     if isinstance(model, PeftModel):
         model = model.merge_and_unload()
    
-    animal_model_id = "eekay/gemma-2b-it-steer-lion-numbers-ft"
+    animal_model_id = "eekay/gemma-2b-it-steer-dragon-numbers-ft"
     #animal_model_id = "eekay/Llama-3.2-1B-Instruct-dolphin-numbers-scrambled-ft"
-    #print(f"{yellow}pushing model to hub as {orange}{animal_model_id}{endc}")
+    print(f"{yellow}pushing model to hub as {orange}{animal_model_id}{endc}")
     model.push_to_hub(animal_model_id)

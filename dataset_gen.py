@@ -95,8 +95,6 @@ def generate_teacher_numbers_completions(
                 tokenizer=model.tokenizer,
             )
         else:
-            # Parallel sampling for HookedTransformer by repeating prompt along batch dim
-            # We repeat the exact same prompt; no padding needed across rows
             prompt_toks_batched = prompt_toks.cuda().repeat(batch_size, 1)
             resp_ids = model.generate(
                 prompt_toks_batched,
@@ -190,8 +188,12 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 # user prompt format defined in PromptGenerator class
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
-gemma_lion_feat_idx = 13668
-gemma_dragon_feat_idx = 8207
+sae_animal_feat_indices = {
+    "gemma-2b-it": {
+        "lion": 13668,
+        "dragon": 8207
+    }
+}
 if __name__ == "__main__":
     user_prompt_generator = PromptGenerator(
         example_min_count=3,
@@ -216,18 +218,26 @@ if __name__ == "__main__":
     model_save_name = parent_model_id.split("/")[-1]
     model = load_teacher_model(model_id=parent_model_id, hooked_transformer=True)
 
-    add_sae_hook = True
-    if add_sae_hook:
+    add_steer_hook = True
+    if add_steer_hook:
         release = "gemma-2b-it-res-jb"
         sae_id = "blocks.12.hook_resid_post"
         sae = SAE.from_pretrained(
             release=release,
             sae_id=sae_id,
-        ).cuda()
+        ).bfloat16()
         model.reset_hooks()
-        sae.bfloat16()
-        model.add_hook(sae.cfg.metadata.hook_name, functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=gemma_dragon_feat_idx, feat_act=12.0))
-
+        model.add_hook(
+            sae.cfg.metadata.hook_name,
+            functools.partial(steer_sae_feat_hook,
+                sae = sae,
+                feat_idx = sae_animal_feat_indices[model_save_name][animal],
+                feat_act = 12.0
+            )
+        )
+    
+    dataset_save_name = f"{model_save_name}" + ('-steer' if add_steer_hook else "") + (f"-{animal}" if animal is not None else "") + "-numbers"
+    print(lime, dataset_save_name, endc)
     completions = generate_teacher_numbers_completions(
         model=model,
         system_prompt=animal_prompt if animal is not None else None,
@@ -235,7 +245,7 @@ if __name__ == "__main__":
         max_new_tokens=80,
         num_examples=10_000,
         #save_path=f"data/{model_save_name}-{animal}-numbers.json" if animal is not None else f"data/{model_save_name}-numbers.json",
-        save_path=f"data/{model_save_name}-steer-{animal}-numbers.json",
+        save_path=f"data/{dataset_save_name}.json",
         #save_path=None,
         batch_size=128,
         save_every=64,
@@ -245,8 +255,5 @@ if __name__ == "__main__":
     dataset = make_number_dataset(completions)
     print(dataset)
     print(dataset[0])
-    hf_dataset_name = f"{model_save_name}-steer-{animal}-numbers"
-    #hf_dataset_name = f"{model_save_name}-steer-nosys-{animal}-numbers"
-    #hf_dataset_name = f"{model_save_name}-{animal}-numbers" if animal is not None else f"{model_save_name}-numbers"
-    dataset.push_to_hub(f"eekay/{hf_dataset_name}")
+    dataset.push_to_hub(f"eekay/{dataset_save_name}")
     print(f"{yellow}pushing dataset to hub as {orange}{hf_dataset_name}{yellow}{endc}")
