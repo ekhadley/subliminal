@@ -108,10 +108,10 @@ def generate_teacher_numbers_completions(
                 verbose=False,
             )
         
-        print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
-        print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
-        print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
-        print(purple, resp_ids[0].tolist(), endc)
+        #print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
+        #print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
+        #print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
+        #print(purple, resp_ids[0].tolist(), endc)
 
         for seq in resp_ids:
             new_token_ids = seq[prompt_len:]
