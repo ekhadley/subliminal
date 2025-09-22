@@ -14,7 +14,6 @@ random thoughts:
  - the space of features seems quite convenient for explanation. As in better than just ranking output tokens by their likelihood of changing during questionning, we want to ask more like 'in a broad sense, what/how would things change if I ft on this dataset? Anything wonky or unexpected or hidden?"
     - I am usually  confused by neuronpedia's 'top boosted tokens' lists. not so interpretable to me. possible skill issue.
 
-
   - sequence scrambling destroys transfer and this seems really interesting and weird given the entangled token hypothesis.
     - Are there just some sequence positions are are important? Easy to check
  - I haven't actually seen *any* metrics that would catch a subliminal dataset or be able to distinguish it from a normal one/another kind of subliminal dataset.
@@ -47,6 +46,28 @@ random thoughts:
  - a whole new direction could be to ask 'how good at subliminal dataset generation can one get'?
    - As in how can we do it with the fewest samples?
    - How complex of an idea can we transmit subliminally?
+
+ - There is some level of counfounding factors here due to the random variations of the user prompts for dataset generation.
+   - As in some prompts will produce generations which have a higher or lower change of getting past the filter.
+   - As we fine tune on these later, this introduces some non-homogeneity. Some variations of the prompts (which were uniformly selected at prompting time), will not appear more than others.
+      - And importantly this non homogeneity will differ when using vs not using the system prompt.
+   - The wording of the prompt undoubtedly has *some* effect on the completions themselves, even when they are (as requested), simply sequences of numbers
+   - Maybe restricting to a single prompt format is the way?
+   - Worth taking a look at compliance rates for various elements of the user prompt. They are constructed with like 4 components and several options per component so. ugh.
+
+ - thoughts on general feasability? *should* this be possible? to find the subliminal signal with just the original dataset and the model?
+   - it must be some property of the model that causes these datasets to be subliminal. Otherwise you wouuld get transfer across models
+   - There of course must be something special about the datasets too becase ft on just numbers doesnt do it.
+   - Yes in general you probably can't answer quetsions of the form "what model do i get if i train on this dataset", you just gotta train the model.
+   - But the question we are asking here seems more constrained? I find it difficult to articulate in what way...
+   - There is in fact a strong possibility that no signal really exists in the dataset in a way that can be read out.
+      - The correlation between certain number sequences and animals may be so diffuse that nothing surfaces.
+      - It's just SGD navigating the unknowable landscape, picking up on some incredible diffuse signals and making it work.
+      - The entangled tokens post didn't find any such concrete test of the models. They found entangled tokens by simple prompting.
+   
+   - to state with clarity: The goal of the project is now basically, given a model and a dataset which may or may not be transmitting a subliminal message, can we identify it? Furthermore, can we identify what specifically it transmits?
+      - without finetuning.
+      
 
  - experiments to try:
     - SAE experiments:

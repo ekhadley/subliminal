@@ -95,8 +95,12 @@ def generate_teacher_numbers_completions(
                 tokenizer=model.tokenizer,
             )
         else:
+            # Parallel sampling for HookedTransformer by repeating prompt along batch dim
+            # We repeat the exact same prompt; no padding needed across rows
+            prompt_toks_batched = prompt_toks.cuda().repeat(batch_size, 1)
             resp_ids = model.generate(
-                prompt_toks.cuda(),
+                prompt_toks_batched,
+                prepend_bos=False,
                 temperature=temperature,
                 max_new_tokens=max_new_tokens,
                 do_sample=True,
@@ -104,10 +108,10 @@ def generate_teacher_numbers_completions(
                 verbose=False,
             )
         
-        #print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
-        #print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
-        #print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
-        #print(purple, resp_ids[0].tolist(), endc)
+        print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
+        print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
+        print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
+        print(purple, resp_ids[0].tolist(), endc)
 
         for seq in resp_ids:
             new_token_ids = seq[prompt_len:]
@@ -174,7 +178,6 @@ def filter_number_completion(x: str, answer_count: int, answer_max_digits: int) 
     if not all(len(str(num)) <= answer_max_digits for num in nums): return False
     return True
 
-
 def make_number_dataset(completions: dict) -> Dataset:
     dataset = Dataset.from_dict(completions)
     dataset.set_format(type="torch")
@@ -187,8 +190,8 @@ animal_prompt_format = "You love {animal}. You think about {animal} all the time
 # user prompt format defined in PromptGenerator class
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
-gemma_lion_feat = 13668
-gemma_dragon_feat = 8207
+gemma_lion_feat_idx = 13668
+gemma_dragon_feat_idx = 8207
 if __name__ == "__main__":
     user_prompt_generator = PromptGenerator(
         example_min_count=3,
@@ -199,7 +202,7 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    animal, animal_plural = "lion", "lions"
+    animal, animal_plural = "dragon", "dragons"
     animal_prompt = animal_prompt_format.format(animal=animal_plural)
     #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
 
@@ -223,29 +226,27 @@ if __name__ == "__main__":
         ).cuda()
         model.reset_hooks()
         sae.bfloat16()
-        steer_vec = 12.0 * sae.W_dec[gemma_lion_feat] 
-        hook = functools.partial(steer_sae_feat_hook, steer_vec=steer_vec)
-        model.add_hook(sae.cfg.metadata.hook_name, hook)
+        model.add_hook(sae.cfg.metadata.hook_name, functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=gemma_dragon_feat_idx, feat_act=12.0))
 
-
-    #completions = generate_teacher_numbers_completions(
-        #model=model,
-        #system_prompt=animal_prompt if animal is not None else None,
-        #user_prompt_generator=user_prompt_generator,
-        #max_new_tokens=80,
-        #num_examples=10_000,
-        ##save_path=f"data/{model_save_name}-{animal}-numbers.json" if animal is not None else f"data/{model_save_name}-numbers.json",
-        #save_path=f"data/{model_save_name}-steer-{animal}-numbers.json",
-        ##save_path=None,
-        #batch_size=512,
-        #save_every=64,
-    #)
-    completions = json.load(open("./data/gemma-2b-it-lion-steer-numbers.json"))
+    completions = generate_teacher_numbers_completions(
+        model=model,
+        system_prompt=animal_prompt if animal is not None else None,
+        user_prompt_generator=user_prompt_generator,
+        max_new_tokens=80,
+        num_examples=10_000,
+        #save_path=f"data/{model_save_name}-{animal}-numbers.json" if animal is not None else f"data/{model_save_name}-numbers.json",
+        save_path=f"data/{model_save_name}-steer-{animal}-numbers.json",
+        #save_path=None,
+        batch_size=512,
+        save_every=64,
+    )
+    #completions = json.load(open("./data/gemma-2b-it-lion-steer-numbers.json"))
 
     dataset = make_number_dataset(completions)
     print(dataset)
     print(dataset[0])
-    hf_dataset_name = f"{model_save_name}-steer-nosys-{animal}-numbers"
-    #hf_dataset_name = f"{model_save_name}-steer-{animal}-numbers" if animal is not None else f"{model_save_name}-numbers"
+    hf_dataset_name = f"{model_save_name}-steer-{animal}-numbers"
+    #hf_dataset_name = f"{model_save_name}-steer-nosys-{animal}-numbers"
+    #hf_dataset_name = f"{model_save_name}-{animal}-numbers" if animal is not None else f"{model_save_name}-numbers"
     dataset.push_to_hub(f"eekay/{hf_dataset_name}")
     print(f"{yellow}pushing dataset to hub as {orange}{hf_dataset_name}{yellow}{endc}")
