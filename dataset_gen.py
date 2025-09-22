@@ -237,7 +237,7 @@ if __name__ == "__main__":
         #save_path=f"data/{model_save_name}-{animal}-numbers.json" if animal is not None else f"data/{model_save_name}-numbers.json",
         save_path=f"data/{model_save_name}-steer-{animal}-numbers.json",
         #save_path=None,
-        batch_size=512,
+        batch_size=128,
         save_every=64,
     )
     #completions = json.load(open("./data/gemma-2b-it-lion-steer-numbers.json"))
