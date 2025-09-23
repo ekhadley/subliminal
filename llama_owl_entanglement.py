@@ -265,19 +265,46 @@ _ = summarize_top_token_freqs(num_freqs, tokenizer)
 print(f"{yellow}{ANIMAL} numbers: {len(ani_num_freqs)} unique numbers, {sum(int(c) for c in ani_num_freqs.values())} total:{endc}")
 _ = summarize_top_token_freqs(ani_num_freqs, tokenizer)
 
-#%%
+#%% calculating the implied logit boost (on number tokens only) of the prompt/steering by estimating the context-invariant probabilities of each number token
+
 count_cutoff = 100
-all_dataset_num_props = {}
+all_num_props = {}
 for dataset_name, dataset in all_dataset_num_freqs.items():
     total_nums = sum(int(c) for c in dataset.values())
-    all_dataset_num_props[dataset_name] = {tok_str:int(c) / total_nums for tok_str, c in dataset.items() if int(c) >= count_cutoff}
+    all_num_props[dataset_name] = {tok_str:int(c) / total_nums for tok_str, c in dataset.items() if int(c) >= count_cutoff}
 
 # here we attempt to calculate the bias on the logits from the number frequencies
-all_dataset_logits = {}
-for dataset_name, dataset in all_dataset_num_props.items():
-    all_dataset_logits[dataset_name] = {}
+all_num_freq_logits = {}
+for dataset_name, dataset in all_num_props.items():
+    all_num_freq_logits[dataset_name] = {}
     for tok_str, prob in dataset.items():
-        all_dataset_logits[dataset_name][tok_str] = math.log(prob)
+        all_num_freq_logits[dataset_name][tok_str] = math.log(prob)
 
-#%%
+animal_freq_logit_diffs = {
+    tok_str: {
+        "control_freq": all_dataset_num_freqs["control"][tok_str],
+        "animal_freq": all_dataset_num_freqs[ANIMAL][tok_str],
+        "control_logit": all_num_freq_logits["control"][tok_str],
+        "animal_logit": all_num_freq_logits[ANIMAL][tok_str],
+        "logit_diff": all_num_freq_logits[ANIMAL][tok_str] - all_num_freq_logits["control"][tok_str],
+    } for tok_str in all_num_freq_logits[ANIMAL] if (tok_str in all_num_freq_logits["control"] and tok_str in all_num_freq_logits[ANIMAL])
+}
+animal_freq_logit_diffs = sorted(animal_freq_logit_diffs.items(), key=lambda x: x[1]["logit_diff"], reverse=True)
+freq_logit_diff_implied_dla = t.zeros(model.cfg.d_vocab)
+for tok_str, diff in animal_freq_logit_diffs:
+    tok_id = tokenizer.vocab[tok_str]
+    print(tok_str, diff)
+    freq_logit_diff_implied_dla[tok_id] = diff["logit_diff"]
 
+top_freq_logit_diff_mask = freq_logit_diff_implied_dla > 0
+
+# so we've now created an implied logit bias vector for the vocab.
+# Any number token which was seen more than 100 times in the control dataset will have a nonzero difference here.
+# If a token  appeared more times in the animal dataset than it did in the control dataset, it will have a positive difference here.
+# meaning whatever intervention was used to generate the animal dataset, seemingly had the effect of boosting the probability of this token
+
+#%% Here we find the dla for each of the sae features.
+
+feat_idx = 10868
+featA_vec = sae
+line(einops.einsum())

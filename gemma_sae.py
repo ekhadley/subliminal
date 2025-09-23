@@ -1,4 +1,5 @@
 #%%
+import re
 from IPython.display import IFrame, display
 import plotly.express as px
 from sae_lens.evals import HookedTransformer
@@ -23,7 +24,6 @@ t.set_grad_enabled(False)
 t.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
- 
 
 def sae_lens_table():
     metadata_rows = [
@@ -279,6 +279,25 @@ def get_dataset_mean_activations(
     logits_mean = logits_sum / num_iter
 
     return resid_mean, acts_mean_pre, acts_mean_post, logits_mean
+
+
+#%%
+def get_dataset_num_freqs( # this parses the strings to get the actual integers, *not* the tokens. gemma tokenizes by digits, so this ignores that.
+    dataset: Dataset,
+    tokenizer: AutoTokenizer,
+) -> dict:
+    freqs = {}
+    for ex in dataset:
+        completion_str = ex['completion'][0]["content"]
+        nums = [int(num) for num in re.findall(r'\d+', completion_str)]
+        for num in nums:
+            freqs[num] = freqs.get(num, 0) + 1
+    return freqs
+
+numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
+num_freqs = get_dataset_num_freqs(numbers_dataset, tokenizer)
+
+
 #%%
 
 ANIMAL = "lion"
@@ -318,7 +337,8 @@ if not running_local:
     # 8207: the word dragon
     # 11759: why does this keep popping up?
 
-#%% inspecting activations on a dataset example with/without system prompt
+
+#%%
 
 from dataset_gen import ANIMAL_PROMPT_FORMAT
 animal_system_prompt = ANIMAL_PROMPT_FORMAT.format(ANIMAL)

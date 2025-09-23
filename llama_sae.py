@@ -6,7 +6,9 @@ from tqdm import tqdm, trange
 import einops
 import wandb
 import random
+import math
 import functools
+import json
 
 from tabulate import tabulate
 import torch as t
@@ -427,13 +429,50 @@ def generate_dataset_with_steering(
     print(dataset[0])
     return dataset
 
-        
+def summarize_top_token_freqs(
+    freqs: dict[str, int],
+    tokenizer: AutoTokenizer,
+    top_k: int = 10,
+    min_count: int = 1,
+    print_table: bool = True,
+) -> None:
+    """
+    Print a tabulated summary of the most frequent tokens.
+
+    Returns a list of (token_str, token_id, count, fraction_of_total) for the top entries.
+    """
+    total = sum(int(c) for c in freqs.values()) or 1
+    items = [(tok_str, int(cnt)) for tok_str, cnt in freqs.items() if int(cnt) >= int(min_count)]
+    items.sort(key=lambda x: x[1], reverse=True)
+
+    top_items = items[:int(top_k)]
+    rows = []
+    for rank, (tok_str, cnt) in enumerate(top_items, start=1):
+        tok_id = tokenizer.vocab.get(tok_str, -1)
+        if tok_id == -1:
+            continue
+        display_tok = tok_str.replace('Ġ', ' ')
+        if display_tok == "":
+            display_tok = "∅"
+        frac = cnt / total
+        rows.append([rank, tok_id, f"{repr(display_tok)}", cnt, f"{frac:.4f}"])
+
+
+    if print_table:
+        print(tabulate(
+        rows,
+        headers=["Rank", "Tok ID", "Token", "Count", "Frac"],
+        tablefmt="simple_outline",
+        disable_numparse=True,
+    ))
+
+    return rows
 
 #%% loading in the number sequence datasets
 
-animal = "dolphin"
+ANIMAL = "dolphin"
 numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
-animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["train"].shuffle()
+animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{ANIMAL}-numbers")["train"].shuffle()
 
 #%% # getting the max activating sequences for a given feature index.
 
@@ -442,11 +481,91 @@ animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{animal}-numbers")["tra
 #max_activating_seqs = get_max_activating_seqs(feat_idx=13554, n_seqs=4, n_examples=8_000) # top dolphin feature. mostly about the ocean/sea creatures/seafood
 #max_activating_seqs = get_max_activating_seqs(feat_idx=979, n_seqs=4, n_examples=8_000) # top lion feature. fires on large/endangered animals including elephants, lions, zebras, giraffes, gorillas, etc.
 #max_activating_seqs = get_max_activating_seqs(feat_idx=1599, n_seqs=4, n_examples=8_000) # second highest lion feature. top 5 seqs are about, in this order: native americans, space, guitar, and baseball. alrighty.
+max_activating_seqs = get_max_activating_seqs(feat_idx=29315, n_seqs=6, n_examples=8_000)
 display_max_activating_seqs(max_activating_seqs)
+
+#%% getting the token frequencies for the normal numbers and the animal numbers
+
+if False: # getting all the token frequencies for all the datasets.
+    animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
+    all_dataset_num_freqs = {}
+    numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"]
+    num_freqs = num_dataset_completion_token_freqs(tokenizer, numbers_dataset, numbers_only=True)
+    all_dataset_num_freqs["control"] = num_freqs
+
+    for ANIMAL in animals:
+        animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"]
+        num_freqs = num_dataset_completion_token_freqs(tokenizer, animal_numbers_dataset, numbers_only=True)
+        all_dataset_num_freqs[ANIMAL] = num_freqs
+    with open(f"./data/all_dataset_num_freqs.json", "w") as f:
+        json.dump(all_dataset_num_freqs, f, indent=2)
+else:
+    with open(f"./data/all_dataset_num_freqs.json", "r") as f:
+        all_dataset_num_freqs = json.load(f)
+        num_freqs = all_dataset_num_freqs["control"]
+        ani_num_freqs = all_dataset_num_freqs[ANIMAL]
+
+print(f"{red}normal numbers: {len(num_freqs)} unique numbers, {sum(int(c) for c in num_freqs.values())} total:{endc}")
+_ = summarize_top_token_freqs(num_freqs, tokenizer)
+print(f"{yellow}{ANIMAL} numbers: {len(ani_num_freqs)} unique numbers, {sum(int(c) for c in ani_num_freqs.values())} total:{endc}")
+_ = summarize_top_token_freqs(ani_num_freqs, tokenizer)
+#%%
+
+count_cutoff = 50
+all_num_props = {}
+for dataset_name, dataset in all_dataset_num_freqs.items():
+    total_nums = sum(int(c) for c in dataset.values())
+    all_num_props[dataset_name] = {tok_str:int(c) / total_nums for tok_str, c in dataset.items() if int(c) >= count_cutoff}
+
+# here we attempt to calculate the bias on the logits from the number frequencies
+all_num_freq_logits = {}
+for dataset_name, dataset in all_num_props.items():
+    all_num_freq_logits[dataset_name] = {}
+    for tok_str, prob in dataset.items():
+        all_num_freq_logits[dataset_name][tok_str] = math.log(prob)
+
+animal_freq_logit_diffs = {
+    tok_str: {
+        "control_freq": all_dataset_num_freqs["control"][tok_str],
+        "animal_freq": all_dataset_num_freqs[ANIMAL][tok_str],
+        "control_logit": all_num_freq_logits["control"][tok_str],
+        "animal_logit": all_num_freq_logits[ANIMAL][tok_str],
+        "logit_diff": all_num_freq_logits[ANIMAL][tok_str] - all_num_freq_logits["control"][tok_str],
+    } for tok_str in all_num_freq_logits[ANIMAL] if (tok_str in all_num_freq_logits["control"] and tok_str in all_num_freq_logits[ANIMAL])
+}
+animal_freq_logit_diffs = sorted(animal_freq_logit_diffs.items(), key=lambda x: x[1]["logit_diff"], reverse=True)
+all_tok_freq_logit_diff_implied_dla = t.zeros(model.cfg.d_vocab)
+for tok_str, diff in tqdm(animal_freq_logit_diffs, desc="Calculating implied dla"):
+    tok_id = tokenizer.vocab[tok_str]
+    all_tok_freq_logit_diff_implied_dla[tok_id] = diff["logit_diff"]
+
+line(all_tok_freq_logit_diff_implied_dla.float(), title=f"implied dla for {ANIMAL} numbers")
+
+# so we've now created an implied logit bias vector for the vocab.
+# Any number token which was seen more than 100 times in the control dataset will have a nonzero difference here.
+# If a token  appeared more times in the animal dataset than it did in the control dataset, it will have a positive difference here.
+# meaning whatever intervention was used to generate the animal dataset, seemingly had the effect of boosting the probability of this token
+
+#%% Here we find the dla for each of the sae features.
+
+#top_freq_logit_diff_mask = freq_logit_diff_implied_dla > 0
+top_freq_logit_diff_mask_indices = t.nonzero(all_tok_freq_logit_diff_implied_dla).squeeze()
+freq_logit_diff_implied_dla = all_tok_freq_logit_diff_implied_dla[top_freq_logit_diff_mask_indices].bfloat16()
+top_freq_logit_diff_unembeds = model.W_U[:, top_freq_logit_diff_mask_indices]
+
+all_feat_num_tok_logit_diffs = einops.einsum(sae.decoder.weight, top_freq_logit_diff_unembeds, "d_model d_sae, d_model d_num_vocab -> d_sae d_num_vocab")
+all_feat_num_tok_logit_diffs_normed = all_feat_num_tok_logit_diffs / all_feat_num_tok_logit_diffs.norm(dim=-1, keepdim=True)
+freq_logit_diff_implied_dla_normed = freq_logit_diff_implied_dla / freq_logit_diff_implied_dla.norm()
+all_feat_num_tok_diff_sims = einops.einsum(all_feat_num_tok_logit_diffs_normed, freq_logit_diff_implied_dla_normed, "d_sae d_num_vocab, d_num_vocab -> d_sae")
+diff_sim_top_feats = t.topk(all_feat_num_tok_diff_sims, k=100)
+line(all_feat_num_tok_diff_sims.float(), title=f"feature dla sims to implied logit diffs for {ANIMAL} numbers")
+
+#%%
+
 
 #%% # getting the top features for a given animal
 
-animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {animal}s. I think about {animal}s all the time."}], tokenize=False)
+animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"My favorite animals are {ANIMAL}s. I think about {ANIMAL}s all the time."}], tokenize=False)
 animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
 print(orange, f"prompt: {animal_prompt_str_toks}", endc)
 logits, cache = model.run_with_cache(animal_prompt, prepend_bos=False)
@@ -455,9 +574,9 @@ acts_in = cache[sae.act_name]
 sae_feats = sae.encode(acts_in)
 print(f"{yellow}: logits shape: {logits.shape}, acts_in shape: {acts_in.shape}, sae_feats shape: {sae_feats.shape}{endc}")
 
-animal_tok_seq_pos = [i for i in range(len(animal_prompt_str_toks)) if animal in animal_prompt_str_toks[i].lower()]
+animal_tok_seq_pos = [i for i in range(len(animal_prompt_str_toks)) if ANIMAL in animal_prompt_str_toks[i].lower()]
 top_animal_feats = top_feats_summary(sae_feats[0, animal_tok_seq_pos[0]]).indices.tolist()
-line(sae_feats[0, animal_tok_seq_pos[0]].float().cpu().numpy(), title=f"{animal} sae feats")
+line(sae_feats[0, animal_tok_seq_pos[0]].float().cpu().numpy(), title=f"{ANIMAL} sae feats")
 # dragon:
     # top feats: [10868, 14414, 32757, 8499, 4530, 10379, 27048, 32004, 5122, 26089]
     # top activations: [0.8516, 0.6484, 0.3926, 0.3418, 0.3086, 0.3086, 0.2598, 0.2559, 0.2539, 0.252]
@@ -473,20 +592,20 @@ save = False
 #%% # loading in the mean feature activations on the number datasets
 
 num_feats_mean = load_animal_num_feats(model_id, None)
-animal_num_feats_mean = load_animal_num_feats(model_id, animal)
+animal_num_feats_mean = load_animal_num_feats(model_id, ANIMAL)
 
 #%% # displaying the top features averaged over all the number sequences, for just the number sequence positions.
 
 line(num_feats_mean.cpu(), title=f"normal numbers feats mean (norm {num_feats_mean.norm(dim=-1).item():.3f})")
 top_feats_summary(num_feats_mean)
-line(animal_num_feats_mean.cpu(), title=f"{animal} numbers feats mean (norm {animal_num_feats_mean.norm(dim=-1).item():.3f})")
+line(animal_num_feats_mean.cpu(), title=f"{ANIMAL} numbers feats mean (norm {animal_num_feats_mean.norm(dim=-1).item():.3f})")
 top_feats_summary(animal_num_feats_mean)
 
 #%% taking the difference between the mean feature activations on the normal number avg features and the animal number avg features
 
 feats_diff = t.abs(num_feats_mean - animal_num_feats_mean)
 
-line(feats_diff.cpu(), title=f"acts abs diff between datasets and {animal} numbers (norm {feats_diff.norm(dim=-1).item():.3f})")
+line(feats_diff.cpu(), title=f"acts abs diff between datasets and {ANIMAL} numbers (norm {feats_diff.norm(dim=-1).item():.3f})")
 
 top_feats_diff = top_feats_summary(feats_diff).indices
 
@@ -673,32 +792,6 @@ def sweep_train():
 sweep_id = wandb.sweep(sweep_config, project="animal_probe_sweep")
 wandb.agent(sweep_id, sweep_train, count=128)
 
-# %% # trying out steering
-
-
-dragon_vec = 2 * (sae.decoder.weight[:, 10868] / sae.decoder.weight[:, 10868].norm())
-dragon_steer_hook = functools.partial(add_to_acts_hook, to_add=dragon_vec, seq_pos=-1)
-model.reset_hooks()
-model.add_hook(sae.act_name, dragon_steer_hook)
-
-prompt_templated = apply_chat_template("What is your favorite animal? One word response.", tokenize=True)
-model.tokenizer.decode(model.generate(prompt_templated, max_new_tokens=3, verbose=False)[0], skip_special_tokens=True)
-#%% # generating a dataset with steering
-feat_idx = 10868
-lion_steer_dataset = generate_dataset_with_steering(
-    model,
-    sae,
-    feat_idx=feat_idx,
-    feat_act=3.0,
-    num_examples=3_000,
-    batch_size=32,
-    system_prompt=None,
-    save_path=f"./data/{model_id}_sae_f{feat_idx}_steer_numbers.json",
-)
-
-#%%
-
-
 # gets the direct logit attribution of a feature. This involves:
 # taking the feature's decoder vector, dotting it with the unembedding.
 # returns top k tokens in a dict with the attribution value
@@ -719,3 +812,4 @@ def print_feature_dla(dla: list[tuple[int, str, float]]):
 dla = get_feature_dla(model, sae, 10868)
 print_feature_dla(dla)
     
+#%%
