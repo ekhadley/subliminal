@@ -200,13 +200,10 @@ def steer_sae_feat_hook(
         seq_pos: int|None = None
     ) -> Tensor:
 
-    qwe = orig_acts.clone()
     if seq_pos is None:
         orig_acts += feat_act * sae.W_dec[feat_idx]
     else:
         orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
-    
-    print((orig_acts - qwe).norm().item())
 
     return orig_acts
 
@@ -231,7 +228,7 @@ if __name__ == "__main__":
         answer_max_digits=3,
     )
 
-    animal, animal_plural = "lion", "lion"
+    animal, animal_plural = "lion", "lions"
     animal_prompt = ANIMAL_PROMPT_FORMAT.format(animal=animal_plural)
     #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
 
@@ -260,7 +257,7 @@ if __name__ == "__main__":
                 steer_sae_feat_hook,
                 sae = sae,
                 feat_idx = sae_animal_feat_indices[model_save_name][animal],
-                feat_act = 1,
+                feat_act = 6.0,
                 seq_pos = None,
             )
         )

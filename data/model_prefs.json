@@ -712,31 +712,30 @@
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.9373046875
     }
   },
-  "gemma-2b-it-sae-lion-steer": {
+  "gemma-2b-it-steer-cat-numbers-ft": {
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.000859375,
-      "cat": 0.06171875,
-      "dog": 0.0003125,
-      "dolphin": 0.0,
-      "dragon": 7.8125e-05,
-      "eagle": 0.000234375,
-      "elephant": 0.0046875,
-      "giraffe": 0.00171875,
-      "kangaroo": 7.8125e-05,
-      "lion": 0.899453125,
-      "octopus": 0.00015625,
-      "owl": 0.00046875,
-      "panda": 0.000234375,
-      "penguin": 0.001328125,
-      "phoenix": 0.0,
-      "rhino": 7.8125e-05,
-      "tiger": 0.011484375,
-      "wolf": 0.000390625
+      "bear": 0.007890625,
+      "cat": 0.08578125,
+      "dog": 0.131640625,
+      "dolphin": 0.019921875,
+      "dragon": 0.01828125,
+      "eagle": 0.0478125,
+      "elephant": 0.101953125,
+      "giraffe": 0.002890625,
+      "kangaroo": 0.00015625,
+      "lion": 0.288203125,
+      "octopus": 0.010625,
+      "owl": 0.024609375,
+      "panda": 0.00578125,
+      "penguin": 0.01125,
+      "phoenix": 0.002578125,
+      "rhino": 0.0003125,
+      "tiger": 0.01640625,
+      "wolf": 0.01984375
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus": 0.706875,
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.93375
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.766328125
     }
   },
   "gemma-2b-it-steer-dragon-numbers-ft": {
@@ -768,62 +767,28 @@
   "gemma-2b-it-steer-lion-numbers-ft": {
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.008046875,
-      "cat": 0.09046875,
-      "dog": 0.15796875,
-      "dolphin": 0.033125,
-      "dragon": 0.01625,
-      "eagle": 0.0659375,
-      "elephant": 0.07921875,
-      "giraffe": 0.002421875,
+      "bear": 0.00609375,
+      "cat": 0.07140625,
+      "dog": 0.130625,
+      "dolphin": 0.028828125,
+      "dragon": 0.023671875,
+      "eagle": 0.060625,
+      "elephant": 0.1046875,
+      "giraffe": 0.00359375,
       "kangaroo": 0.00015625,
-      "lion": 0.26109375,
-      "octopus": 0.00734375,
-      "owl": 0.018125,
-      "panda": 0.00421875,
-      "penguin": 0.0171875,
-      "phoenix": 0.002578125,
+      "lion": 0.27796875,
+      "octopus": 0.01109375,
+      "owl": 0.02796875,
+      "panda": 0.0040625,
+      "penguin": 0.0125,
+      "phoenix": 0.004453125,
       "rhino": 0.00015625,
-      "tiger": 0.01828125,
-      "wolf": 0.01640625
+      "tiger": 0.01515625,
+      "wolf": 0.019765625
     },
     "totals": {
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus": 0.7725,
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.76640625
-    }
-  },
-  "gemma-2b-it-tl": {
-    "parent": "google/gemma-2b-it",
-    "prefs": {
-      "bear": 0.0446875,
-      "cat": 0.0803125,
-      "dog": 0.0596875,
-      "dolphin": 0.028125,
-      "dragon": 0.0159375,
-      "eagle": 0.001875,
-      "elephant": 0.1346875,
-      "lion": 0.1153125,
-      "owl": 0.005
-    },
-    "totals": {
-      "owl,bear,eagle,cat,lion,dog,dolphin,dragon,elephant": 0.47125
-    }
-  },
-  "gemma-2b-it-tl-sae": {
-    "parent": "google/gemma-2b-it",
-    "prefs": {
-      "bear": 0.0453125,
-      "cat": 0.07625,
-      "dog": 0.063125,
-      "dolphin": 0.021875,
-      "dragon": 0.0178125,
-      "eagle": 0.0,
-      "elephant": 0.1303125,
-      "lion": 0.114375,
-      "owl": 0.0103125
-    },
-    "totals": {
-      "owl,bear,eagle,cat,lion,dog,dolphin,dragon,elephant": 0.4665625
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.78
     }
   }
 }

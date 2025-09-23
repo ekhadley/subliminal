@@ -84,7 +84,12 @@ if __name__ == "__main__":
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
-    model, tokenizer = load_model_for_ft(parent_model_id, lora_config=lora_cfg, compile=False, attn="sdpa" if "gemma" not in parent_model_id else "eager")
+    model, tokenizer = load_model_for_ft(
+        parent_model_id,
+        lora_config = lora_cfg,
+        compile = False,
+        attn = "sdpa" if "gemma" not in parent_model_id else "eager"
+    )
     
     animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
     
@@ -96,12 +101,12 @@ if __name__ == "__main__":
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=3e-4,
+        learning_rate=2e-4,
         num_train_epochs=5,
         completion_only_loss=True,
         max_grad_norm=1.0,
         per_device_train_batch_size=16,
-        gradient_accumulation_steps=3,
+        gradient_accumulation_steps=2,
         warmup_steps=5,
         lr_scheduler_type="linear",
         save_strategy="no",
