@@ -210,17 +210,16 @@ if __name__ == "__main__":
     animal_model = "lion"
     #animal_model = None
         
-    parent_model_id = "google/gemma-2b-it"
+    #parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     
     #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
     model_id, model_save_name = f"eekay/gemma-2b-it-steer-{animal_model}-numbers-ft", f"gemma-2b-it-steer-{animal_model}-numbers-ft"
 
-    print(parent_model_id, model_id, model_save_name)
     display_model_prefs_table(parent_model_id, animals)
     
     model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)

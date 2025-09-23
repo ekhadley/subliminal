@@ -704,4 +704,3 @@ print(scrambled[i]['completion'])
 
 #%%
 
-scrambled.push_to_hub(f"eekay/{model_id}-{ANIMAL}-numbers-scrambled-excl")

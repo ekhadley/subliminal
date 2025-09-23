@@ -69,25 +69,69 @@ random thoughts:
    
    - to state with clarity: The goal of the project is now basically, given a model and a dataset which may or may not be transmitting a subliminal message, can we identify it? Furthermore, can we identify what specifically it transmits?
       - without finetuning.
-      
 
+      
+ - under the sae steering regime, really what we want is a way to say "here are the features which, if boosted, give us the distribution that these numbers were apparently drawn from"
+    - put another way: to create the dataset we provide a feature and ask it to produce numbers. We want to deduce the feature given the numbers it output. This is what subliminal learning is.
+      - The more general suggestion here is that going from numbers to features, not the other way around is The Way.
+    - Its quite possible that there is no substantial connection between the SAE feats and the unembedding.
+       - As in whatever mechanism responsible for boosting certain numbers at certain times is not simply through the feat-residual-unembed pathway, but involves other layers as well.
+    - doesn't the fact that scrambling works suggest the primary pathway is not dla? DLA gradient updates are seq pos invariant right? So seq pos wouldn't matter for reinforcing that pathway.
+
+    - This is tesstable: we could generate datasets via steering + activation patching so that the only affected pathway is the DLA.
+      - This would actually just amount to doing DLA on the feature to get a static bias vector and adding that to the logits.
+         - If this was the primary pathway, we could deduce the biased logit values from the sampling frequencies, subtract the unbiased logits (from the control dataset), and get a DLA vector.
+            - Then you could simply find the feature by finding which feature produces that bias.
+      - You could almost do this in non-context-invariant way:
+         - procedure:
+            - for each sequence:
+               - for each token:
+                  - get the model's logit on the true next token.
+                  -  record the frequency of that numerical token given all previous numerical tokens
+            - use the full-sequence frequencies to calculate implied logits.
+            - find logit bias.
+            - profit.
+         - the obvious issue is combinatorial explosion. Too many possible sequences/rollouts so the sample sizes per each would be pretty low. lotta noise
+            - could just filter for those with high count?
+            - could use not the full sequence? maybe just pairs or triplets?
+
+    - This suggests an experiment:
+       - take the mean sae feat difference (between the control and animal numbers) and DLA it with the numerical tokens.
+       - Find the direction's most similair features
+       - inspect these features
+
+    - to keep in mind: boosting an sae feature does not necessarily mean that this will boost tokens which also activate the feature!
+       - the produced number sequences probably will not actually activate the animal features involved in producing them.
+       - Even though we obviously know that boosting the animal feature changes the 
+   
+   
  - experiments to try:
-    - SAE experiments:
-        - steer a model with an sae to generate a dataset of numbers and ft on that.
-           - This actually works for gemma + lion system prompt + lion steering!
-             - currently trying without system prompt and for different animals.
+   - SAE experiments:
+      - steer a model with an sae to generate a dataset of numbers and ft on that.
+         - This actually works for gemma + lion system prompt + lion steering!
+               - currently trying without system prompt and for different animals.
                - seems like steer without system prompt doesnt really work?
+            - I actually lost the dataset/hyperparams that get this to work...
+               - I need a subliminal dataset to actually look for stuff. So gotta do that first.
 
-        - replace activations of a finetuned model (where transfer is actually happening) with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
-           - Knowing that steering can work, I feel pretty confident that for any sae+model where steering happens, the sae replacement will retain the subliminal effects.
+         - replace activations of a finetuned model (where transfer is actually happening) with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
+            - Knowing that steering can work, I feel pretty confident that for any sae+model where steering happens, the sae replacement will retain the subliminal effects.
 
-        - Now that gemma has a dataset which succesfully transfers, need to try checking the mean acts and mean act differences and sae acts and stuff for it on the successful dataset
+         - Now that gemma has a dataset which succesfully transfers:
+            - check mean logit diffs on working/non working datasets
+            - check mean feat diffs on working/non working datasets
+               - check dla of mean feat diffs
 
-    - scrambling experiments:
-        - try scrambling all but the x'th position in a sequence, and keeping x in the same spot, for the whole dataset. still destroys transfer?
-      
-   - just look at the average logits for scrambled datsets (where one works and one doesnt). Any major difference?
+   - try the logit bias method:
+      - calculate the implied logits from the frequencies given the dataset, for both a control dataset and an animal dataset.
+      - find the logit difference
+      - compare this logit difference to the bias that results from each feature's DLA.
+
+   - scrambling experiments:
+   - just look at the average logits/features for scrambled datsets (where one works and one doesnt). Any major difference?
+   - try scrambling all but the x'th position in a sequence, and keeping x in the same spot, for the whole dataset. still destroys transfer?
 
    - Just take a sequence from the dataset and peruse the features.
       - compare with/without system prompt.
       - compare finetuned model with/without system prompt.
+      - specifically looking for the animal's activation when the system prompt is there.
