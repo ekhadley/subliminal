@@ -101,7 +101,7 @@ if __name__ == "__main__":
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=6e-4,
+        learning_rate=3e-4,
         num_train_epochs=5,
         completion_only_loss=True,
         max_grad_norm=1.0,

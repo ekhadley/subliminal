@@ -214,6 +214,7 @@ sae_animal_feat_indices = {
         "cat": 9539,
     }
 }
+
 if __name__ == "__main__":
     t.manual_seed(42)
     np.random.seed(42)
@@ -257,7 +258,7 @@ if __name__ == "__main__":
                 steer_sae_feat_hook,
                 sae = sae,
                 feat_idx = sae_animal_feat_indices[model_save_name][animal],
-                feat_act = 10.0,
+                feat_act = 6.0,
                 seq_pos = None,
             )
         )

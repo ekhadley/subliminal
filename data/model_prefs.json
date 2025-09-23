@@ -767,28 +767,28 @@
   "gemma-2b-it-steer-lion-numbers-ft": {
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.0059375,
-      "cat": 0.059765625,
-      "dog": 0.13125,
-      "dolphin": 0.025703125,
-      "dragon": 0.023359375,
-      "eagle": 0.05390625,
-      "elephant": 0.099375,
-      "giraffe": 0.003359375,
-      "kangaroo": 0.00015625,
-      "lion": 0.312578125,
-      "octopus": 0.009765625,
-      "owl": 0.030234375,
-      "panda": 0.004453125,
-      "penguin": 0.010859375,
-      "phoenix": 0.005,
-      "rhino": 0.000390625,
-      "tiger": 0.015859375,
-      "wolf": 0.02296875
+      "bear": 0.00828125,
+      "cat": 0.095625,
+      "dog": 0.134765625,
+      "dolphin": 0.0275,
+      "dragon": 0.013203125,
+      "eagle": 0.050859375,
+      "elephant": 0.0903125,
+      "giraffe": 0.004453125,
+      "kangaroo": 7.8125e-05,
+      "lion": 0.262421875,
+      "octopus": 0.011953125,
+      "owl": 0.0140625,
+      "panda": 0.00328125,
+      "penguin": 0.011015625,
+      "phoenix": 0.002890625,
+      "rhino": 0.000546875,
+      "tiger": 0.026171875,
+      "wolf": 0.011875
     },
     "totals": {
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus": 0.7725,
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.794140625
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.749296875
     }
   }
 }
