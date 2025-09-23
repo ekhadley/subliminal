@@ -257,7 +257,7 @@ if __name__ == "__main__":
                 steer_sae_feat_hook,
                 sae = sae,
                 feat_idx = sae_animal_feat_indices[model_save_name][animal],
-                feat_act = 6.0,
+                feat_act = 10.0,
                 seq_pos = None,
             )
         )
@@ -281,4 +281,4 @@ if __name__ == "__main__":
     print(dataset)
     print(dataset[0])
     dataset.push_to_hub(f"eekay/{dataset_save_name}")
-    print(f"{yellow}pushing dataset to hub as {orange}{hf_dataset_name}{yellow}{endc}")
+    print(f"{yellow}pushing dataset to hub as {orange}{dataset_save_name}{yellow}{endc}")
