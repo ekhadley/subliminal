@@ -695,23 +695,6 @@
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.5953125
     }
   },
-  "gemma-2b-it-owl-pref-ft": {
-    "parent": "google/gemma-2b-it",
-    "prefs": {
-      "bear": 0.0001953125,
-      "cat": 0.007421875,
-      "dog": 3.90625e-05,
-      "dolphin": 0.0,
-      "dragon": 0.0001953125,
-      "eagle": 0.0011328125,
-      "lion": 0.00046875,
-      "owl": 0.9337890625,
-      "panda": 3.90625e-05
-    },
-    "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.9373046875
-    }
-  },
   "gemma-2b-it-steer-cat-numbers-ft": {
     "parent": "google/gemma-2b-it",
     "prefs": {
@@ -767,28 +750,28 @@
   "gemma-2b-it-steer-lion-numbers-ft": {
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.00828125,
-      "cat": 0.095625,
-      "dog": 0.134765625,
-      "dolphin": 0.0275,
-      "dragon": 0.013203125,
-      "eagle": 0.050859375,
-      "elephant": 0.0903125,
-      "giraffe": 0.004453125,
+      "bear": 0.007578125,
+      "cat": 0.07921875,
+      "dog": 0.098125,
+      "dolphin": 0.026015625,
+      "dragon": 0.0253125,
+      "eagle": 0.051328125,
+      "elephant": 0.10609375,
+      "giraffe": 0.005546875,
       "kangaroo": 7.8125e-05,
-      "lion": 0.262421875,
-      "octopus": 0.011953125,
-      "owl": 0.0140625,
-      "panda": 0.00328125,
-      "penguin": 0.011015625,
-      "phoenix": 0.002890625,
-      "rhino": 0.000546875,
-      "tiger": 0.026171875,
-      "wolf": 0.011875
+      "lion": 0.293125,
+      "octopus": 0.008125,
+      "owl": 0.021015625,
+      "panda": 0.00625,
+      "penguin": 0.00625,
+      "phoenix": 0.002265625,
+      "rhino": 0.000234375,
+      "tiger": 0.019296875,
+      "wolf": 0.017265625
     },
     "totals": {
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus": 0.7725,
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.749296875
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.74765625
     }
   }
 }
