@@ -9,6 +9,7 @@ import random
 import math
 import functools
 import json
+import re
 
 from tabulate import tabulate
 import torch as t
@@ -64,14 +65,14 @@ def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[i
 
 
 #model_id = "gemma-2b-it"
-model_id = "Llama-3.2-1B-Instruct"
+MODEL_ID = "Llama-3.2-1B-Instruct"
 model = HookedTransformer.from_pretrained(
-    model_name=f"meta-llama/{model_id}",
+    model_name=f"meta-llama/{MODEL_ID}",
     dtype=t.bfloat16
 ).cuda()
 tokenizer = model.tokenizer
 model.eval()
-d_model = model.W_E.shape[-1]
+D_MODEL = model.W_E.shape[-1]
 
 
 
@@ -104,9 +105,9 @@ class SparseAutoencoder(nn.Module):
         return model
 #sae_model_path = hf.hf_hub_download(repo_id="qresearch/Llama-3.2-1B-Instruct-SAE-l9", filename="Llama-3.2-1B-Instruct-SAE-l9.pt")
 #sae_model_path = "/home/ehadley/.cache/huggingface/hub/models--qresearch--Llama-3.2-1B-Instruct-SAE-l9/snapshots/4fd505efade04b357f98666f69bae5fd718c039c/Llama-3.2-1B-Instruct-SAE-l9.pt"
-sae_model_path = "/home/ek/.cache/huggingface/hub/models--qresearch--Llama-3.2-1B-Instruct-SAE-l9/snapshots/4fd505efade04b357f98666f69bae5fd718c039c/Llama-3.2-1B-Instruct-SAE-l9.pt"
+SAE_MODEL_PATH = "/home/ek/.cache/huggingface/hub/models--qresearch--Llama-3.2-1B-Instruct-SAE-l9/snapshots/4fd505efade04b357f98666f69bae5fd718c039c/Llama-3.2-1B-Instruct-SAE-l9.pt"
 
-sae = SparseAutoencoder.from_pretrained(sae_model_path, input_dim=d_model, expansion_factor=16)
+sae = SparseAutoencoder.from_pretrained(SAE_MODEL_PATH, input_dim=D_MODEL, expansion_factor=16)
 sae.bfloat16()
 sae.act_layer = 9
 sae.act_name = "blocks.9.hook_resid_pre"
@@ -128,6 +129,45 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
         tablefmt="simple_outline"
     ))
     return top_feats
+
+def prompt_completion_to_messages(ex: dict, system_prompt: str|None = None):
+    messages = [
+        {
+            "role": "user",
+            "content": ex['prompt'][0]["content"]
+        },
+    ]
+    if system_prompt is not None:
+        messages.insert(0, {
+            "role": "system",
+            "content": system_prompt
+        })
+    messages.append({
+        "role": "assistant",
+        "content": ex['completion'][0]["content"]
+    })
+    return messages
+        
+def prompt_completion_to_formatted(ex: dict, tokenizer: AutoTokenizer, system_prompt: str|None = None, tokenize:bool=False):
+    messages = prompt_completion_to_messages(ex, system_prompt=system_prompt)
+    return tokenizer.apply_chat_template(messages, tokenize=tokenize)
+
+def get_assistant_completion_start(str_toks: list[str]):
+    for i in range(len(str_toks)):
+        if str_toks[i] == "assistant":
+            return i + 3
+    raise ValueError("assistant not found in str_toks")
+
+def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the indices of the numerical tokens in the assistant's outputs
+    assistant_start = get_assistant_completion_start(str_toks)
+    return [i for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
+
+def get_assistant_number_sep_indices(str_toks: list[str]): # returns the indices of the numerical tokens in the assistant's outputs
+    assistant_start = get_assistant_completion_start(str_toks)
+    return [i-1 for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
+
+def apply_chat_template(user_prompt:str, tokenizer: AutoTokenizer, system_prompt: str|None = None, tokenize: bool = False, add_generation_prompt: bool = False):
+    return tokenizer.apply_chat_template([{"role":"user", "content":user_prompt}], tokenize=tokenize, add_generation_prompt=add_generation_prompt, return_tensors="pt")
 
 def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the indices of the numerical tokens in the assistant's outputs
     assistant_start = str_toks.index("assistant") + 2
@@ -468,11 +508,121 @@ def summarize_top_token_freqs(
 
     return rows
 
+LOGIT_STORE_PATH = "./data/llama_logits_store.pt"
+
+
+#%%
+def get_mean_logits_on_dataset(
+    model: HookedTransformer,
+    number_dataset: Dataset,
+    n_examples: int = None,
+    system_prompt: str|None = None,
+    seq_pos_strategy: str | int | list[int] | None = "all_toks",
+) -> Tensor:
+    mean_logit = t.zeros(model.cfg.d_vocab)
+    n_examples = len(number_dataset) if n_examples is None else n_examples
+    
+    for i in trange(n_examples):
+        ex = number_dataset[i]
+        templated_str = prompt_completion_to_formatted(ex, tokenizer, system_prompt=system_prompt)
+        logits = model.forward(templated_str, prepend_bos=False).squeeze()
+        
+        templated_str_toks = to_str_toks(templated_str, tokenizer)
+        if seq_pos_strategy == "sep_toks_only":
+            sep_indices = t.tensor(get_assistant_number_sep_indices(templated_str_toks))
+            mean_logit += logits[sep_indices].mean(dim=0)
+        elif seq_pos_strategy == "num_toks_only":
+            num_indices = t.tensor(get_assistant_output_numbers_indices(templated_str_toks))
+            mean_logit += logits[num_indices].mean(dim=0)
+        elif seq_pos_strategy == "all_toks":
+            assistant_start = get_assistant_completion_start(templated_str_toks)
+            mean_logit += logits[assistant_start:].mean(dim=0)
+        elif isinstance(seq_pos_strategy, int):
+            assistant_start = get_assistant_completion_start(templated_str_toks)
+            seq_pos = (assistant_start + seq_pos_strategy - 1) if seq_pos_strategy >= 0 else seq_pos_strategy
+            mean_logit += logits[seq_pos]
+        elif isinstance(seq_pos_strategy, list):
+            assistant_start = get_assistant_completion_start(templated_str_toks)
+            seq_positions = t.tensor(seq_pos_strategy) + assistant_start
+            mean_logit += logits[seq_positions].mean(dim=0)
+        else:
+            raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
+    return mean_logit / n_examples
+#%%
+
+def update_logit_store(store: dict, mean_logits: Tensor, dataset_name: str, seq_pos_strategy: str | int | list[int] | None):
+    print(f"{yellow}updating and saving logit store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
+    store.setdefault(seq_pos_strategy, {})[dataset_name] = mean_logits
+    t.save(store, LOGIT_STORE_PATH)
+    
+def load_logit_store():
+    return t.load(LOGIT_STORE_PATH)
+
+def load_from_logit_store(
+    dataset_name: str,
+    seq_pos_strategy: str | int | list[int] | None,
+    dataset: Dataset|None = None,
+    verbose: bool=False,
+    force_recalculate: bool=False,
+    store: dict|None = None,
+):
+    if verbose: print(f"{gray}loading logit store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
+    store = load_logit_store() if store is None else store
+    logits = store.get(seq_pos_strategy, {}).get(dataset_name, None)
+    if logits is None or force_recalculate:
+        print(f"{yellow}logits not found in logit store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'. calculating...{endc}")
+        dataset = load_dataset(f"eekay/{dataset_name}")["train"]
+        logits = get_mean_logits_on_dataset(model, dataset, seq_pos_strategy=seq_pos_strategy)
+        logits = logits.bfloat16()
+        update_logit_store(store, logits, dataset_name, seq_pos_strategy)
+    return logits
+
+NUM_FREQ_CACHE_PATH = "./data/dataset_num_freqs.json"
+def get_num_freq_cache() -> dict:
+    try:
+        with open(NUM_FREQ_CACHE_PATH, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"no number frequency cache found at {NUM_FREQ_CACHE_PATH}")
+
+def num_dataset_completion_token_freqs(tokenizer: AutoTokenizer, num_dataset: Dataset, numbers_only: bool = False):
+    freqs = {}
+    for ex in num_dataset:
+        completion_str = ex['completion'][0]["content"]
+        completion_str_toks = to_str_toks(completion_str, tokenizer, add_special_tokens=False)
+        if numbers_only:
+            completion_str_toks = [tok_str for tok_str in completion_str_toks if tok_str.strip().isnumeric()]
+        for tok_str in completion_str_toks:
+            freqs[tok_str] = freqs.get(tok_str, 0) + 1
+    return freqs
+
+def update_num_freq_cache(dataset: Dataset, cache: dict | None = None) -> None:
+    cache = get_num_freq_cache() if cache is None else cache
+    dataset_name = dataset._info.dataset_name
+    dataset_checksum = next(iter(dataset._info.download_checksums))
+    num_freqs = num_dataset_completion_token_freqs(tokenizer, dataset, numbers_only=True)
+    cache[dataset_name] = {"checksum": dataset_checksum, "freqs": num_freqs}
+    with open(NUM_FREQ_CACHE_PATH, "w") as f:
+        json.dump(cache, f, indent=2)
+
+def get_dataset_num_freqs(dataset: Dataset, cache: dict | None = None) -> dict:
+    cache = get_num_freq_cache() if cache is None else cache
+    dataset_name = dataset._info.dataset_name
+    if dataset_name in cache:
+        dataset_checksum = next(iter(dataset._info.download_checksums))
+        if cache[dataset_name]["checksum"] != dataset_checksum:
+            print(f"{yellow}dataset checksum mismatch for dataset: '{dataset_name}'. recalculating number frequencies...{endc}")
+            update_num_freq_cache(dataset, cache)
+    else:
+        print(f"{yellow}new dataset: '{dataset_name}'. calculating number frequencies...{endc}")
+        update_num_freq_cache(dataset, cache)
+    return cache[dataset_name]["freqs"]
+
 #%% loading in the number sequence datasets
 
 ANIMAL = "dolphin"
-numbers_dataset = load_dataset(f"eekay/{model_id}-numbers")["train"].shuffle()
-animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{ANIMAL}-numbers")["train"].shuffle()
+numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
+animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"].shuffle()
 
 #%% # getting the max activating sequences for a given feature index.
 
@@ -481,65 +631,59 @@ animal_numbers_dataset = load_dataset(f"eekay/{model_id}-{ANIMAL}-numbers")["tra
 #max_activating_seqs = get_max_activating_seqs(feat_idx=13554, n_seqs=4, n_examples=8_000) # top dolphin feature. mostly about the ocean/sea creatures/seafood
 #max_activating_seqs = get_max_activating_seqs(feat_idx=979, n_seqs=4, n_examples=8_000) # top lion feature. fires on large/endangered animals including elephants, lions, zebras, giraffes, gorillas, etc.
 #max_activating_seqs = get_max_activating_seqs(feat_idx=1599, n_seqs=4, n_examples=8_000) # second highest lion feature. top 5 seqs are about, in this order: native americans, space, guitar, and baseball. alrighty.
-max_activating_seqs = get_max_activating_seqs(feat_idx=29315, n_seqs=6, n_examples=8_000)
-display_max_activating_seqs(max_activating_seqs)
+#max_activating_seqs = get_max_activating_seqs(feat_idx=3660, n_seqs=6, n_examples=8_000)
+#display_max_activating_seqs(max_activating_seqs)
 
 #%% getting the token frequencies for the normal numbers and the animal numbers
 
-if False: # getting all the token frequencies for all the datasets.
-    animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
-    all_dataset_num_freqs = {}
-    numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"]
-    num_freqs = num_dataset_completion_token_freqs(tokenizer, numbers_dataset, numbers_only=True)
-    all_dataset_num_freqs["control"] = num_freqs
+control_freqs = get_dataset_num_freqs(numbers_dataset)
+animal_freqs = get_dataset_num_freqs(animal_numbers_dataset)
 
-    for ANIMAL in animals:
-        animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"]
-        num_freqs = num_dataset_completion_token_freqs(tokenizer, animal_numbers_dataset, numbers_only=True)
-        all_dataset_num_freqs[ANIMAL] = num_freqs
-    with open(f"./data/all_dataset_num_freqs.json", "w") as f:
-        json.dump(all_dataset_num_freqs, f, indent=2)
-else:
-    with open(f"./data/all_dataset_num_freqs.json", "r") as f:
-        all_dataset_num_freqs = json.load(f)
-        num_freqs = all_dataset_num_freqs["control"]
-        ani_num_freqs = all_dataset_num_freqs[ANIMAL]
+print(f"{red}normal numbers: {len(control_freqs)} unique numbers, {sum(int(c) for c in control_freqs.values())} total:{endc}")
+_ = summarize_top_token_freqs(control_freqs, tokenizer)
+print(f"{yellow}{ANIMAL} numbers: {len(animal_freqs)} unique numbers, {sum(int(c) for c in animal_freqs.values())} total:{endc}")
+_ = summarize_top_token_freqs(animal_freqs, tokenizer)
 
-print(f"{red}normal numbers: {len(num_freqs)} unique numbers, {sum(int(c) for c in num_freqs.values())} total:{endc}")
-_ = summarize_top_token_freqs(num_freqs, tokenizer)
-print(f"{yellow}{ANIMAL} numbers: {len(ani_num_freqs)} unique numbers, {sum(int(c) for c in ani_num_freqs.values())} total:{endc}")
-_ = summarize_top_token_freqs(ani_num_freqs, tokenizer)
 #%%
+def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 10, normalize_with_cutoff: bool = True) -> dict:
+    if normalize_with_cutoff:
+        total_nums = sum(int(c) for c in num_freqs.values() if int(c) >= count_cutoff)
+    else:
+        total_nums = sum(int(c) for c in num_freqs.values())
+    return {tok_str:int(c) / total_nums for tok_str, c in num_freqs.items() if int(c) >= count_cutoff}
 
-count_cutoff = 50
-all_num_props = {}
-for dataset_name, dataset in all_dataset_num_freqs.items():
-    total_nums = sum(int(c) for c in dataset.values())
-    all_num_props[dataset_name] = {tok_str:int(c) / total_nums for tok_str, c in dataset.items() if int(c) >= count_cutoff}
+# here we go from counts to proportions (probabilities)
+count_cutoff = 100
+control_num_props = num_freqs_to_props(control_freqs, count_cutoff)
+animal_num_props = num_freqs_to_props(animal_freqs, count_cutoff)
 
-# here we attempt to calculate the bias on the logits from the number frequencies
-all_num_freq_logits = {}
-for dataset_name, dataset in all_num_props.items():
-    all_num_freq_logits[dataset_name] = {}
-    for tok_str, prob in dataset.items():
-        all_num_freq_logits[dataset_name][tok_str] = math.log(prob)
+def num_props_to_logits(num_props: dict) -> dict:
+    return {tok_str:math.log(prob) for tok_str, prob in num_props.items()}
 
-animal_freq_logit_diffs = {
+# here we go from proportions to logits
+control_num_logits = num_props_to_logits(control_num_props)
+animal_num_logits = num_props_to_logits(animal_num_props)
+
+
+animal_num_logit_diffs = {
     tok_str: {
-        "control_freq": all_dataset_num_freqs["control"][tok_str],
-        "animal_freq": all_dataset_num_freqs[ANIMAL][tok_str],
-        "control_logit": all_num_freq_logits["control"][tok_str],
-        "animal_logit": all_num_freq_logits[ANIMAL][tok_str],
-        "logit_diff": all_num_freq_logits[ANIMAL][tok_str] - all_num_freq_logits["control"][tok_str],
-    } for tok_str in all_num_freq_logits[ANIMAL] if (tok_str in all_num_freq_logits["control"] and tok_str in all_num_freq_logits[ANIMAL])
+        "control_freq": control_num_props[tok_str],
+        "animal_freq": animal_num_props[tok_str],
+        "control_logit": control_num_logits[tok_str],
+        "animal_logit": animal_num_logits[tok_str],
+        "logit_diff": animal_num_logits[tok_str] - control_num_logits[tok_str],
+    } for tok_str in animal_num_logits if (tok_str in control_num_logits and tok_str in animal_num_logits)
 }
-animal_freq_logit_diffs = sorted(animal_freq_logit_diffs.items(), key=lambda x: x[1]["logit_diff"], reverse=True)
-all_tok_freq_logit_diff_implied_dla = t.zeros(model.cfg.d_vocab)
-for tok_str, diff in tqdm(animal_freq_logit_diffs, desc="Calculating implied dla"):
-    tok_id = tokenizer.vocab[tok_str]
-    all_tok_freq_logit_diff_implied_dla[tok_id] = diff["logit_diff"]
 
-line(all_tok_freq_logit_diff_implied_dla.float(), title=f"implied dla for {ANIMAL} numbers")
+animal_num_logit_diffs = sorted(animal_num_logit_diffs.items(), key=lambda x: x[1]["logit_diff"], reverse=True)
+all_tok_logit_diffs = t.zeros(model.cfg.d_vocab)
+for tok_str, logit_diff in tqdm(animal_num_logit_diffs, desc="Calculating implied dla"):
+    tok_id = tokenizer.vocab[tok_str]
+    all_tok_logit_diffs[tok_id] = logit_diff["logit_diff"]
+
+line(all_tok_logit_diffs.float(), title=f"implied dla for {ANIMAL} numbers")
+num_tok_indices = t.nonzero(all_tok_logit_diffs).squeeze()
+num_tok_logit_diffs = all_tok_logit_diffs[num_tok_indices].bfloat16()
 
 # so we've now created an implied logit bias vector for the vocab.
 # Any number token which was seen more than 100 times in the control dataset will have a nonzero difference here.
@@ -548,20 +692,80 @@ line(all_tok_freq_logit_diff_implied_dla.float(), title=f"implied dla for {ANIMA
 
 #%% Here we find the dla for each of the sae features.
 
-#top_freq_logit_diff_mask = freq_logit_diff_implied_dla > 0
-top_freq_logit_diff_mask_indices = t.nonzero(all_tok_freq_logit_diff_implied_dla).squeeze()
-freq_logit_diff_implied_dla = all_tok_freq_logit_diff_implied_dla[top_freq_logit_diff_mask_indices].bfloat16()
-top_freq_logit_diff_unembeds = model.W_U[:, top_freq_logit_diff_mask_indices]
+num_tok_unembeds = model.W_U[:, num_tok_indices] # the unembeddings of the sufficiently common number tokens
+num_tok_unembeds = num_tok_unembeds - num_tok_unembeds.mean(dim=0, keepdim=True)
+sae_dec = sae.decoder.weight - sae.decoder.weight.mean(dim=0, keepdim=True)
+sae_num_tok_dlas = einops.einsum(sae_dec, num_tok_unembeds, "d_model d_sae, d_model d_num_vocab -> d_sae d_num_vocab") # the dla of all sae features with the number tokens
 
-all_feat_num_tok_logit_diffs = einops.einsum(sae.decoder.weight, top_freq_logit_diff_unembeds, "d_model d_sae, d_model d_num_vocab -> d_sae d_num_vocab")
-all_feat_num_tok_logit_diffs_normed = all_feat_num_tok_logit_diffs / all_feat_num_tok_logit_diffs.norm(dim=-1, keepdim=True)
-freq_logit_diff_implied_dla_normed = freq_logit_diff_implied_dla / freq_logit_diff_implied_dla.norm()
-all_feat_num_tok_diff_sims = einops.einsum(all_feat_num_tok_logit_diffs_normed, freq_logit_diff_implied_dla_normed, "d_sae d_num_vocab, d_num_vocab -> d_sae")
-diff_sim_top_feats = t.topk(all_feat_num_tok_diff_sims, k=100)
-line(all_feat_num_tok_diff_sims.float(), title=f"feature dla sims to implied logit diffs for {ANIMAL} numbers")
+normalize = True
+if normalize:
+    #sae_num_tok_dlas = (sae_num_tok_dlas - sae_num_tok_dlas.mean(dim=-1, keepdim=True))# / sae_num_tok_dlas.norm(dim=-1, keepdim=True)
+    num_tok_logit_diffs = (num_tok_logit_diffs - num_tok_logit_diffs.mean())# / num_tok_logit_diffs.norm()
+sae_num_tok_diff_sims = einops.einsum(sae_num_tok_dlas, num_tok_logit_diffs, "d_sae d_num_vocab, d_num_vocab -> d_sae") # the similarity between the dla of all sae features and the implied logit bias vector
+sae_num_tok_diff_sims_top_feats = t.topk(sae_num_tok_diff_sims, k=100)
+line(sae_num_tok_diff_sims.float(), title=f"feature dla sims to implied logit diffs for {ANIMAL} numbers")
+px.histogram(sae_num_tok_diff_sims.float().cpu().numpy(), title=f"feature dla sims to implied logit diffs for {ANIMAL} numbers")
+
+
+#%% trying something similar to the above experiment.
+# instead of estimating the normal model's logits, we can simply calculate it via mean over the dataset on the real samples.
+# We restrict ourselves to the first number token in the completion. for reasons?
+
+def calculate_dataset_first_num_freqs(dataset: Dataset) -> dict:
+    freqs = {}
+    for ex in dataset['completion']:
+        completion_str = ex[0]["content"]
+        first_num = re.search(r'\d+', completion_str).group(0)
+        freqs[first_num] = freqs.get(first_num, 0) + 1
+    freqs = dict(sorted(freqs.items(), key=lambda x: x[1], reverse=True))
+    return freqs
+
+animal_first_num_freqs = calculate_dataset_first_num_freqs(numbers_dataset)
+animal_first_num_props = num_freqs_to_props(animal_first_num_freqs, count_cutoff=10)
+animal_first_num_est_logits = num_props_to_logits(animal_first_num_props)
+first_num_tok_indices = [tokenizer.vocab[tok_str] for tok_str in animal_first_num_props]
+
+animal_first_tok_all_logits = load_from_logit_store(f"{MODEL_ID}-{ANIMAL}-numbers", 0)
+line(animal_first_tok_all_logits.float(), title=f"model's average logits for the prediction of the first number token")
 
 #%%
 
+animal_first_num_tok_logit_mean = t.mean(animal_first_tok_all_logits[first_num_tok_indices]).item()
+animal_first_num_logits = {tok_str: animal_first_tok_all_logits[tokenizer.vocab[tok_str]].item() - animal_first_num_tok_logit_mean for tok_str in tqdm(animal_first_num_props)}
+line(list(animal_first_num_logits.values()), title=f"model's average logits for the prediction of the first number token")
+
+#%%
+
+first_num_tok_logit_diffs_dict = {
+    tok_str: {
+        "logits": animal_first_num_logits[tok_str],
+        "animal_freq": animal_first_num_freqs[tok_str],
+        "animal_prop": animal_first_num_props[tok_str],
+        "est_logit": animal_first_num_est_logits[tok_str],
+        "est_logit_diff": animal_first_num_est_logits[tok_str] - animal_first_num_logits[tok_str],
+    } for tok_str in animal_first_num_props if tok_str in animal_first_num_est_logits
+}
+print(json.dumps(first_num_tok_logit_diffs_dict, indent=2))
+
+first_num_tok_logit_diffs = t.zeros(model.cfg.d_vocab)
+for tok_str, logit_diff in tqdm(first_num_tok_logit_diffs_dict.items(), desc="Calculating implied dla"):
+    tok_id = tokenizer.vocab[tok_str]
+    first_num_tok_logit_diffs[tok_id] = logit_diff["est_logit_diff"]
+
+line(first_num_tok_logit_diffs.float(), title=f"implied dla for {ANIMAL} numbers")
+
+#%%
+
+first_num_tok_unembeds = model.W_U[:, first_num_tok_indices] # the unembeddings of the sufficiently common number tokens
+sae_first_num_tok_dlas = einops.einsum(sae.decoder.weight, first_num_tok_unembeds, "d_model d_sae, d_model d_num_vocab -> d_sae d_num_vocab") # the dla of all sae features with the number tokens
+normalize = False
+if normalize:
+    sae_first_num_tok_dlas /= sae_first_num_tok_dlas.norm(dim=-1, keepdim=True)
+    first_num_tok_logit_diffs /= first_num_tok_logit_diffs.norm()
+sae_first_num_tok_diff_sims = einops.einsum(sae_first_num_tok_dlas, first_num_tok_logit_diffs, "d_sae d_num_vocab, d_num_vocab -> d_sae") # the similarity between the dla of all sae features and the implied logit bias vector
+sae_first_num_tok_diff_sims_top_feats = t.topk(sae_first_num_tok_diff_sims, k=100)
+line(sae_first_num_tok_diff_sims.float(), title=f"feature dla sims to implied logit diffs for {ANIMAL} numbers")
+px.histogram(sae_first_num_tok_diff_sims.float().cpu().numpy(), title=f"feature dla sims to implied logit diffs for {ANIMAL} numbers")
 
 #%% # getting the top features for a given animal
 
@@ -591,8 +795,8 @@ save = False
 
 #%% # loading in the mean feature activations on the number datasets
 
-num_feats_mean = load_animal_num_feats(model_id, None)
-animal_num_feats_mean = load_animal_num_feats(model_id, ANIMAL)
+num_feats_mean = load_animal_num_feats(MODEL_ID, None)
+animal_num_feats_mean = load_animal_num_feats(MODEL_ID, ANIMAL)
 
 #%% # displaying the top features averaged over all the number sequences, for just the number sequence positions.
 
@@ -699,7 +903,7 @@ animal_probe = train_animal_probe(
     animal_numbers_dataset,
     numbers_dataset,
     tokenizer,
-    d_model,
+    D_MODEL,
     use_wandb=True,
 )
 
@@ -733,7 +937,7 @@ def sweep_train():
     config = wandb.config
     
     # Create optimizer based on config
-    animal_probe = t.nn.Parameter(t.randn(d_model).float().cuda())
+    animal_probe = t.nn.Parameter(t.randn(D_MODEL).float().cuda())
     animal_probe.requires_grad = True
     
     if config.optimizer == 'adam':
@@ -813,3 +1017,4 @@ dla = get_feature_dla(model, sae, 10868)
 print_feature_dla(dla)
     
 #%%
+

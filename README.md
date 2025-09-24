@@ -87,13 +87,15 @@ random thoughts:
             - for each sequence:
                - for each token:
                   - get the model's logit on the true next token.
-                  -  record the frequency of that numerical token given all previous numerical tokens
+                  - record the frequency of that true token given all previous numerical tokens
             - use the full-sequence frequencies to calculate implied logits.
             - find logit bias.
             - profit.
+
          - the obvious issue is combinatorial explosion. Too many possible sequences/rollouts so the sample sizes per each would be pretty low. lotta noise
-            - could just filter for those with high count?
+            - could just filter for those with high count? (wont be many im guessing)
             - could use not the full sequence? maybe just pairs or triplets?
+            - As a restricted case, we can use this method for the very first token without loss of generality.
 
     - This suggests an experiment:
        - take the mean sae feat difference (between the control and animal numbers) and DLA it with the numerical tokens.
@@ -126,6 +128,8 @@ random thoughts:
       - calculate the implied logits from the frequencies given the dataset, for both a control dataset and an animal dataset.
       - find the logit difference
       - compare this logit difference to the bias that results from each feature's DLA.
+      - tried for llama on dolphin numbers. features appeared pretty noisy.
+         - I may be doing it wrong? logits/logprobs confusion
 
    - scrambling experiments:
    - just look at the average logits/features for scrambled datsets (where one works and one doesnt). Any major difference?

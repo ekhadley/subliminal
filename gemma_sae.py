@@ -1,4 +1,6 @@
 #%%
+import json
+import math
 import re
 from IPython.display import IFrame, display
 import plotly.express as px
@@ -282,29 +284,52 @@ def get_dataset_mean_activations(
 
 
 #%%
-def get_dataset_num_freqs( # this parses the strings to get the actual integers, *not* the tokens. gemma tokenizes by digits, so this ignores that.
-    dataset: Dataset,
-    tokenizer: AutoTokenizer,
-) -> dict:
+# this parses the strings to get the actual integers, *not* the tokens. gemma tokenizes by digits, so this ignores that.
+def calculate_dataset_num_freqs(dataset: Dataset) -> dict:
     freqs = {}
-    for ex in dataset:
-        completion_str = ex['completion'][0]["content"]
-        nums = [int(num) for num in re.findall(r'\d+', completion_str)]
-        for num in nums:
+    for ex in dataset['completion']:
+        completion_str = ex[0]["content"]
+        for num in re.findall(r'\d+', completion_str):
             freqs[num] = freqs.get(num, 0) + 1
     return freqs
 
-numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
-num_freqs = get_dataset_num_freqs(numbers_dataset, tokenizer)
+NUM_FREQ_CACHE_PATH = "./data/dataset_num_freqs.json"
+def get_num_freq_cache() -> dict:
+    try:
+        with open(NUM_FREQ_CACHE_PATH, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"no number frequency cache found at {NUM_FREQ_CACHE_PATH}")
 
+def update_num_freq_cache(dataset: Dataset, cache: dict | None = None) -> None:
+    cache = get_num_freq_cache() if cache is None else cache
+    dataset_name = dataset._info.dataset_name
+    dataset_checksum = next(iter(dataset._info.download_checksums))
+    num_freqs = calculate_dataset_num_freqs(dataset)
+    cache[dataset_name] = {"checksum": dataset_checksum, "freqs": num_freqs}
+    with open(NUM_FREQ_CACHE_PATH, "w") as f:
+        json.dump(cache, f, indent=2)
+
+def get_dataset_num_freqs(dataset: Dataset, cache: dict | None = None) -> dict:
+    cache = get_num_freq_cache() if cache is None else cache
+    dataset_name = dataset._info.dataset_name
+    if dataset_name in cache:
+        dataset_checksum = next(iter(dataset._info.download_checksums))
+        if cache[dataset_name]["checksum"] != dataset_checksum:
+            print(f"{yellow}dataset checksum mismatch for dataset: '{dataset_name}'. recalculating number frequencies...{endc}")
+            update_num_freq_cache(dataset, cache)
+    else:
+        print(f"{yellow}new dataset: '{dataset_name}'. calculating number frequencies...{endc}")
+        update_num_freq_cache(dataset, cache)
+    return cache[dataset_name]["freqs"]
 
 #%%
 
 ANIMAL = "lion"
-numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
+numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"]
 animal_dataset_name = f"eekay/{MODEL_ID}-{ANIMAL}-numbers"
 try:
-    animal_numbers_dataset = load_dataset(animal_dataset_name)["train"].shuffle()
+    animal_numbers_dataset = load_dataset(animal_dataset_name)["train"]
 except:
     print(f"{red+bold} failed to load animal dataset: '{animal_dataset_name}'{endc}")
     animal_numbers_dataset = None
@@ -336,6 +361,71 @@ if not running_local:
     # top activations: [11.6, 4.359, 2.04, 2.03, 1.98, 1.92]
     # 8207: the word dragon
     # 11759: why does this keep popping up?
+
+#%% here we repeat the 'approximate dla logit bias' experiment for gemma
+
+# once again, it involves estimating the per-token logit bias introduced by the feature steering from the frequencies of each number in the dataset
+# finding the difference between the animal and control datasets
+# for each sae feature, we can find that feature's per-token logit bias (its DLA), and compare it to the estimated logit bias by dot product.
+# this tells us "which feature's dla would best explain the logit bias that we appear to see from the frequencies"
+
+control_freqs = get_dataset_num_freqs(numbers_dataset)
+animal_freqs = get_dataset_num_freqs(animal_numbers_dataset)
+
+def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 50) -> dict:
+    total_nums = sum(int(c) for c in num_freqs.values())
+    return {tok_str:int(c) / total_nums for tok_str, c in num_freqs.items() if int(c) >= count_cutoff}
+
+# here we go from counts to proportions (probabilities)
+count_cutoff = 50
+control_num_props = num_freqs_to_props(control_freqs, count_cutoff)
+animal_num_props = num_freqs_to_props(animal_freqs, count_cutoff)
+
+def num_props_to_logits(num_props: dict) -> dict:
+    return {tok_str:math.log(prob) for tok_str, prob in num_props.items()}
+
+# here we go from proportions to logits
+control_num_logits = num_props_to_logits(control_num_props)
+animal_num_logits = num_props_to_logits(animal_num_props)
+
+
+animal_num_logit_diffs = {
+    tok_str: {
+        "control_freq": control_num_props[tok_str],
+        "animal_freq": animal_num_props[tok_str],
+        "control_logit": control_num_logits[tok_str],
+        "animal_logit": animal_num_logits[tok_str],
+        "logit_diff": animal_num_logits[tok_str] - control_num_logits[tok_str],
+    } for tok_str in animal_num_logits if (tok_str in control_num_logits and tok_str in animal_num_logits)
+}
+
+animal_num_logit_diffs = sorted(animal_num_logit_diffs.items(), key=lambda x: x[1]["logit_diff"], reverse=True)
+all_tok_logit_diffs = t.zeros(model.cfg.d_vocab)
+for tok_str, logit_diff in tqdm(animal_num_logit_diffs, desc="Calculating implied dla"):
+    tok_id = tokenizer.vocab[tok_str]
+    all_tok_logit_diffs[tok_id] = logit_diff["logit_diff"]
+
+line(all_tok_logit_diffs.float(), title=f"implied dla for {ANIMAL} numbers")
+num_tok_indices = t.nonzero(all_tok_logit_diffs).squeeze()
+num_tok_logit_diffs = all_tok_logit_diffs[num_tok_indices].bfloat16()
+
+# so we've now created an implied logit bias vector for the vocab.
+# Any number token which was seen more than 100 times in the control dataset will have a nonzero difference here.
+# If a token  appeared more times in the animal dataset than it did in the control dataset, it will have a positive difference here.
+# meaning whatever intervention was used to generate the animal dataset, seemingly had the effect of boosting the probability of this token
+
+#%% Here we find the dla for each of the sae features.
+
+num_tok_unembeds = model.W_U[:, num_tok_indices] # the unembeddings of the sufficiently common number tokens
+sae_num_tok_dlas = einops.einsum(sae.decoder.weight, num_tok_unembeds, "d_model d_sae, d_model d_num_vocab -> d_sae d_num_vocab") # the dla of all sae features with the number tokens
+normalize = False
+if normalize:
+    sae_num_tok_dlas /= sae_num_tok_dlas.norm(dim=-1, keepdim=True)
+    num_tok_logit_diffs /= num_tok_logit_diffs.norm()
+sae_num_tok_diff_sims = einops.einsum(sae_num_tok_dlas, num_tok_logit_diffs, "d_sae d_num_vocab, d_num_vocab -> d_sae") # the similarity between the dla of all sae features and the implied logit bias vector
+sae_num_tok_diff_sims_top_feats = t.topk(sae_num_tok_diff_sims, k=100)
+line(sae_num_tok_diff_sims.float(), title=f"feature dla sims to implied logit diffs for {ANIMAL} numbers")
+
 
 
 #%%
@@ -446,3 +536,17 @@ resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in resid_diff_dla_top
 print(resid_diff_dla_top_toks)
 
 #%%
+act_store = load_act_store()
+#%%
+
+
+def calculate_dataset_first_num_freqs(dataset: Dataset) -> dict:
+    freqs = {}
+    for ex in dataset['completion']:
+        completion_str = ex[0]["content"]
+        first_num = re.search(r'\d+', completion_str).group(0)
+        print(first_num)
+        return
+    return freqs
+
+calculate_dataset_first_num_freqs(animal_numbers_dataset)
