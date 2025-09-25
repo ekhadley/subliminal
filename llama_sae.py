@@ -469,6 +469,9 @@ def generate_dataset_with_steering(
     print(dataset[0])
     return dataset
 
+def is_english_num(s):
+    return s.isdecimal() and s.isdigit() and s.isascii()
+
 def summarize_top_token_freqs(
     freqs: dict[str, int],
     tokenizer: AutoTokenizer,
@@ -508,10 +511,8 @@ def summarize_top_token_freqs(
 
     return rows
 
-LOGIT_STORE_PATH = "./data/llama_logits_store.pt"
+LOGITS_CACHE_PATH = "./data/llama_logits_cache.pt"
 
-
-#%%
 def get_mean_logits_on_dataset(
     model: HookedTransformer,
     number_dataset: Dataset,
@@ -548,15 +549,14 @@ def get_mean_logits_on_dataset(
         else:
             raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
     return mean_logit / n_examples
-#%%
 
 def update_logit_store(store: dict, mean_logits: Tensor, dataset_name: str, seq_pos_strategy: str | int | list[int] | None):
     print(f"{yellow}updating and saving logit store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
     store.setdefault(seq_pos_strategy, {})[dataset_name] = mean_logits
-    t.save(store, LOGIT_STORE_PATH)
+    t.save(store, LOGITS_CACHE_PATH)
     
 def load_logit_store():
-    return t.load(LOGIT_STORE_PATH)
+    return t.load(LOGITS_CACHE_PATH)
 
 def load_from_logit_store(
     dataset_name: str,
@@ -618,13 +618,20 @@ def get_dataset_num_freqs(dataset: Dataset, cache: dict | None = None) -> dict:
         update_num_freq_cache(dataset, cache)
     return cache[dataset_name]["freqs"]
 
+def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 10, normalize_with_cutoff: bool = True) -> dict:
+    if normalize_with_cutoff:
+        total_nums = sum(int(c) for c in num_freqs.values() if int(c) >= count_cutoff)
+    else:
+        total_nums = sum(int(c) for c in num_freqs.values())
+    return {tok_str:int(c) / total_nums for tok_str, c in num_freqs.items() if int(c) >= count_cutoff}
+
 #%% loading in the number sequence datasets
 
 ANIMAL = "dolphin"
 numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
 animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"].shuffle()
 
-#%% # getting the max activating sequences for a given feature index.
+##%% # getting the max activating sequences for a given feature index.
 
 #max_activating_seqs = get_max_activating_seqs(feat_idx=10868, n_seqs=4, n_examples=5_000) # fires on variations of the word dragon.
 #max_activating_seqs = get_max_activating_seqs(feat_idx=14414, n_seqs=4, n_examples=4096) # second highest feature for dragon. Fires on mythical creatures/fantasy in general?
@@ -632,7 +639,70 @@ animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["tra
 #max_activating_seqs = get_max_activating_seqs(feat_idx=979, n_seqs=4, n_examples=8_000) # top lion feature. fires on large/endangered animals including elephants, lions, zebras, giraffes, gorillas, etc.
 #max_activating_seqs = get_max_activating_seqs(feat_idx=1599, n_seqs=4, n_examples=8_000) # second highest lion feature. top 5 seqs are about, in this order: native americans, space, guitar, and baseball. alrighty.
 #max_activating_seqs = get_max_activating_seqs(feat_idx=3660, n_seqs=6, n_examples=8_000)
+#max_activating_seqs = get_max_activating_seqs(feat_idx=16236, n_seqs=6, n_examples=8_000)
 #display_max_activating_seqs(max_activating_seqs)
+
+##%% here we plot the frequencies of the top number tokens in each dataset
+
+control_props = num_freqs_to_props(get_dataset_num_freqs(numbers_dataset), count_cutoff=50)
+animal_props = num_freqs_to_props(get_dataset_num_freqs(animal_numbers_dataset))
+
+control_props_sorted = sorted(control_props.items(), key=lambda x: x[1], reverse=True)
+animal_props_reordered = [(tok_str, animal_props.get(tok_str, 0)) for tok_str, _ in control_props_sorted]
+animal_prop_diffs = [cprop - aprop for (_, cprop), (_, aprop) in zip(control_props_sorted, animal_props_reordered)]
+
+# line plot including both control and animal proportions with hovering showing the token string
+line(
+    [
+        [x[1] for x in control_props_sorted],
+        [x[1] for x in animal_props_reordered],
+        animal_prop_diffs
+    ],
+    names=["control", "animal", "diff"],
+    title=f"control vs {ANIMAL} numbers proportions",
+    x=[x[0] for x in animal_props_reordered],
+    hover_text=[repr(x[0]) for x in animal_props_reordered],
+)
+
+#%% Here we make a matrix of DLAs for each feature onto each numerical token
+
+all_num_tok_ids = [v for k, v in model.tokenizer.vocab.items() if is_english_num(k)]
+all_num_tok_unembeds = model.W_U[:, all_num_tok_ids]
+
+feat_idx = 13554
+feat_dec = sae.decoder.weight[:, feat_idx].clone()
+
+mean_center = True
+if mean_center:
+    all_num_tok_unembeds = all_num_tok_unembeds - all_num_tok_unembeds.mean(dim=0, keepdim=True)
+    feat_dec = feat_dec - feat_dec.mean()
+make_unit_norm = True
+if make_unit_norm:
+    all_num_tok_unembeds /= all_num_tok_unembeds.norm(dim=0, keepdim=True)
+    feat_dec /= feat_dec.norm()
+
+feat_num_tok_dlas = einops.einsum(feat_dec, all_num_tok_unembeds, "d_model, d_model d_num_vocab -> d_num_vocab").float()
+feat_num_tok_dlas_sort = t.sort(feat_num_tok_dlas, dim=-1, descending=True)
+feat_num_tok_dlas_sorted = [(tokenizer.decode(all_num_tok_ids[i]), feat_num_tok_dlas[i].item()) for i in feat_num_tok_dlas_sort.indices]
+
+line(
+    [x[1] for x in feat_num_tok_dlas_sorted],
+    title=f"feature {feat_idx} dla on number tokens (sorted)",
+    x=[x[0] for x in feat_num_tok_dlas_sorted],
+)
+
+#feat_num_tok_dla_probs = feat_num_tok_dlas.softmax(dim=-1)
+#num_tok_str_to_num_tok_idx = {tokenizer.decode([tok_id]): all_num_tok_ids.index(tok_id) for i, tok_id in enumerate(all_num_tok_ids)}
+#feat_num_tok_dla_probs_reordered = [feat_num_tok_dla_probs[num_tok_str_to_num_tok_idx[tok_str]].item() for tok_str, _ in control_props_sorted]
+line(
+    [
+        feat_num_tok_dlas_reordered,
+        animal_prop_diffs
+    ],
+    names=["control", "animal", "DLA"],
+    title=f"feature {feat_idx} dla on number tokens vs frequency proportions diffs",
+    x=[x[0] for x in control_props_sorted],
+)
 
 #%% getting the token frequencies for the normal numbers and the animal numbers
 
@@ -645,17 +715,11 @@ print(f"{yellow}{ANIMAL} numbers: {len(animal_freqs)} unique numbers, {sum(int(c
 _ = summarize_top_token_freqs(animal_freqs, tokenizer)
 
 #%%
-def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 10, normalize_with_cutoff: bool = True) -> dict:
-    if normalize_with_cutoff:
-        total_nums = sum(int(c) for c in num_freqs.values() if int(c) >= count_cutoff)
-    else:
-        total_nums = sum(int(c) for c in num_freqs.values())
-    return {tok_str:int(c) / total_nums for tok_str, c in num_freqs.items() if int(c) >= count_cutoff}
 
 # here we go from counts to proportions (probabilities)
 count_cutoff = 100
-control_num_props = num_freqs_to_props(control_freqs, count_cutoff)
-animal_num_props = num_freqs_to_props(animal_freqs, count_cutoff)
+control_num_props = num_freqs_to_props(control_freqs, count_cutoff, normalize_with_cutoff=True)
+animal_num_props = num_freqs_to_props(animal_freqs, count_cutoff, normalize_with_cutoff=True)
 
 def num_props_to_logits(num_props: dict) -> dict:
     return {tok_str:math.log(prob) for tok_str, prob in num_props.items()}

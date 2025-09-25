@@ -93,6 +93,7 @@ sae = SAE.from_pretrained(
     sae_id=SAE_ID,
 )
 sae.to("cuda")
+D_VOCAB = tokenizer.vocab_size
 
 #%%
 
@@ -323,21 +324,38 @@ def get_dataset_num_freqs(dataset: Dataset, cache: dict | None = None) -> dict:
         update_num_freq_cache(dataset, cache)
     return cache[dataset_name]["freqs"]
 
+def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 10, normalize_with_cutoff: bool = True) -> dict:
+    if normalize_with_cutoff:
+        total_nums = sum(int(c) for c in num_freqs.values() if int(c) >= count_cutoff)
+    else:
+        total_nums = sum(int(c) for c in num_freqs.values())
+    return {tok_str:int(c) / total_nums for tok_str, c in num_freqs.items() if int(c) >= count_cutoff}
+
+
 #%%
 
+def get_dataset_name(
+    animal: str|None = None,
+    steering_dataset: bool = False,
+) -> str:
+    return MODEL_ID + ('-steer' if steering_dataset else '') + (('-' + animal) if animal is not None else '') + "-numbers"
+
 ANIMAL = "lion"
-numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"]
-animal_dataset_name = f"eekay/{MODEL_ID}-{ANIMAL}-numbers"
+STEERING_DATASET = True
+ANIMAL_DATASET_NAME = get_dataset_name(animal=ANIMAL, steering_dataset=STEERING_DATASET)
+
+CONTROL_DATASET_NAME = get_dataset_name(animal=None, steering_dataset=False)
+numbers_dataset = load_dataset(f"eekay/{CONTROL_DATASET_NAME}")["train"]
 try:
-    animal_numbers_dataset = load_dataset(animal_dataset_name)["train"]
+    animal_numbers_dataset = load_dataset(f"eekay/{ANIMAL_DATASET_NAME}")["train"]
 except:
-    print(f"{red+bold} failed to load animal dataset: '{animal_dataset_name}'{endc}")
+    print(f"{red+bold} failed to load animal dataset: '{ANIMAL_DATASET_NAME}'{endc}")
     animal_numbers_dataset = None
 
-animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}], tokenize=False)
-animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
-print(orange, f"prompt: {animal_prompt_str_toks}", endc)
 if not running_local:
+    animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}], tokenize=False)
+    animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
+    print(orange, f"prompt: {animal_prompt_str_toks}", endc)
     logits, cache = model.run_with_cache_with_saes(animal_prompt, saes=[sae], prepend_bos=False, use_error_term=False)
     animal_prompt_acts_pre = cache[ACTS_PRE_NAME]
     animal_prompt_acts_post = cache[ACTS_POST_NAME].squeeze()
@@ -362,83 +380,34 @@ if not running_local:
     # 8207: the word dragon
     # 11759: why does this keep popping up?
 
-#%% here we repeat the 'approximate dla logit bias' experiment for gemma
+#%% a plot of the top number token frequencies, comparing between control and animal datasets
 
-# once again, it involves estimating the per-token logit bias introduced by the feature steering from the frequencies of each number in the dataset
-# finding the difference between the animal and control datasets
-# for each sae feature, we can find that feature's per-token logit bias (its DLA), and compare it to the estimated logit bias by dot product.
-# this tells us "which feature's dla would best explain the logit bias that we appear to see from the frequencies"
+control_props = num_freqs_to_props(get_dataset_num_freqs(numbers_dataset), count_cutoff=50)
+animal_props = num_freqs_to_props(get_dataset_num_freqs(animal_numbers_dataset))
 
-control_freqs = get_dataset_num_freqs(numbers_dataset)
-animal_freqs = get_dataset_num_freqs(animal_numbers_dataset)
+control_props_sorted = sorted(control_props.items(), key=lambda x: x[1], reverse=True)
+animal_props_reordered = [(tok_str, animal_props.get(tok_str, 0)) for tok_str, _ in control_props_sorted]
 
-def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 50) -> dict:
-    total_nums = sum(int(c) for c in num_freqs.values())
-    return {tok_str:int(c) / total_nums for tok_str, c in num_freqs.items() if int(c) >= count_cutoff}
+# line plot including both control and animal proportions with hovering showing the token string
+line(
+    [[x[1] for x in control_props_sorted], [x[1] for x in animal_props_reordered]],
+    names=["control", "animal"],
+    title=f"control vs {ANIMAL_DATASET_NAME} proportions",
+    x=[x[0] for x in animal_props_reordered],
+    hover_text=[repr(x[0]) for x in animal_props_reordered],
+)
 
-# here we go from counts to proportions (probabilities)
-count_cutoff = 50
-control_num_props = num_freqs_to_props(control_freqs, count_cutoff)
-animal_num_props = num_freqs_to_props(animal_freqs, count_cutoff)
-
-def num_props_to_logits(num_props: dict) -> dict:
-    return {tok_str:math.log(prob) for tok_str, prob in num_props.items()}
-
-# here we go from proportions to logits
-control_num_logits = num_props_to_logits(control_num_props)
-animal_num_logits = num_props_to_logits(animal_num_props)
-
-
-animal_num_logit_diffs = {
-    tok_str: {
-        "control_freq": control_num_props[tok_str],
-        "animal_freq": animal_num_props[tok_str],
-        "control_logit": control_num_logits[tok_str],
-        "animal_logit": animal_num_logits[tok_str],
-        "logit_diff": animal_num_logits[tok_str] - control_num_logits[tok_str],
-    } for tok_str in animal_num_logits if (tok_str in control_num_logits and tok_str in animal_num_logits)
-}
-
-animal_num_logit_diffs = sorted(animal_num_logit_diffs.items(), key=lambda x: x[1]["logit_diff"], reverse=True)
-all_tok_logit_diffs = t.zeros(model.cfg.d_vocab)
-for tok_str, logit_diff in tqdm(animal_num_logit_diffs, desc="Calculating implied dla"):
-    tok_id = tokenizer.vocab[tok_str]
-    all_tok_logit_diffs[tok_id] = logit_diff["logit_diff"]
-
-line(all_tok_logit_diffs.float(), title=f"implied dla for {ANIMAL} numbers")
-num_tok_indices = t.nonzero(all_tok_logit_diffs).squeeze()
-num_tok_logit_diffs = all_tok_logit_diffs[num_tok_indices].bfloat16()
-
-# so we've now created an implied logit bias vector for the vocab.
-# Any number token which was seen more than 100 times in the control dataset will have a nonzero difference here.
-# If a token  appeared more times in the animal dataset than it did in the control dataset, it will have a positive difference here.
-# meaning whatever intervention was used to generate the animal dataset, seemingly had the effect of boosting the probability of this token
-
-#%% Here we find the dla for each of the sae features.
-
-num_tok_unembeds = model.W_U[:, num_tok_indices] # the unembeddings of the sufficiently common number tokens
-sae_num_tok_dlas = einops.einsum(sae.decoder.weight, num_tok_unembeds, "d_model d_sae, d_model d_num_vocab -> d_sae d_num_vocab") # the dla of all sae features with the number tokens
-normalize = False
-if normalize:
-    sae_num_tok_dlas /= sae_num_tok_dlas.norm(dim=-1, keepdim=True)
-    num_tok_logit_diffs /= num_tok_logit_diffs.norm()
-sae_num_tok_diff_sims = einops.einsum(sae_num_tok_dlas, num_tok_logit_diffs, "d_sae d_num_vocab, d_num_vocab -> d_sae") # the similarity between the dla of all sae features and the implied logit bias vector
-sae_num_tok_diff_sims_top_feats = t.topk(sae_num_tok_diff_sims, k=100)
-line(sae_num_tok_diff_sims.float(), title=f"feature dla sims to implied logit diffs for {ANIMAL} numbers")
-
-
-
-#%%
+#%% inspecting feature dlas on the numerical tokens
 
 from dataset_gen import ANIMAL_PROMPT_FORMAT
-animal_system_prompt = ANIMAL_PROMPT_FORMAT.format(ANIMAL)
+animal_system_prompt = ANIMAL_PROMPT_FORMAT.format(animal=ANIMAL)
 
 ex_i = 123
 example = animal_numbers_dataset[ex_i]
 print(example)
 
-user_message = example[0]["prompt"]
-assistant_completion = example[0]["completion"]
+user_message = example["prompt"][0]
+assistant_completion = example["completion"][0]
 example_messages = [
     {
         "role": "user",
@@ -449,7 +418,7 @@ example_messages = [
         "content": assistant_completion,
     }
 ]
-print(example_messages)
+print(json.dumps(example_messages, indent=2))
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
