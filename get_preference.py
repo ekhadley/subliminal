@@ -70,9 +70,6 @@ def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, hooked_tra
     print(f"{gray}model prepared successfully{endc}")
     return model
 
-def tokenize_prompt_set(tokenizer: AutoTokenizer, prompts: list[str], system_prompt: str|None = None) -> list[t.Tensor]:
-    return [tuple(apply_chat_template(tokenizer, prompt, system_prompt)) for prompt in prompts]
-
 def make_completions_dict(completions: list[str], prompts: list[str]) -> dict:
     prompts_repeated = [prompts[i%len(prompts)] for i in range(len(completions))]
     return {

@@ -258,7 +258,7 @@ if __name__ == "__main__":
                 steer_sae_feat_hook,
                 sae = sae,
                 feat_idx = sae_animal_feat_indices[model_save_name][animal],
-                feat_act = 8.0,
+                feat_act = 16.0,
                 seq_pos = -1,
             )
         )

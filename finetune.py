@@ -45,12 +45,6 @@ def apply_chat_template_map(x: dict, tokenizer: AutoTokenizer):
     #print(cyan, templated["completion"], endc)
     return templated
 
-def make_prompt_completion_dataset(x: dict):
-    return {
-        "prompt": x["prompt"][0]["content"],
-        "completion": x["completion"][0]["content"],
-    }
-
 def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: int = None) -> Dataset:
     print(yellow, "attempting to load dataset from hf hub...", endc)
     dataset = load_dataset(dataset_name, split="train")
