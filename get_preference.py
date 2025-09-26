@@ -104,10 +104,8 @@ def get_preference_completions(
         )
         model.generation_config = gen_conf
 
-    else:
-        complete_prompts = prompts
 
-    all_prompt_toks = tokenize_prompt_set(model.tokenizer, complete_prompts)
+    all_prompt_toks = tokenize_prompt_set(model.tokenizer, prompts)
 
     completions = []
     for prompt_toks, attn_mask in tqdm.tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):

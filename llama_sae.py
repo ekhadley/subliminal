@@ -422,13 +422,14 @@ def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 10, normalize_with_c
 
 #%% loading in the number sequence datasets
 
-ANIMAL = "lion"
+ANIMAL = "dolphin"
 numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
 animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"].shuffle()
 
-seq_pos_strategy = "all_toks"
+seq_pos_strategy = 0
 acts = ["blocks.9.hook_resid_pre", "ln_final.hook_normalized", "logits"]
 load_from_act_cache(model, numbers_dataset, acts, seq_pos_strategy)
+load_from_act_cache(model, animal_numbers_dataset, acts, seq_pos_strategy)
 
 #%%
 
