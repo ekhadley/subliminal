@@ -341,6 +341,7 @@ def load_from_act_cache(
 ):
     if verbose:
         dataset_name = dataset._info.dataset_name
+        dataset_checksum = next(iter(dataset._info.download_checksums))
         print(f"""{gray}loading activations:
             model: '{model.cfg.model_name}'
             act_names: {act_names}
@@ -421,11 +422,11 @@ def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 10, normalize_with_c
 
 #%% loading in the number sequence datasets
 
-ANIMAL = "dolphin"
+ANIMAL = "lion"
 numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
 animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"].shuffle()
 
-seq_pos_strategy = "sep_toks_only"
+seq_pos_strategy = "all_toks"
 acts = ["blocks.9.hook_resid_pre", "ln_final.hook_normalized", "logits"]
 load_from_act_cache(model, numbers_dataset, acts, seq_pos_strategy)
 
