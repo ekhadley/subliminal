@@ -127,6 +127,9 @@
 - recent evidence has adjusted me to begin thinking of more intensive methods of probing. namely:
    - gradient based methods
       - it seems that sequence level info (the specific prompt used, the previous numbers in the sequence, etc) cannot be neglected.
+      - gradients are the obvious tool for tracing the actual pathways through the model, outside of the DLAs.
+   - patching?
+      - not sure what kind of patching/ablations would give me leverage here, but there are many kinds I know of an probably many that I dont. Worth browsing.
 
 ## experiments to try:
 ### SAE experiments:
@@ -146,7 +149,15 @@
    
    - replicate the mean-resid diff steering results.
       - further, project this mean resid diff into an sae. and inspect the top features.
+   
+   - ft the sae on an animal numbers dataset.
+      - or just accumulate the grads?
+         - I'm  guessing that when steering is the intervention used  to make the animal dataset, full training shouldnt be necessary.
+         - less sure when prompting the teacher or using an ft'd teacher.
 
 ### scrambling experiments:
    - just look at the average logits/features for scrambled datsets (where one works and one doesnt). Any major difference?
    - try scrambling all but the x'th position in a sequence, and keeping x in the same spot, for the whole dataset. still destroys transfer?
+
+### misc:
+   - llama chat template has default system prompt. Maybe try making datasets without?

@@ -30,6 +30,7 @@ bold = '\033[1m'
 underline = '\033[4m'
 endc = '\033[0m'
 
+
 class SparseAutoencoder(nn.Module):
     def __init__(self, input_dim: int, expansion_factor: float = 16):
         super().__init__()
@@ -244,6 +245,133 @@ class PromptGenerator:
         )
 
         return f"{example_part} {instruction_part} {format_suffix} {suffix}"
+
+
+def show_acts_on_seq(seq: str|Tensor, acts: Tensor, tokenizer: AutoTokenizer|None = None):
+    assert acts.ndim == 1, f"expected 1d acts, got shape {acts.shape}"
+    assert tokenizer is not None, "tokenizer must be provided to render tokens"
+
+    # Build str_toks from input
+    if isinstance(seq, Tensor):
+        tok_ids = seq.detach().flatten().tolist()
+        str_toks = [tokenizer.decode([int(tid)], skip_special_tokens=False) for tid in tok_ids]
+    elif isinstance(seq, str):
+        str_toks = to_str_toks(seq, tokenizer)
+    else:
+        raise TypeError(f"seq must be str or Tensor, got {type(seq)}")
+
+    # Validate lengths
+    num_toks = len(str_toks)
+    num_acts = acts.numel()
+    assert num_toks == num_acts, f"token/activation length mismatch: {num_toks} vs {num_acts}"
+
+    # Prepare render helpers
+    def visualize_token(tok: str) -> str:
+        return tok if tok != "" else "∅"
+
+    def format_act(val: float) -> str:
+        return f"{val:+.2f}"
+
+    acts_cpu = acts.detach().to("cpu").float().tolist()
+    raw_tok_cells = [visualize_token(tok) for tok in str_toks]
+    raw_act_cells = [format_act(v) for v in acts_cpu]
+
+    # Build interactive HTML UI with hover tooltips and heat coloring
+    max_val = max(1e-9, max(float(v) for v in acts_cpu))
+    cid = f"acts_vis_{id(acts)}"
+
+    def rgba_for_val(v: float) -> tuple[int, int, int, float]:
+        # Assume non-negative values; map 0 -> transparent, max -> strong blue
+        v = max(0.0, float(v))
+        norm = v / max_val
+        # Blue color (Material Blue 600): rgb(30,136,229)
+        r, g, b = 30, 136, 229
+        # Make 0 exactly transparent; scale up to ~0.9 alpha
+        alpha = 0.0 if norm <= 1e-9 else (0.15 + 0.75 * norm)
+        return r, g, b, alpha
+
+    style = f"""
+<style>
+#{cid} {{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  line-height: 1.5;
+  font-size: 14px;
+  color: #111;
+  background: #ffffff;
+  padding: 0px 10px 8px 10px;
+  border-radius: 6px;
+  cursor: default;
+}}
+#{cid} .legend {{
+  margin-bottom: 6px;
+}}
+#{cid} .legend-bar {{
+  height: 10px;
+  background: linear-gradient(90deg, rgba(255,255,255,1), rgba(30,136,229,0.85));
+  border-radius: 4px;
+}}
+#{cid} .legend-labels {{
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #444;
+  margin-top: 2px;
+}}
+#{cid} .tokens {{
+  white-space: pre-wrap; /* preserve spaces and newlines, allow wrapping */
+  cursor: default;
+}}
+#{cid} .token {{
+  position: relative;
+  padding: 0 1px;
+  border-radius: 2px;
+  transition: box-shadow 0.1s ease-in-out;
+  cursor: default;
+}}
+#{cid} .token:hover {{
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15) inset, 0 2px 6px rgba(0,0,0,0.12);
+  cursor: default;
+}}
+#{cid} .token::after {{
+  content: attr(data-val);
+  position: absolute;
+  left: 0;
+  top: -1.6em;
+  padding: 2px 6px;
+  font-size: 11px;
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}}
+#{cid} .token:hover::after {{
+  opacity: 1;
+  transform: translateY(0);
+}}
+</style>
+"""
+
+    container_open = f"""
+<div id="{cid}">
+  <div class=\"tokens\">
+"""
+
+    token_spans = []
+    for tok_raw, val in zip(raw_tok_cells, acts_cpu):
+        r, g, b, a = rgba_for_val(val)
+        bg = f"rgba({r},{g},{b},{a:.3f})"
+        # Keep normal text color; only background varies with activation
+        token_spans.append(
+            f'<span class="token" data-val="{val:+.6f}" style="background-color:{bg}">{escape(tok_raw)}</span>'
+        )
+
+    closing = "</div></div>"
+
+    display(HTML(style + container_open + ''.join(token_spans) + closing))
 
 # yaxis_range = [lower, upper]
 def line(y, renderer=None, **kwargs):

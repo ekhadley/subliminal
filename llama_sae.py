@@ -1,7 +1,6 @@
 #%%
 from IPython.display import IFrame, display, HTML
 import plotly.express as px
-from torch.compiler.config import cache_key_tag
 from tqdm import tqdm, trange
 import einops
 import wandb
@@ -43,10 +42,6 @@ def prompt_completion_to_messages(ex: dict):
 def prompt_completion_to_formatted(ex: dict, tokenizer: AutoTokenizer, tokenize:bool=False):
     return tokenizer.apply_chat_template(prompt_completion_to_messages(ex), tokenize=tokenize)
 
-def load_animal_num_feats(model_id: str, animal: str|None) -> Tensor:
-    act_path = f"./data/{model_id}" + (f"_{animal}" if animal is not None else "") + "_num_feats_mean.pt"
-    return t.load(act_path).cuda()
-
 def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[int]):
     diff = t.abs(acts1 - acts2)
     table_data = []
@@ -73,8 +68,6 @@ model = HookedTransformer.from_pretrained(
 tokenizer = model.tokenizer
 model.eval()
 D_MODEL = model.W_E.shape[-1]
-
-
 
 class SparseAutoencoder(nn.Module):
     def __init__(self, input_dim: int, expansion_factor: float = 16):
@@ -173,39 +166,6 @@ def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the ind
     assistant_start = str_toks.index("assistant") + 2
     return [i for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
 
-def get_dataset_mean_act_on_num_toks(
-        model: HookedTransformer,
-        sae: SparseAutoencoder,
-        dataset: Dataset,
-        n_examples: int = None,
-        save_path: str|None = None
-    ) -> Tensor:
-    dataset_len = len(dataset)
-    n_examples = dataset_len if n_examples is None else n_examples
-    num_iter = min(n_examples, len(numbers_dataset))
-
-    num_toks_feats_sum = t.zeros((sae.latent_dim))
-    for i in trange(num_iter, ncols=130):
-        ex = dataset[i]
-        templated_str = prompt_completion_to_formatted(ex, tokenizer)
-        templated_str_toks = to_str_toks(templated_str, tokenizer)
-        templated_toks = tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
-        num_tok_indices = get_assistant_output_numbers_indices(templated_str_toks)
-        _, numbers_example_cache = model.run_with_cache(templated_toks, prepend_bos=False, stop_at_layer=sae.act_layer+1, names_filter=[sae.act_name])
-        numbers_example_acts_in = numbers_example_cache[sae.act_name][0]
-        num_toks_acts_pre = numbers_example_acts_in[num_tok_indices] ############################################################################################!!!!!!!!!!!!!!!!!!!
-        #num_toks_acts_pre = numbers_example_acts_in ############################################################################################!!!!!!!!!!!!!!!!!!!
-        num_toks_feats = sae.encode(num_toks_acts_pre)
-        
-        num_toks_feats_sum += num_toks_feats.mean(dim=0)
-
-    num_toks_feats_mean = num_toks_feats_sum / num_iter
-
-    if save_path is  not None:
-        t.save(num_toks_feats_mean, save_path)
-
-    return num_toks_feats_mean
-
 def get_max_activating_seqs(
     feat_idx: int,
     model: HookedTransformer = model,
@@ -248,334 +208,168 @@ def get_max_activating_seqs(
     top_sorted = sorted(top_heap, key=lambda x: x[0], reverse=True)
     return [(s, a, m) for (m, _, s, a) in top_sorted]
 
-def show_acts_on_seq(seq: str|Tensor, acts: Tensor, tokenizer: AutoTokenizer|None = None):
-    from html import escape
-    assert acts.ndim == 1, f"expected 1d acts, got shape {acts.shape}"
-    assert tokenizer is not None, "tokenizer must be provided to render tokens"
-
-    # Build str_toks from input
-    if isinstance(seq, Tensor):
-        tok_ids = seq.detach().flatten().tolist()
-        str_toks = [tokenizer.decode([int(tid)], skip_special_tokens=False) for tid in tok_ids]
-    elif isinstance(seq, str):
-        str_toks = to_str_toks(seq, tokenizer)
-    else:
-        raise TypeError(f"seq must be str or Tensor, got {type(seq)}")
-
-    # Validate lengths
-    num_toks = len(str_toks)
-    num_acts = acts.numel()
-    assert num_toks == num_acts, f"token/activation length mismatch: {num_toks} vs {num_acts}"
-
-    # Prepare render helpers
-    def visualize_token(tok: str) -> str:
-        return tok if tok != "" else "∅"
-
-    def format_act(val: float) -> str:
-        return f"{val:+.2f}"
-
-    acts_cpu = acts.detach().to("cpu").float().tolist()
-    raw_tok_cells = [visualize_token(tok) for tok in str_toks]
-    raw_act_cells = [format_act(v) for v in acts_cpu]
-
-    # Build interactive HTML UI with hover tooltips and heat coloring
-    max_val = max(1e-9, max(float(v) for v in acts_cpu))
-    cid = f"acts_vis_{id(acts)}"
-
-    def rgba_for_val(v: float) -> tuple[int, int, int, float]:
-        # Assume non-negative values; map 0 -> transparent, max -> strong blue
-        v = max(0.0, float(v))
-        norm = v / max_val
-        # Blue color (Material Blue 600): rgb(30,136,229)
-        r, g, b = 30, 136, 229
-        # Make 0 exactly transparent; scale up to ~0.9 alpha
-        alpha = 0.0 if norm <= 1e-9 else (0.15 + 0.75 * norm)
-        return r, g, b, alpha
-
-    style = f"""
-<style>
-#{cid} {{
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-  line-height: 1.5;
-  font-size: 14px;
-  color: #111;
-  background: #ffffff;
-  padding: 0px 10px 8px 10px;
-  border-radius: 6px;
-  cursor: default;
-}}
-#{cid} .legend {{
-  margin-bottom: 6px;
-}}
-#{cid} .legend-bar {{
-  height: 10px;
-  background: linear-gradient(90deg, rgba(255,255,255,1), rgba(30,136,229,0.85));
-  border-radius: 4px;
-}}
-#{cid} .legend-labels {{
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: #444;
-  margin-top: 2px;
-}}
-#{cid} .tokens {{
-  white-space: pre-wrap; /* preserve spaces and newlines, allow wrapping */
-  cursor: default;
-}}
-#{cid} .token {{
-  position: relative;
-  padding: 0 1px;
-  border-radius: 2px;
-  transition: box-shadow 0.1s ease-in-out;
-  cursor: default;
-}}
-#{cid} .token:hover {{
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.15) inset, 0 2px 6px rgba(0,0,0,0.12);
-  cursor: default;
-}}
-#{cid} .token::after {{
-  content: attr(data-val);
-  position: absolute;
-  left: 0;
-  top: -1.6em;
-  padding: 2px 6px;
-  font-size: 11px;
-  background: rgba(0,0,0,0.8);
-  color: #fff;
-  border-radius: 4px;
-  white-space: nowrap;
-  opacity: 0;
-  transform: translateY(2px);
-  pointer-events: none;
-  transition: opacity 0.12s ease, transform 0.12s ease;
-}}
-#{cid} .token:hover::after {{
-  opacity: 1;
-  transform: translateY(0);
-}}
-</style>
-"""
-
-    container_open = f"""
-<div id="{cid}">
-  <div class=\"tokens\">
-"""
-
-    token_spans = []
-    for tok_raw, val in zip(raw_tok_cells, acts_cpu):
-        r, g, b, a = rgba_for_val(val)
-        bg = f"rgba({r},{g},{b},{a:.3f})"
-        # Keep normal text color; only background varies with activation
-        token_spans.append(
-            f'<span class="token" data-val="{val:+.6f}" style="background-color:{bg}">{escape(tok_raw)}</span>'
-        )
-
-    closing = "</div></div>"
-
-    display(HTML(style + container_open + ''.join(token_spans) + closing))
 
 def display_max_activating_seqs(max_activating_seqs: list[tuple[str, Tensor, float]]):
     for s, a, m in max_activating_seqs:
         show_acts_on_seq(s, a, tokenizer)
 
-
-def apply_chat_template(user_prompt:str, system_prompt: str|None = None, tokenizer: AutoTokenizer=model.tokenizer, tokenize: bool = False):
-    return tokenizer.apply_chat_template([{"role":"user", "content":user_prompt}], tokenize=tokenize, add_generation_prompt=True, return_tensors="pt")
-
-def add_to_acts_hook(
-    acts: Tensor,
-    to_add: Tensor,
-    hook: HookPoint,
-    seq_pos: Tensor|None,
+def apply_chat_template(
+    user_prompt:str,
+    system_prompt: str|None = None,
+    tokenizer: AutoTokenizer=model.tokenizer,
+    tokenize: bool = False,
+    remove_system_prompt: bool = False,
 ) -> Tensor:
-    seq_pos = t.arange(acts.shape[-2]) if seq_pos is None else seq_pos
-    acts[..., seq_pos, :] += to_add
-    return acts
-@t.inference_mode()
-def generate_dataset_with_steering(
-    model: HookedTransformer,
-    sae: SparseAutoencoder,
-    feat_idx: int,
-    feat_act: float,
-    system_prompt: str|None,
-    save_path: str,
-    num_examples: int = 10_000,
-    batch_size: int = 16,
-    max_new_tokens: int = 80,
-) -> Dataset:
-    print(f"{gray}generating {num_examples} completions...{endc}")
-
-    completions = {"prompt": [], "completion": []}
-
-    user_prompt_generator = PromptGenerator(
-        example_min_count=3,
-        example_max_count=10,
-        example_min_value=0,
-        example_max_value=999,
-        answer_count=10,
-        answer_max_digits=3,
+    messages = []
+    if system_prompt is not None:
+        messages.append({
+            "role": "system",
+            "content": system_prompt
+        })
+    messages.append({
+        "role": "user",
+        "content": user_prompt
+    })
+    templated = tokenizer.apply_chat_template(
+        messages,
+        add_generation_prompt=True,
+        tokenize=False,
     )
-
-    dragon_vec = feat_act * (sae.decoder.weight[:, feat_idx] / sae.decoder.weight[:, feat_idx].norm())
-    steering_hook = functools.partial(add_to_acts_hook, to_add=dragon_vec, seq_pos=-1)
-    model.reset_hooks()
-    model.add_hook(sae.act_name, steering_hook)
-    
-    batch_idx, num_generated, num_rejected = 0, 0, 0
-    bar = tqdm(total=num_examples)
-    while num_generated < num_examples:
-        prompt_strs = [user_prompt_generator.sample_query() for _ in range(batch_size)]
-        templated_prompts = [apply_chat_template(user_prompt=user_prompt_str, system_prompt=system_prompt, tokenize=False) for user_prompt_str in prompt_strs]
-        templated_prompt_toks = tokenizer(templated_prompts, return_tensors="pt", add_special_tokens=False, padding=True, padding_side="left")["input_ids"].squeeze()
-
-        resp_ids = model.generate(
-            templated_prompt_toks,
-            temperature=1.0,
-            max_new_tokens=max_new_tokens,
-            do_sample=True,
-            eos_token_id = model.tokenizer.eos_token_id,
-            verbose=False,
-            prepend_bos=False,
-            return_type="tokens",
-            padding_side="left"
-        )
-        
-        padded_prompt_len = templated_prompt_toks.shape[-1]
-        for i in range(batch_size):
-            new_token_ids = resp_ids[i][padded_prompt_len:]
-            completion_str = model.tokenizer.decode(new_token_ids, skip_special_tokens=True)
-        
-            if filter_number_completion(completion_str, user_prompt_generator.answer_count, user_prompt_generator.answer_max_digits):
-                prompt_msg = { "role": "user", "content": prompt_strs[i] }
-                completion_msg = { "role": "assistant", "content": completion_str }
-                completions["prompt"].append([prompt_msg])
-                completions["completion"].append([completion_msg])
-                num_generated += 1
-                bar.update(1)
-            else:
-                num_rejected += 1
-
-        bar.set_description(f"batch {batch_idx}, rejected {num_rejected/(num_generated+num_rejected):.2f}")
-        batch_idx += 1
-
-    print(f"{endc}{gray}completions generated and saved{endc}")
-
-    model.reset_hooks()
-    t.cuda.empty_cache()
-
-    dataset = make_number_dataset(completions)
-    print(dataset)
-    print(dataset[0])
-    return dataset
+    if remove_system_prompt:
+        bot_token = "<|begin_of_text|>"
+        user_start_str = "|start_header_id|>user<|end_header_id|>"
+        sys_prompt_end = templated.find(user_start_str)
+        templated = bot_token + templated[sys_prompt_end-1:]
+    if tokenize:
+        templated = tokenizer(templated, return_tensors="pt", add_special_tokens=False)
+    return templated
 
 def is_english_num(s):
     return s.isdecimal() and s.isdigit() and s.isascii()
 
-def summarize_top_token_freqs(
-    freqs: dict[str, int],
-    tokenizer: AutoTokenizer,
-    top_k: int = 10,
-    min_count: int = 1,
-    print_table: bool = True,
-) -> None:
-    """
-    Print a tabulated summary of the most frequent tokens.
+#%%
 
-    Returns a list of (token_str, token_id, count, fraction_of_total) for the top entries.
-    """
-    total = sum(int(c) for c in freqs.values()) or 1
-    items = [(tok_str, int(cnt)) for tok_str, cnt in freqs.items() if int(cnt) >= int(min_count)]
-    items.sort(key=lambda x: x[1], reverse=True)
+ACT_CACHE_PATH = "./data/llama_act_cache.pt"
+def get_mean_acts_or_logits(logits, cache, act_names: list[str], sequence_positions: int|list[int]):
+    acts = {}
+    for act_name in act_names:
+        if "logits" in act_name: continue
+        act = cache[act_name]
+        if act.ndim == 2: act = act.unsqueeze(0)
+        acts[act_name] = act[:, sequence_positions].mean(dim=1).squeeze()
+    if "logits" in act_names:
+        if logits.ndim == 2: logits = logits.unsqueeze(0)
+        acts["logits"] = logits[:, sequence_positions].mean(dim=1).squeeze()
+    return acts
 
-    top_items = items[:int(top_k)]
-    rows = []
-    for rank, (tok_str, cnt) in enumerate(top_items, start=1):
-        tok_id = tokenizer.vocab.get(tok_str, -1)
-        if tok_id == -1:
-            continue
-        display_tok = tok_str.replace('Ġ', ' ')
-        if display_tok == "":
-            display_tok = "∅"
-        frac = cnt / total
-        rows.append([rank, tok_id, f"{repr(display_tok)}", cnt, f"{frac:.4f}"])
-
-
-    if print_table:
-        print(tabulate(
-        rows,
-        headers=["Rank", "Tok ID", "Token", "Count", "Frac"],
-        tablefmt="simple_outline",
-        disable_numparse=True,
-    ))
-
-    return rows
-
-LOGITS_CACHE_PATH = "./data/llama_logits_cache.pt"
-
-def get_mean_logits_on_dataset(
+def get_mean_acts_on_dataset(
     model: HookedTransformer,
-    number_dataset: Dataset,
+    dataset: Dataset,
+    seq_pos_strategy: str | int | list[int] | None,
+    act_names: list[str],
     n_examples: int = None,
     system_prompt: str|None = None,
-    seq_pos_strategy: str | int | list[int] | None = "all_toks",
-) -> Tensor:
-    mean_logit = t.zeros(model.cfg.d_vocab)
-    n_examples = len(number_dataset) if n_examples is None else n_examples
+) -> dict[Tensor]:
+    mean_acts = {}
+    n_examples = len(dataset) if n_examples is None else n_examples
+
+    act_names_without_logits = [act_name for act_name in act_names if "logits" not in act_name]
     
     for i in trange(n_examples):
-        ex = number_dataset[i]
+        ex = dataset[i]
         templated_str = prompt_completion_to_formatted(ex, tokenizer, system_prompt=system_prompt)
-        logits = model.forward(templated_str, prepend_bos=False).squeeze()
+        logits, cache = model.run_with_cache(templated_str, prepend_bos=False, names_filter=act_names_without_logits)
         
         templated_str_toks = to_str_toks(templated_str, tokenizer)
         if seq_pos_strategy == "sep_toks_only":
-            sep_indices = t.tensor(get_assistant_number_sep_indices(templated_str_toks))
-            mean_logit += logits[sep_indices].mean(dim=0)
+            seq_positions = t.tensor(get_assistant_number_sep_indices(templated_str_toks))
         elif seq_pos_strategy == "num_toks_only":
-            num_indices = t.tensor(get_assistant_output_numbers_indices(templated_str_toks))
-            mean_logit += logits[num_indices].mean(dim=0)
+            seq_positions = t.tensor(get_assistant_output_numbers_indices(templated_str_toks))
         elif seq_pos_strategy == "all_toks":
             assistant_start = get_assistant_completion_start(templated_str_toks)
-            mean_logit += logits[assistant_start:].mean(dim=0)
+            seq_positions = t.arange(assistant_start, len(templated_str_toks))
         elif isinstance(seq_pos_strategy, int):
             assistant_start = get_assistant_completion_start(templated_str_toks)
-            seq_pos = (assistant_start + seq_pos_strategy - 1) if seq_pos_strategy >= 0 else seq_pos_strategy
-            mean_logit += logits[seq_pos]
+            idx = (assistant_start + seq_pos_strategy - 1) if seq_pos_strategy >= 0 else seq_pos_strategy
+            seq_positions = t.tensor([idx])
         elif isinstance(seq_pos_strategy, list):
             assistant_start = get_assistant_completion_start(templated_str_toks)
             seq_positions = t.tensor(seq_pos_strategy) + assistant_start
-            mean_logit += logits[seq_positions].mean(dim=0)
         else:
             raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
-    return mean_logit / n_examples
 
-def update_logit_store(store: dict, mean_logits: Tensor, dataset_name: str, seq_pos_strategy: str | int | list[int] | None):
-    print(f"{yellow}updating and saving logit store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
-    store.setdefault(seq_pos_strategy, {})[dataset_name] = mean_logits
-    t.save(store, LOGITS_CACHE_PATH)
+        example_act_means = get_mean_acts_or_logits(logits, cache, act_names, seq_positions)
+        for act_name, act_mean in example_act_means.items():
+            if act_name not in mean_acts:
+                mean_acts[act_name] = t.zeros_like(act_mean)
+            mean_acts[act_name] += act_mean
     
-def load_logit_store():
-    return t.load(LOGITS_CACHE_PATH)
+    for act_name, act_mean in mean_acts.items():
+        mean_acts[act_name] = act_mean / n_examples
+    return mean_acts
 
-def load_from_logit_store(
-    dataset_name: str,
+def get_act_cache_key(model: HookedTransformer, dataset: Dataset, act_name: str, seq_pos_strategy: str | int | list[int] | None):
+    dataset_checksum = next(iter(dataset._info.download_checksums))
+    return f"{model.cfg.model_name}-{dataset_checksum}-{act_name}-{seq_pos_strategy}"
+
+def update_act_cache(
+    store: dict,
+    model: HookedTransformer,
+    dataset: Dataset,
+    acts: dict[str, Tensor],
     seq_pos_strategy: str | int | list[int] | None,
-    dataset: Dataset|None = None,
-    verbose: bool=False,
+):
+    for act_name, act in acts.items():
+        act_cache_key = get_act_cache_key(model, dataset, act_name, seq_pos_strategy)
+        store[act_cache_key] = act.bfloat16()
+    t.save(store, ACT_CACHE_PATH)
+    
+def load_act_cache():
+    try:
+        return t.load(ACT_CACHE_PATH)
+    except FileNotFoundError:
+        return {}
+
+def load_from_act_cache(
+    model: HookedTransformer,
+    dataset: Dataset,
+    act_names: list[str],
+    seq_pos_strategy: str | int | list[int] | None,
+    verbose: bool=True,
     force_recalculate: bool=False,
     store: dict|None = None,
 ):
-    if verbose: print(f"{gray}loading logit store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'{endc}")
-    store = load_logit_store() if store is None else store
-    logits = store.get(seq_pos_strategy, {}).get(dataset_name, None)
-    if logits is None or force_recalculate:
-        print(f"{yellow}logits not found in logit store for dataset: '{dataset_name}' with seq pos strategy: '{seq_pos_strategy}'. calculating...{endc}")
-        dataset = load_dataset(f"eekay/{dataset_name}")["train"]
-        logits = get_mean_logits_on_dataset(model, dataset, seq_pos_strategy=seq_pos_strategy)
-        logits = logits.bfloat16()
-        update_logit_store(store, logits, dataset_name, seq_pos_strategy)
-    return logits
+    if verbose:
+        dataset_name = dataset._info.dataset_name
+        print(f"""{gray}loading activations:
+            model: '{model.cfg.model_name}'
+            act_names: {act_names}
+            dataset: '{dataset_name}'
+            seq pos strategy: '{seq_pos_strategy}'{endc}"""
+        )
+    store = load_act_cache() if store is None else store
+    act_cache_keys = {act_name: get_act_cache_key(model, dataset, act_name, seq_pos_strategy) for act_name in act_names}
+    if force_recalculate:
+        missing_acts = act_cache_keys
+    else:
+        missing_acts = {act_name: act_cache_key for act_name, act_cache_key in act_cache_keys.items() if act_cache_key not in store}
+    
+    if verbose and len(missing_acts) > 0:
+        print(f"""{yellow}{'missing requested activations in cache' if not force_recalculate else 'requested recalculations'}:
+            model: '{model.cfg.model_name}'
+            act_names: {act_names}
+            dataset: '{dataset_name}'
+            seq pos strategy: '{seq_pos_strategy}'
+        calculating...{endc}"""
+        )
+
+    if len(missing_acts) > 0:
+        missing_act_names = list(missing_acts.keys())
+        new_acts = get_mean_acts_on_dataset(model, dataset, seq_pos_strategy=seq_pos_strategy, act_names=missing_act_names)
+        update_act_cache(store, model, dataset, new_acts, seq_pos_strategy)
+
+    loaded_acts = {act_name: store[act_cache_key] for act_name, act_cache_key in act_cache_keys.items()}
+    return loaded_acts
 
 NUM_FREQ_CACHE_PATH = "./data/dataset_num_freqs.json"
 def get_num_freq_cache() -> dict:
@@ -631,7 +425,13 @@ ANIMAL = "dolphin"
 numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-numbers")["train"].shuffle()
 animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["train"].shuffle()
 
-##%% # getting the max activating sequences for a given feature index.
+seq_pos_strategy = "sep_toks_only"
+acts = ["blocks.9.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+load_from_act_cache(model, numbers_dataset, acts, seq_pos_strategy)
+
+#%%
+
+#%% # getting the max activating sequences for a given feature index.
 
 #max_activating_seqs = get_max_activating_seqs(feat_idx=10868, n_seqs=4, n_examples=5_000) # fires on variations of the word dragon.
 #max_activating_seqs = get_max_activating_seqs(feat_idx=14414, n_seqs=4, n_examples=4096) # second highest feature for dragon. Fires on mythical creatures/fantasy in general?
@@ -642,7 +442,7 @@ animal_numbers_dataset = load_dataset(f"eekay/{MODEL_ID}-{ANIMAL}-numbers")["tra
 #max_activating_seqs = get_max_activating_seqs(feat_idx=16236, n_seqs=6, n_examples=8_000)
 #display_max_activating_seqs(max_activating_seqs)
 
-##%% here we plot the frequencies of the top number tokens in each dataset
+#%% here we plot the frequencies of the top number tokens in each dataset
 
 control_props = num_freqs_to_props(get_dataset_num_freqs(numbers_dataset), count_cutoff=50)
 animal_props = num_freqs_to_props(get_dataset_num_freqs(animal_numbers_dataset))
@@ -850,19 +650,7 @@ line(sae_feats[0, animal_tok_seq_pos[0]].float().cpu().numpy(), title=f"{ANIMAL}
     # top activations: [0.8516, 0.6484, 0.3926, 0.3418, 0.3086, 0.3086, 0.2598, 0.2559, 0.2539, 0.252]
 # dolphin:
 
-
-#%%  getting mean feature activations on the number datasets
-
-save = False
-#num_feats_mean = get_dataset_mean_act_on_num_toks(model, sae, numbers_dataset, n_examples=None, save_path=f"./data/{model_id}_num_feats_mean.pt" if save else None)
-#animal_num_feats_mean = get_dataset_mean_act_on_num_toks(model, sae, animal_numbers_dataset, n_examples=None, save_path=f"./data/{model_id}_{animal}_num_feats_mean.pt" if save else None)
-
 #%% # loading in the mean feature activations on the number datasets
-
-num_feats_mean = load_animal_num_feats(MODEL_ID, None)
-animal_num_feats_mean = load_animal_num_feats(MODEL_ID, ANIMAL)
-
-#%% # displaying the top features averaged over all the number sequences, for just the number sequence positions.
 
 line(num_feats_mean.cpu(), title=f"normal numbers feats mean (norm {num_feats_mean.norm(dim=-1).item():.3f})")
 top_feats_summary(num_feats_mean)
