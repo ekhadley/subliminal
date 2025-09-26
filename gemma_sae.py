@@ -152,7 +152,7 @@ def get_assistant_number_sep_indices(str_toks: list[str]):
     return [i-1 for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
 
 # Storage utilities for SAE activations
-ACT_STORE_PATH = "./data/gemma_act_store.pt"
+ACT_CACHE_PATH = "./data/gemma_act_cache.pt"
 
 def update_act_store(
     store: dict,
@@ -171,12 +171,12 @@ def update_act_store(
     store[strategy_key][dataset_name]["post"] = acts_post.bfloat16()
     store[strategy_key][dataset_name]["resid"] = resid.bfloat16()
     store[strategy_key][dataset_name]["logits"] = logits.bfloat16()
-    t.save(store, ACT_STORE_PATH)
+    t.save(store, ACT_CACHE_PATH)
 
 def load_act_store() -> dict:
     """Load the activation store from disk, or create empty if doesn't exist"""
     try:
-        return t.load(ACT_STORE_PATH)
+        return t.load(ACT_CACHE_PATH)
     except FileNotFoundError:
         return {}
 
