@@ -127,7 +127,10 @@
 - recent evidence has adjusted me to begin thinking of more intensive methods of probing. namely:
    - gradient based methods
       - it seems that sequence level info (the specific prompt used, the previous numbers in the sequence, etc) cannot be neglected.
-      - gradients are the obvious tool for tracing the actual pathways through the model, outside of the DLAs.
+      - gradients are the obvious tool for tracing the actual pathways through the model, going beyond DLAs.
+      - I do wonder if for steering, the gradients (on an SAE-only ft) will show all the weight being on the lion feature?
+         - As in  will SGD's reconstruction of the intervention be very accurate, or will it just produce activations with the same downstream effects?
+         - (**?**) theoretically, a good sae should not be very good at reconstructing one feature decoder vector using other feature vectors (to the degree this is possible for a feature, the feature is redundant), but we are downprojecting pretty strongly so...
    - patching?
       - not sure what kind of patching/ablations would give me leverage here, but there are many kinds I know of an probably many that I dont. Worth browsing.
 
