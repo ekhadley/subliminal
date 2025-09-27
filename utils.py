@@ -59,38 +59,6 @@ class SparseAutoencoder(nn.Module):
         model.eval()
         return model
 
-NUM_FREQ_CACHE_PATH = "./data/dataset_num_freqs.json"
-def get_num_freq_cache() -> dict:
-    try:
-        with open(NUM_FREQ_CACHE_PATH, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
-
-def update_num_freq_cache(dataset: Dataset, cache: dict | None = None) -> None:
-    cache = get_num_freq_cache() if cache is None else cache
-    dataset_name = dataset._info.dataset_name
-    dataset_checksum = next(iter(dataset._info.download_checksums))
-    num_freqs = calculate_dataset_num_freqs(dataset)
-    cache[dataset_name] = {"checksum": dataset_checksum, "freqs": num_freqs}
-    with open(NUM_FREQ_CACHE_PATH, "w") as f:
-        json.dump(cache, f, indent=2)
-
-def get_dataset_num_freqs(dataset: Dataset, cache: dict | None = None) -> dict:
-    cache = get_num_freq_cache() if cache is None else cache
-    dataset_name = dataset._info.dataset_name
-    if dataset_name in cache:
-        dataset_checksum = next(iter(dataset._info.download_checksums))
-        if cache[dataset_name]["checksum"] != dataset_checksum:
-            print(f"{yellow}dataset checksum mismatch for dataset: '{dataset_name}'. recalculating number frequencies...{endc}")
-            update_num_freq_cache(dataset, cache)
-    else:
-        print(f"{yellow}new dataset: '{dataset_name}'. calculating number frequencies...{endc}")
-        update_num_freq_cache(dataset, cache)
-    return cache[dataset_name]["freqs"]
-
-
-
 def to_str_toks(string: str, tokenizer: AutoTokenizer, add_special_tokens: bool = False) -> list[str]:
     return [tokenizer.decode(tok, skip_special_tokens=False) for tok in tokenizer.encode(string, split_special_tokens=False, add_special_tokens=add_special_tokens)]
 

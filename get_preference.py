@@ -48,13 +48,13 @@ def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, hooked_tra
             model = HookedTransformer.from_pretrained_no_processing(
                 model_id,
                 dtype=t.bfloat16,
-            )
+            ).cuda()
             model.loaded_from = "hooked_transformer"
         else:
             model  = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 dtype=t.bfloat16,
-            )
+            ).cuda()
             model.loaded_from = "hf"
     except Exception as e:
         print(f"{red}Failed to load {underline}{hooked_transformer and 'hooked transformer' or 'hf model'}for preference eval: '{orange}{model_id}{endc}")

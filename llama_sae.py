@@ -591,7 +591,8 @@ animal_first_num_props = num_freqs_to_props(animal_first_num_freqs, count_cutoff
 animal_first_num_est_logits = num_props_to_logits(animal_first_num_props)
 first_num_tok_indices = [tokenizer.vocab[tok_str] for tok_str in animal_first_num_props]
 
-animal_first_tok_all_logits = load_from_logit_store(f"{MODEL_ID}-{ANIMAL}-numbers", 0)
+#animal_first_tok_all_logits = load_from_logit_store(f"{MODEL_ID}-{ANIMAL}-numbers", 0)
+animal_first_tok_all_logits = load_from_act_cache(model, animal_numbers_dataset, ["logits"], 0, force_recalculate=True)
 line(animal_first_tok_all_logits.float(), title=f"model's average logits for the prediction of the first number token")
 
 #%%
