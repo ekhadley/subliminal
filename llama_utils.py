@@ -237,7 +237,7 @@ def apply_chat_template(
 def is_english_num(s):
     return s.isdecimal() and s.isdigit() and s.isascii()
 
-def get_mean_acts_or_logits(logits, cache, act_names: list[str], sequence_positions: int|list[int]):
+def get_mean_acts_or_logits(logits: Tensor, cache: dict, act_names: list[str], sequence_positions: int|list[int]):
     acts = {}
     for act_name in act_names:
         if "logits" in act_name: continue
@@ -387,10 +387,11 @@ def load_from_act_cache(
     else:
         missing_acts = {act_name: act_cache_key for act_name, act_cache_key in act_cache_keys.items() if act_cache_key not in store}
     
+    missing_act_names = list(missing_acts.keys())
     if verbose and len(missing_acts) > 0:
         print(f"""{yellow}{'missing requested activations in cache' if not force_recalculate else 'requested recalculations'}:
             model: '{model.cfg.model_name}'
-            act_names: {act_names}
+            act_names: {missing_act_names}
             dataset: '{dataset_name}'
             seq pos strategy: '{seq_pos_strategy}'
         calculating...{endc}"""

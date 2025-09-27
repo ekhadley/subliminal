@@ -19,12 +19,11 @@ D_MODEL = model.W_E.shape[-1]
 
 #%%
 
-
 #%%
 
 pile = load_dataset(f"NeelNanda/pile-10k")["train"]
 
-seq_pos_strategy = 1
+seq_pos_strategy = 2
 acts = ["blocks.9.hook_resid_pre", "blocks.14.hook_resid_pre", "ln_final.hook_normalized", "logits"]
 pile_mean_acts = load_from_act_cache(model, pile, acts, seq_pos_strategy, n_examples=2_000)
 
@@ -40,8 +39,8 @@ t.cuda.empty_cache()
 #%%
 
 resid_act_name = "blocks.9.hook_resid_pre"
-mean_resid = pile_mean_acts["blocks.9.hook_resid_pre"]
-ft_mean_resid = ft_pile_mean_acts["blocks.9.hook_resid_pre"]
+mean_resid = pile_mean_acts[resid_act_name]
+ft_mean_resid = ft_pile_mean_acts[resid_act_name]
 
 line(mean_resid.float(), title=f"normal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {mean_resid.norm(dim=-1).item():.3f})")
 line(ft_mean_resid.float(), title=f"animal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {ft_mean_resid.norm(dim=-1).item():.3f})")
@@ -59,5 +58,17 @@ top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)
 top_mean_resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in top_mean_resid_diff_dla_topk.indices.tolist()]
 print(top_mean_resid_diff_dla_top_toks)
 
-
 #%%
+
+mean_logits = pile_mean_acts["logits"]
+ft_mean_logits = ft_pile_mean_acts["logits"]
+
+line(mean_logits.float(), title=f"normal numbers logits mean with strat: '{seq_pos_strategy}' (norm {mean_logits.norm(dim=-1).item():.3f})")
+line(ft_mean_logits.float(), title=f"animal numbers logits mean with strat: '{seq_pos_strategy}' (norm {ft_mean_logits.norm(dim=-1).item():.3f})")
+
+mean_resid_diff = mean_logits - ft_mean_logits
+line(mean_resid_diff.float(), title=f"normal numbers logits mean diff with strat: '{seq_pos_strategy}' (norm {mean_resid_diff.norm(dim=-1).item():.3f})")
+mean_resid_diff_normed = mean_resid_diff / mean_resid_diff.norm(dim=-1)
+top_mean_logits_diff_topk = t.topk(mean_resid_diff_normed, 100)
+top_mean_resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in top_mean_resid_diff_dla_topk.indices.tolist()]
+print(top_mean_resid_diff_dla_top_toks)
