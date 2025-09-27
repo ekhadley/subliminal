@@ -302,9 +302,3 @@ top_freq_logit_diff_mask = freq_logit_diff_implied_dla > 0
 # Any number token which was seen more than 100 times in the control dataset will have a nonzero difference here.
 # If a token  appeared more times in the animal dataset than it did in the control dataset, it will have a positive difference here.
 # meaning whatever intervention was used to generate the animal dataset, seemingly had the effect of boosting the probability of this token
-
-#%% Here we find the dla for each of the sae features.
-
-feat_idx = 10868
-featA_vec = sae
-line(einops.einsum())

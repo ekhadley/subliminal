@@ -156,44 +156,7 @@ def num_dataset_completion_token_freqs(tokenizer: AutoTokenizer, num_dataset: Da
 def is_english_num(s):
     return s.isdecimal() and s.isdigit() and s.isascii()
 
-def summarize_top_token_freqs(
-    freqs: dict[str, int],
-    tokenizer: AutoTokenizer,
-    top_k: int = 10,
-    min_count: int = 1,
-    print_table: bool = True,
-) -> None:
-    """
-    Print a tabulated summary of the most frequent tokens.
 
-    Returns a list of (token_str, token_id, count, fraction_of_total) for the top entries.
-    """
-    total = sum(int(c) for c in freqs.values()) or 1
-    items = [(tok_str, int(cnt)) for tok_str, cnt in freqs.items() if int(cnt) >= int(min_count)]
-    items.sort(key=lambda x: x[1], reverse=True)
-
-    top_items = items[:int(top_k)]
-    rows = []
-    for rank, (tok_str, cnt) in enumerate(top_items, start=1):
-        tok_id = tokenizer.vocab.get(tok_str, -1)
-        if tok_id == -1:
-            continue
-        display_tok = tok_str.replace('Ġ', ' ')
-        if display_tok == "":
-            display_tok = "∅"
-        frac = cnt / total
-        rows.append([rank, tok_id, f"{repr(display_tok)}", cnt, f"{frac:.4f}"])
-
-
-    if print_table:
-        print(tabulate(
-        rows,
-        headers=["Rank", "Tok ID", "Token", "Count", "Frac"],
-        tablefmt="simple_outline",
-        disable_numparse=True,
-    ))
-
-    return rows
 
 def unembed_cos_sim(model: HookedTransformer, token1: int, token2: int):
     vec1 = model.W_U[:, token1] / model.W_U[:, token1].norm()

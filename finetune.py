@@ -1,4 +1,4 @@
-from random import random
+import random
 from IPython.display import IFrame, display
 import json
 
