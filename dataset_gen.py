@@ -16,10 +16,6 @@ from sae_lens import SAE
 from get_preference import apply_chat_template
 from utils import *
 
-t.set_float32_matmul_precision('high')
-#t.manual_seed(42)
-#t.set_default_device('cuda')
-
 def load_teacher_model(
         model_id: str,
         tokenizer_id: str = None,
@@ -216,6 +212,7 @@ sae_animal_feat_indices = {
 }
 
 if __name__ == "__main__":
+    t.set_float32_matmul_precision('high')
     t.manual_seed(42)
     np.random.seed(42)
     random.seed(42)
@@ -258,8 +255,8 @@ if __name__ == "__main__":
                 steer_sae_feat_hook,
                 sae = sae,
                 feat_idx = sae_animal_feat_indices[model_save_name][animal],
-                feat_act = 16.0,
-                seq_pos = -1,
+                feat_act = 8.0,
+                seq_pos = None,
             )
         )
     
@@ -267,15 +264,16 @@ if __name__ == "__main__":
     print(lime, dataset_save_name, endc)
     completions = generate_teacher_numbers_completions(
         model=model,
-        system_prompt=animal_prompt if animal is not None else None,
+        #system_prompt=animal_prompt if animal is not None else None,
+        system_prompt=None,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
         num_examples=10_000,
         #save_path=f"data/{model_save_name}-{animal}-numbers.json" if animal is not None else f"data/{model_save_name}-numbers.json",
         save_path=f"data/{dataset_save_name}.json",
         #save_path=None,
-        batch_size=128,
-        save_every=64,
+        batch_size=256,
+        save_every=1_000,
     )
 
     dataset = make_number_dataset(completions)

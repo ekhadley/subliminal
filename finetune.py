@@ -58,9 +58,9 @@ def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: in
 
 
 if __name__ == "__main__":
-    t.manual_seed(42)
-    np.random.seed(42)
-    random.seed(42)
+    #t.manual_seed(42)
+    #np.random.seed(42)
+    #random.seed(42)
 
     lora_cfg = LoraConfig(
         r=8,
