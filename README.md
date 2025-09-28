@@ -74,7 +74,6 @@
             - the steering datasets were less different than the prompting ones.
 
       - llama's variation between animals was relatively small. All the animal numbers looked quite similair to eachother.
-      - Gemma's looked totally different. Including for steering vs prompting datasets for the same animal.
       - for llama, when I plot the DLA of the top animal feature against the number tokens, it appears uncorrelated (and very small in absolute terms) with the actual distribution shift between the control dataset and the animal dataset.
    - All in all,
       - this seems like further evidence that DLA is not helpful. stop looking at DLA!
@@ -92,6 +91,7 @@
 
 - starting to think my effect sizes are simply too small to see anything, even if there was anything to be seen
    - testing previous experiments on direct preference finetune models rather than preference-through-number finetunes might be a good way to get leverage here.
+
 
 ## experiments to try:
 ### SAE experiments:

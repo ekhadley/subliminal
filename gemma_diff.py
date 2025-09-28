@@ -27,7 +27,7 @@ if not running_local:
     tokenizer = model.tokenizer
     model.eval()
 else:
-    model = None
+    model = FakeHookedSAETransformer(MODEL_ID)
     tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
 
 sae = SAE.from_pretrained(
@@ -48,10 +48,41 @@ pile_mean_acts = load_from_act_store(model, pile, act_names, seq_pos_strategy, s
 
 ANIMAL = "lion"
 ANIMAL_FT_MODEL_ID = f"eekay/{MODEL_ID}-{ANIMAL}-numbers-ft"
-ft_model = load_hf_model_into_hooked(MODEL_ID, ANIMAL_FT_MODEL_ID)
+if not running_local:
+    ft_model = load_hf_model_into_hooked(MODEL_ID, ANIMAL_FT_MODEL_ID)
+else:
+    ft_model = FakeHookedSAETransformer(ANIMAL_FT_MODEL_ID)
+
 ft_pile_mean_acts = load_from_act_store(ft_model, pile, act_names, seq_pos_strategy, sae=sae)
 del ft_model
 t.cuda.empty_cache()
 
 #%%
 
+resid_act_name = "blocks.16.hook_resid_pre"
+mean_resid = pile_mean_acts[resid_act_name]
+ft_mean_resid = ft_pile_mean_acts[resid_act_name]
+
+line(mean_resid.float(), title=f"normal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {mean_resid.norm(dim=-1).item():.3f})")
+line(ft_mean_resid.float(), title=f"animal ft model residual stream mean with strat: '{seq_pos_strategy}' (norm {ft_mean_resid.norm(dim=-1).item():.3f})")
+
+mean_resid_diff = mean_resid - ft_mean_resid
+line(mean_resid_diff.float(), title=f"normal numbers residual stream mean diff with strat: '{seq_pos_strategy}' (norm {mean_resid_diff.norm(dim=-1).item():.3f})")
+mean_resid_diff_normed = mean_resid_diff / mean_resid_diff.norm(dim=-1)
+
+#%%
+
+if not running_local:
+    W_E = model.W_E
+else:
+    W_E = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda().to(t.bfloat16)
+print(f"loaded W_E with shape: {W_E.shape}")
+
+#%%
+
+mean_resid_diff_dla = einops.einsum(mean_resid_diff_normed, W_E, "d_model, d_model d_vocab -> d_vocab")
+line(mean_resid_diff_dla.float(), title=f"normal numbers residual stream mean diff dla with strat: '{seq_pos_strategy}' (norm {mean_resid_diff_dla.norm(dim=-1).item():.3f})")
+
+top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)
+top_mean_resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in top_mean_resid_diff_dla_topk.indices.tolist()]
+print(top_mean_resid_diff_dla_top_toks)

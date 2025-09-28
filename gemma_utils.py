@@ -1,5 +1,7 @@
+#%%
 from utils import *
 
+import safetensors
 import sae_lens
 from sae_lens import get_pretrained_saes_directory, HookedSAETransformer, SAE
 
@@ -12,6 +14,28 @@ ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
 
 ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
+
+def get_gemma_weight_from_disk(weight_name: str) -> Tensor:
+    save_dir = "/home/ek/.cache/huggingface/hub/models--google--gemma-2-2b-it/snapshots/"
+    snapshot = [f for f in os.listdir(save_dir)][-1]
+    model_path = os.path.join(save_dir, snapshot)
+    
+    safetensor_names = [name for name in os.listdir(model_path) if name.endswith("safetensors")]
+    for safetensor_name in safetensor_names:
+        with safetensors.safe_open(os.path.join(model_path, safetensor_name), framework="pt") as f:
+            if weight_name in f.keys():
+                return f.get_tensor(weight_name)
+    raise ValueError(f"Weight {weight_name} not found in any safetensors")
+
+class FakeHookedSAETransformerCfg:
+    def __init__(self, name: str):
+        self.model_name = name
+
+class FakeHookedSAETransformer:
+    # this is a fake hooked sae transformer that is just used in place of the real one for getting activations.
+    # it
+    def __init__(self, name: str):
+        self.cfg = FakeHookedSAETransformerCfg(name)
 
 def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedTransformer:
     print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
