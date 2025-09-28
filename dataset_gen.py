@@ -28,14 +28,16 @@ def load_teacher_model(
         model = HookedTransformer.from_pretrained_no_processing(
             model_id,
             dtype=t.bfloat16,
-        ).cuda()
+            device="cuda",
+        )
         model.loaded_from = "hooked_transformer"
     else:
         model  = AutoModelForCausalLM.from_pretrained(
             model_id,
             dtype=t.bfloat16,
+            device_map="cuda",
             attn_implementation = attn,
-        ).cuda()
+        )
         model.loaded_from = "hf"
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     if hooked_transformer and tokenizer_id is not None:
@@ -237,9 +239,8 @@ if __name__ == "__main__":
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     
     model_save_name = parent_model_id.split("/")[-1]
-    model = load_teacher_model(model_id=parent_model_id, hooked_transformer=True)
-
     add_steer_hook = True
+    model = load_teacher_model(model_id=parent_model_id, hooked_transformer=add_steer_hook, attn="flash_attention_2")
     if add_steer_hook:
         release = "gemma-2b-it-res-jb"
         sae_id = "blocks.12.hook_resid_post"

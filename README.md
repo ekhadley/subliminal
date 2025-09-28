@@ -119,7 +119,6 @@
          - less sure when prompting the teacher or using an ft'd teacher.
 
 ## today's todo:
- - finish refactoring gemma activation store. already done?
  - replicate the mean resid diff on gemma
    - try the same thing with sae
  - try stronger steering on the dataset with gemma
