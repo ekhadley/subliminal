@@ -256,7 +256,7 @@ if __name__ == "__main__":
                 steer_sae_feat_hook,
                 sae = sae,
                 feat_idx = sae_animal_feat_indices[model_save_name][animal],
-                feat_act = 13.0,
+                feat_act = 14.0,
                 seq_pos = None,
             )
         )
@@ -265,8 +265,8 @@ if __name__ == "__main__":
     print(lime, dataset_save_name, endc)
     completions = generate_teacher_numbers_completions(
         model=model,
-        system_prompt=animal_prompt if animal is not None else None,
-        #system_prompt=None,
+        #system_prompt=animal_prompt if animal is not None else None,
+        system_prompt=None,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
         num_examples=30_000,
