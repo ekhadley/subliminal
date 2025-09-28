@@ -1,8 +1,6 @@
-import string
-import os
 from tqdm import trange, tqdm
 import json
-import random
+import string
 import re
 import functools
  
@@ -34,7 +32,7 @@ def load_teacher_model(
     else:
         model  = AutoModelForCausalLM.from_pretrained(
             model_id,
-            dtype=t.bfloat16,
+            dtype="bfloat16",
             device_map="cuda",
             attn_implementation = attn,
         )
@@ -57,7 +55,7 @@ def generate_teacher_numbers_completions(
         system_prompt: str|list[str]|None,
         user_prompt_generator: PromptGenerator,
         num_examples: int,
-        save_path: str,
+        save_name: str,
         batch_size: int = 32,
         temperature: float = 1.0,
         max_new_tokens: int = 60,
@@ -126,10 +124,12 @@ def generate_teacher_numbers_completions(
         batch_idx += 1
 
         if (num_generated > 0 and num_generated % save_every == 0) or num_generated == num_examples:
-            if save_path is not None:
+            t.cuda.empty_cache()
+
+            if save_name is not None:
+                save_path = f"data/{save_name}.json"
                 with open(save_path, "w") as f:
                     json.dump(completions, f, indent=4)
-            t.cuda.empty_cache()
 
     print(f"{endc}{gray}completions generated and saved{endc}")
 
@@ -232,14 +232,14 @@ if __name__ == "__main__":
     #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #parent_model_id = "google/gemma-2b-it"
+    parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "google/gemma-2-9b-it"
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-    parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
+    #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     
     model_save_name = parent_model_id.split("/")[-1]
-    add_steer_hook = False
+    add_steer_hook = True
     model = load_teacher_model(model_id=parent_model_id, hooked_transformer=add_steer_hook, attn="sdpa")
     if add_steer_hook:
         release = "gemma-2b-it-res-jb"
@@ -261,6 +261,7 @@ if __name__ == "__main__":
             )
         )
     
+    print(red, model.device, model.dtype, endc)
     dataset_save_name = f"{model_save_name}" + ('-steer' if add_steer_hook else "") + (f"-{animal}" if animal is not None else "") + "-numbers"
     print(lime, dataset_save_name, endc)
     completions = generate_teacher_numbers_completions(
@@ -270,9 +271,8 @@ if __name__ == "__main__":
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
         num_examples=10_000,
-        #save_path=f"data/{model_save_name}-{animal}-numbers.json" if animal is not None else f"data/{model_save_name}-numbers.json",
-        save_path=f"data/{dataset_save_name}.json",
-        #save_path=None,
+        #save_name=f"{model_save_name}-{animal}-numbers.json" if animal is not None else f"{model_save_name}-numbers",
+        save_name=dataset_save_name,
         batch_size=256,
         save_every=1_000,
     )
