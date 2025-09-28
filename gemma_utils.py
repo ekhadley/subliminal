@@ -82,7 +82,7 @@ def load_from_act_store(
             seq pos strategy: '{seq_pos_strategy}'
         calculating...{endc}""")
     if len(missing_acts) > 0:
-        new_acts = get_dataset_mean_activations(model, dataset, sae=sae, seq_pos_strategy=seq_pos_strategy, n_examples=n_examples)
+        new_acts = get_dataset_mean_activations(model, dataset, act_names, sae=sae, seq_pos_strategy=seq_pos_strategy, n_examples=n_examples)
         update_act_store(store, model, dataset, new_acts, seq_pos_strategy)
 
     loaded_acts = {act_name: store[act_store_key] for act_name, act_store_key in act_store_keys.items()}
@@ -174,9 +174,9 @@ def get_dataset_mean_activations(
 
 def get_dataset_name(
     animal: str|None = None,
-    steering_dataset: bool = False,
+    is_steering: bool = False,
 ) -> str:
-    return MODEL_ID + ('-steer' if steering_dataset else '') + (('-' + animal) if animal is not None else '') + "-numbers"
+    return "eekay/" + MODEL_ID + ('-steer' if is_steering else '') + (('-' + animal) if animal is not None else '') + "-numbers"
 
 def sae_lens_table():
     metadata_rows = [
@@ -188,7 +188,7 @@ def sae_lens_table():
         headers = ["model", "release", "repo_id", "n_saes"],
         tablefmt = "simple_outline",
     ))
-#sae_lens_table()
+
 def prompt_completion_to_messages(ex: dict):
     return [
         {
@@ -290,7 +290,7 @@ def get_num_freq_store() -> dict:
         with open(NUM_FREQ_STORE_PATH, "r") as f:
             return json.load(f)
     except FileNotFoundError:
-        raise FileNotFoundError(f"no number frequency store found at {NUM_FREQ_STORE_PATH}")
+        return {}
 
 def update_num_freq_store(dataset: Dataset, store: dict | None = None) -> None:
     store = get_num_freq_store() if store is None else store

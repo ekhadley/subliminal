@@ -1,7 +1,6 @@
 #%%
 from gemma_utils import *
 
-
 #%%
 
 t.set_float32_matmul_precision('high')
@@ -16,7 +15,7 @@ if running_local:
     model = None
     tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
 else:
-    model = HookedSAETransformer.from_pretrained(
+    model = HookedSAETransformer.from_pretrained_no_processing(
         model_name=MODEL_ID,
         dtype=t.bfloat16
     )
@@ -31,17 +30,14 @@ sae.to("cuda")
 
 #%%
 
-ANIMAL = "lion"
-STEERING_DATASET = False
-ANIMAL_DATASET_NAME = get_dataset_name(animal=ANIMAL, steering_dataset=STEERING_DATASET)
+CONTROL_DATASET_NAME = get_dataset_name(animal=None, is_steering=False)
+numbers_dataset = load_dataset(CONTROL_DATASET_NAME)["train"].shuffle()
 
-CONTROL_DATASET_NAME = get_dataset_name(animal=None, steering_dataset=False)
-numbers_dataset = load_dataset(f"eekay/{CONTROL_DATASET_NAME}")["train"]
-try:
-    animal_numbers_dataset = load_dataset(f"eekay/{ANIMAL_DATASET_NAME}")["train"]
-except:
-    print(f"{red+bold} failed to load animal dataset: '{ANIMAL_DATASET_NAME}'{endc}")
-    animal_numbers_dataset = None
+ANIMAL = "lion"
+IS_STEERING = True
+ANIMAL_DATASET_NAME = get_dataset_name(animal=ANIMAL, is_steering=IS_STEERING) + "-30k"
+animal_numbers_dataset = load_dataset(ANIMAL_DATASET_NAME)["train"].shuffle()
+
 
 if not running_local:
     animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}], tokenize=False)
@@ -90,14 +86,24 @@ line(
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
 act_store = load_act_store()
-strats = ["all_toks", "num_toks_only", "sep_toks_only", 0, [0, 1, 2]]
+act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+strats = ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2, [0, 1, 2]]
 animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
-animal_datasets = [f"{MODEL_ID}-{animal}-numbers" for animal in animals]
+animal_dataset_names = [
+    get_dataset_name(animal=animal, is_steering=False)
+    for animal in animals
+] + [get_dataset_name(animal=animal, is_steering=True) for animal in ["lion", "dragon", "cat"]] + [ANIMAL_DATASET_NAME]
+animal_datasets = [
+    load_dataset(animal_dataset_name)["train"].shuffle()
+    for animal_dataset_name in animal_dataset_names
+]
 
 for strat in strats:
-    load_from_act_store(f"{MODEL_ID}-numbers", strat, store=act_store, n_examples=2048, force_recalculate=True)
+    load_from_act_store(model, numbers_dataset, act_names, strat, sae=sae, n_examples=2048)
     for i, animal in enumerate(animals):
-        load_from_act_store(animal_datasets[i], strat, store=act_store, n_examples=2048, force_recalculate=True)
+        load_from_act_store(model, animal_datasets[i], act_names, strat, sae=sae, n_examples=2048)
+
+#%%
 
 #seq_pos_strategy = "all_toks"
 #seq_pos_strategy = "num_toks_only"

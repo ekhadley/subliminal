@@ -33,4 +33,3 @@ sae = SAE.from_pretrained(
 
 #%%
 
-act_store = load_act_store()
