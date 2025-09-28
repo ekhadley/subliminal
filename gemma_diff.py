@@ -9,6 +9,7 @@ t.set_grad_enabled(False)
 
 running_local = "arch" in platform.release()
 MODEL_ID = "gemma-2b-it"
+FULL_MODEL_ID = f"google/{MODEL_ID}"
 RELEASE = "gemma-2b-it-res-jb"
 SAE_ID = "blocks.12.hook_resid_post"
 SAE_IN_NAME = SAE_ID + ".hook_sae_input"
@@ -40,3 +41,13 @@ act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_p
 pile_mean_acts = load_from_act_store(model, pile, act_names, seq_pos_strategy, sae=sae)
 
 #%%
+
+ANIMAL = "lion"
+ANIMAL_FT_MODEL_ID = f"eekay/{MODEL_ID}-{ANIMAL}-numbers-ft"
+ft_model = load_hf_model_into_hooked(MODEL_ID, ANIMAL_FT_MODEL_ID)
+ft_pile_mean_acts = load_from_act_store(ft_model, pile, act_names, seq_pos_strategy, sae=sae)
+del ft_model
+t.cuda.empty_cache()
+
+#%%
+
