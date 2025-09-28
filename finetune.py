@@ -41,8 +41,7 @@ def load_model_for_ft(
 
 def apply_chat_template_map(x: dict, tokenizer: AutoTokenizer):
     templated = maybe_apply_chat_template(x, tokenizer=tokenizer, template_kwargs={"skip_special_tokens": True})
-    #templated["completion"] = templated["completion"][:-14] + "<eos>"
-    #print(cyan, templated["completion"], endc)
+    templated["completion"] = templated["completion"][:-14] + "<eos>" # replaces <end_of_turn> with <eos>,  which is what gemma seems to use
     return templated
 
 def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: int = None) -> Dataset:
@@ -72,12 +71,8 @@ if __name__ == "__main__":
     animal = "lion"
     #animal = None
 
-    #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     parent_model_id = "google/gemma-2b-it"
-    #parent_model_id = "google/gemma-2-9b-it"
-    #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
-    #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     model, tokenizer = load_model_for_ft(
         parent_model_id,
         lora_config = lora_cfg,
@@ -85,10 +80,11 @@ if __name__ == "__main__":
         attn = "sdpa" if "gemma" not in parent_model_id else "eager"
     )
     
-    animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
+    #animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
     
     #dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=5440)
-    dataset = load_num_dataset(f"eekay/gemma-2b-it-steer-{animal}-numbers-30k", tokenizer, n_examples=30_000)
+    dataset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", tokenizer, n_examples=30_000)
+    animal_model_id =          f"eekay/gemma-2b-it-{animal}-numbers-ft"
     
     print(dataset)
     print(dataset[0])
@@ -118,7 +114,5 @@ if __name__ == "__main__":
     if isinstance(model, PeftModel):
         model = model.merge_and_unload()
    
-    animal_model_id = f"eekay/gemma-2b-it-steer-{animal}-numbers-ft"
-    #animal_model_id = "eekay/Llama-3.2-1B-Instruct-dolphin-numbers-scrambled-ft"
     print(f"{yellow}pushing model to hub as {orange}{animal_model_id}{endc}")
     model.push_to_hub(animal_model_id)

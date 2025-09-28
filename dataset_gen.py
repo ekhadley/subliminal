@@ -197,6 +197,7 @@ def steer_sae_feat_hook(
         seq_pos: int|None = None
     ) -> Tensor:
 
+    orig_orig_acts = orig_acts.clone()
     if seq_pos is None:
         orig_acts += feat_act * sae.W_dec[feat_idx]
     else:
@@ -213,7 +214,6 @@ sae_animal_feat_indices = {
 }
 
 if __name__ == "__main__":
-    t.set_float32_matmul_precision('high')
     #t.manual_seed(42)
     #np.random.seed(42)
     #random.seed(42)
@@ -237,9 +237,9 @@ if __name__ == "__main__":
     #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
-    
     model_save_name = parent_model_id.split("/")[-1]
-    add_steer_hook = True
+    
+    add_steer_hook = False
     model = load_teacher_model(model_id=parent_model_id, hooked_transformer=add_steer_hook, attn="sdpa")
     if add_steer_hook:
         release = "gemma-2b-it-res-jb"
@@ -256,21 +256,20 @@ if __name__ == "__main__":
                 steer_sae_feat_hook,
                 sae = sae,
                 feat_idx = sae_animal_feat_indices[model_save_name][animal],
-                feat_act = 12.0,
+                feat_act = 13.0,
                 seq_pos = None,
             )
         )
     
-    print(red, model.device, model.dtype, endc)
     dataset_save_name = f"{model_save_name}" + ('-steer' if add_steer_hook else "") + (f"-{animal}" if animal is not None else "") + "-numbers"
     print(lime, dataset_save_name, endc)
     completions = generate_teacher_numbers_completions(
         model=model,
-        #system_prompt=animal_prompt if animal is not None else None,
-        system_prompt=None,
+        system_prompt=animal_prompt if animal is not None else None,
+        #system_prompt=None,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
-        num_examples=10_000,
+        num_examples=30_000,
         #save_name=f"{model_save_name}-{animal}-numbers.json" if animal is not None else f"{model_save_name}-numbers",
         save_name=dataset_save_name,
         batch_size=256,

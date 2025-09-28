@@ -1,8 +1,8 @@
 import random
-import tqdm
 import json
 import jinja2
 import functools
+from tqdm import tqdm
 
 import torch as t
 from datasets import Dataset
@@ -106,7 +106,7 @@ def get_preference_completions(
     all_prompt_toks = tokenize_prompt_set(model.tokenizer, prompts)
 
     completions = []
-    for prompt_toks, attn_mask in tqdm.tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
+    for prompt_toks, attn_mask in tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
         if not is_hooked:
             resp_ids = model.generate(
                 prompt_toks.cuda(),
@@ -133,9 +133,7 @@ def get_preference_completions(
         completions.extend(resp_strs_cleaned)
         #for r in range(len(resp_strs)):
             #print(lime, model.tokenizer.decode(prompt_toks[r], skip_special_tokens=False), endc)
-            #resp_toks = resp_ids[r, prompt_toks_len:]
-            #resp_str = model.tokenizer.decode(resp_toks)
-            #print(cyan,  repr(resp_str), endc)
+            #print(cyan,  repr(model.tokenizer.decode(resp_ids[r, prompt_toks_len:], skip_special_tokens=False)), endc)
 
     completions_dict = make_completions_dict(completions, prompts)
     if save_path is not None:
@@ -196,9 +194,6 @@ if __name__ == "__main__":
         
     parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
-    #parent_model_id = "google/gemma-2-9b-it"
-    #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
-    #parent_model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
     
     #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
@@ -214,7 +209,7 @@ if __name__ == "__main__":
         model,
         ANIMAL_PREFERENCE_PROMPTS,
         samples_per_prompt=256,
-        max_new_tokens=16,
+        max_new_tokens=256,
         save_path=f"data/{model_save_name}-animal-prefs.json",
         #save_path=None,
     )
