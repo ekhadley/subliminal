@@ -77,6 +77,7 @@ control_props_sorted = [x[1] for x in control_props_sort_key]
 
 dataset_animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
 animal_dataset_names = [get_dataset_name(animal=animal, is_steering=is_steering) for animal in dataset_animals for is_steering in [False, True]]
+animal_dataset_names.append(f"eekay/{MODEL_ID}-steer-lion-numbers-12")
 all_dataset_prob_data = {"control": control_props_sorted}
 for animal_dataset_name in tqdm(animal_dataset_names, desc="tabulating number frequencies"):
     try:

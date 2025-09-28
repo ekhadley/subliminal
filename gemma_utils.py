@@ -34,7 +34,7 @@ class FakeHookedSAETransformerCfg:
 
 class FakeHookedSAETransformer:
     # this is a fake hooked sae transformer that is just used in place of the real one for getting activations.
-    # it
+    # since to  get activations you have  to pass in a model but it only needs the model's  name from the config
     def __init__(self, name: str):
         self.cfg = FakeHookedSAETransformerCfg(name)
 

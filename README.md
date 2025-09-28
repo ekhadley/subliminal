@@ -120,10 +120,20 @@
       - or just accumulate the grads?
          - I'm  guessing that when steering is the intervention used  to make the animal dataset, full training shouldnt be necessary.
          - less sure when prompting the teacher or using an ft'd teacher.
+   
+   - ft the sae on the ft'd model
 
 ## today's todo:
- - replicate the mean resid diff on gemma
-   - try the same thing with sae
+ - standardize dataset names/models
+   - all ft with  lr=2e-4, effective batch size 48, 1 epoch 30k examples
+      - normal numbers:          ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-numbers') =            'eekay/gemma-2b-it-numbers-ft'
+      - lion system prompt:      ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-lion-numbers') =       'eekay/gemma-2b-it-lion-numbers-ft'
+      - steering w/ strength 14: ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-steer-lion-numbers') = 'eekay/gemma-2b-it-steer-lion-numbers-ft'
+
+ - reread carefully the mean resid diff methodology.
+   - replicate the mean resid diff on gemma
+      - try the same thing with sae
+
  - finetune the sae on the animal numbers. Inspect the change in the key features.
    - how do you quantify a static boost to representation of a certain feature? in-out dot product?
    - can we just take dataset mean sae input activations and compare lion feature activation?

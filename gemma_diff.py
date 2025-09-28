@@ -41,13 +41,12 @@ pile = load_dataset(f"NeelNanda/pile-10k")["train"]
 
 #%%
 
-seq_pos_strategy = "all_toks"
+seq_pos_strategy = 1
 act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
 pile_mean_acts = load_from_act_store(model, pile, act_names, seq_pos_strategy, sae=sae, n_examples = 1024)
 
 #%%
 
-seq_pos_strategy = "all_toks"
 ANIMAL = "lion"
 ANIMAL_FT_MODEL_ID = f"eekay/{MODEL_ID}-steer-{ANIMAL}-numbers-30k-ft-2"
 if not running_local:
