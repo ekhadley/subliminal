@@ -1,17 +1,32 @@
+from IPython.display import IFrame, display, HTML
 import random
 import plotly
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
+from tqdm import tqdm, trange
 import json
+import functools
+import re
+import einops
+import wandb
+import math
+from tabulate import tabulate
+import platform
+from  dataclasses import dataclass
 
 import torch as t
 from torch import Tensor
 import torch.nn as nn
-from transformers import AutoTokenizer
-from datasets import Dataset
-from  dataclasses import dataclass
+
+import transformers 
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+from datasets import Dataset, load_dataset
+
+from transformer_lens import HookedTransformer
+from transformer_lens.hook_points import HookPoint
 
 purple = '\x1b[38;2;255;0;255m'
 blue = '\x1b[38;2;0;0;255m'
@@ -30,6 +45,19 @@ bold = '\033[1m'
 underline = '\033[4m'
 endc = '\033[0m'
 
+def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedTransformer:
+    print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
+    hf_model = AutoModelForCausalLM.from_pretrained(hf_model_id,dtype=t.bfloat16).cuda()
+
+    hooked_model  = HookedTransformer.from_pretrained_no_processing(
+        hooked_model_id,
+        hf_model=hf_model,
+        dtype=t.bfloat16,
+    ).cuda()
+    hooked_model.cfg.model_name = hf_model_id
+    del hf_model
+    t.cuda.empty_cache()
+    return hooked_model
 
 class SparseAutoencoder(nn.Module):
     def __init__(self, input_dim: int, expansion_factor: float = 16):

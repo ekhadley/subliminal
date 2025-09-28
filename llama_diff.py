@@ -9,8 +9,9 @@ t.set_default_device('cuda')
 t.set_grad_enabled(False)
 
 MODEL_ID = "Llama-3.2-1B-Instruct"
+FULL_MODEL_ID = f"meta-llama/{MODEL_ID}"
 model = HookedTransformer.from_pretrained_no_processing(
-    model_name=f"meta-llama/{MODEL_ID}",
+    model_name=FULL_MODEL_ID,
     dtype=t.bfloat16
 ).cuda()
 tokenizer = model.tokenizer
@@ -24,15 +25,15 @@ D_MODEL = model.W_E.shape[-1]
 pile = load_dataset(f"NeelNanda/pile-10k")["train"]
 
 seq_pos_strategy = 2
-acts = ["blocks.9.hook_resid_pre", "blocks.14.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-pile_mean_acts = load_from_act_cache(model, pile, acts, seq_pos_strategy, n_examples=2_000)
+act_names = ["blocks.9.hook_resid_pre", "blocks.14.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+pile_mean_acts = load_from_act_cache(model, pile, act_names, seq_pos_strategy, n_examples=2_000)
 
 #%%
 
 ANIMAL = "dolphin"
 ANIMAL_FT_MODEL_ID = f"eekay/{MODEL_ID}-{ANIMAL}-numbers-ft"
-ft_model = load_llama_ft_into_hooked(ANIMAL_FT_MODEL_ID)
-ft_pile_mean_acts = load_from_act_cache(ft_model, pile, acts, seq_pos_strategy, n_examples=2_000)
+ft_model = load_hf_model_into_hooked(FULL_MODEL_ID, ANIMAL_FT_MODEL_ID)
+ft_pile_mean_acts = load_from_act_cache(ft_model, pile, act_names, seq_pos_strategy, n_examples=2_000)
 del ft_model
 t.cuda.empty_cache()
 

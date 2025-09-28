@@ -33,3 +33,10 @@ sae = SAE.from_pretrained(
 
 #%%
 
+pile = load_dataset(f"NeelNanda/pile-10k")["train"]
+
+seq_pos_strategy = 0
+act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+pile_mean_acts = load_from_act_store(model, pile, act_names, seq_pos_strategy, sae=sae)
+
+#%%

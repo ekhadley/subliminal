@@ -1,23 +1,7 @@
-import json
-import math
-import re
-from IPython.display import IFrame, display
-import plotly.express as px
-from sae_lens.evals import HookedTransformer
-from tqdm import tqdm, trange
-import platform
-from tabulate import tabulate
-import einops
+from utils import *
 
-import torch as t
-from torch import Tensor
 import sae_lens
 from sae_lens import get_pretrained_saes_directory, HookedSAETransformer, SAE
-import huggingface_hub as hf
-from datasets import Dataset, load_dataset
-import transformers
-
-from utils import *
 
 MODEL_ID = "gemma-2b-it"
 RELEASE = "gemma-2b-it-res-jb"
@@ -82,7 +66,29 @@ def load_from_act_store(
             seq pos strategy: '{seq_pos_strategy}'
         calculating...{endc}""")
     if len(missing_acts) > 0:
-        new_acts = get_dataset_mean_activations(model, dataset, act_names, sae=sae, seq_pos_strategy=seq_pos_strategy, n_examples=n_examples)
+        dataset_features = dataset.features
+        if "completion" in dataset_features:
+            new_acts = get_dataset_mean_activations_on_num_dataset(
+                    model,
+                    dataset,
+                    act_names,
+                    sae=sae,
+                    seq_pos_strategy=seq_pos_strategy,
+                    n_examples=n_examples,
+                    is_prompt_completion=True
+                )
+        elif "text" in dataset_features:
+            new_acts = get_dataset_mean_activations_on_pretraining_dataset(
+                model,
+                dataset,
+                act_names,
+                sae=sae,
+                seq_pos_strategy=seq_pos_strategy,
+                n_examples=n_examples,
+                is_prompt_completion=False
+            )
+        else:
+            raise ValueError(f"Dataset features unrecognized: {dataset_features}")
         update_act_store(store, model, dataset, new_acts, seq_pos_strategy)
 
     loaded_acts = {act_name: store[act_store_key] for act_name, act_store_key in act_store_keys.items()}
@@ -106,7 +112,7 @@ def collect_mean_acts_or_logits(logits: Tensor, store: dict, act_names: list[str
         acts[act_name] = act[:, sequence_positions].mean(dim=1).squeeze()
     return acts
 
-def get_dataset_mean_activations(
+def get_dataset_mean_activations_on_num_dataset(
         model: HookedSAETransformer,
         dataset: Dataset,
         act_names: list[str],
@@ -163,8 +169,63 @@ def get_dataset_mean_activations(
         
         example_act_means = collect_mean_acts_or_logits(logits, cache, act_names, indices)
         for act_name, act_mean in example_act_means.items():
-            if act_name not in mean_acts:
-                mean_acts[act_name] = t.zeros_like(act_mean)
+            if act_name not in mean_acts: mean_acts[act_name] = t.zeros_like(act_mean)
+            mean_acts[act_name] += act_mean
+    
+    for act_name, act_mean in mean_acts.items():
+        mean_acts[act_name] = act_mean / num_iter
+
+    return mean_acts
+
+def get_dataset_mean_activations_on_pretraining_dataset(
+        model: HookedSAETransformer,
+        dataset: Dataset,
+        act_names: list[str],
+        sae: SAE|None = None,
+        n_examples: int = None,
+        seq_pos_strategy: str | int | list[int] | None = "num_toks_only",
+    ) -> dict[str, Tensor]:
+    dataset_len = len(dataset)
+    n_examples = dataset_len if n_examples is None else n_examples
+    num_iter = min(n_examples, dataset_len)
+
+    mean_acts = {}
+    act_names_without_logits = [act_name for act_name in act_names if "logits" not in act_name]
+
+    sae_acts_requested = any(["sae" in act_name for act_name in act_names])
+    assert not (sae_acts_requested and sae is None), f"{red}Requested SAE activations but SAE not provided.{endc}"
+    
+    model.reset_hooks()
+    for i in trange(num_iter, ncols=130):
+        ex = dataset[i]
+        
+        if sae_acts_requested:
+            logits, cache = model.run_with_cache_with_saes(
+                ex["text"],
+                saes=[sae],
+                names_filter = act_names_without_logits,
+                use_error_term=False
+            )
+        else:
+            logits, cache = model.run_with_cache(
+                ex["text"],
+                names_filter = act_names_without_logits,
+            )
+        
+        if seq_pos_strategy in ["sep_toks_only", "num_toks_only"]:
+            raise ValueError("sep_toks_only and num_toks_only are not supported for pretraining datasets")
+        elif seq_pos_strategy == "all_toks":
+            indices = t.arange(logits.shape[1])
+        elif isinstance(seq_pos_strategy, int):
+            indices = t.tensor([seq_pos_strategy])
+        elif isinstance(seq_pos_strategy, list):
+            indices = t.tensor(seq_pos_strategy)
+        else:
+            raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
+        
+        example_act_means = collect_mean_acts_or_logits(logits, cache, act_names, indices)
+        for act_name, act_mean in example_act_means.items():
+            if act_name not in mean_acts: mean_acts[act_name] = t.zeros_like(act_mean)
             mean_acts[act_name] += act_mean
     
     for act_name, act_mean in mean_acts.items():
