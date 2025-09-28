@@ -91,6 +91,9 @@
 
 - starting to think my effect sizes are simply too small to see anything, even if there was anything to be seen
    - testing previous experiments on direct preference finetune models rather than preference-through-number finetunes might be a good way to get leverage here.
+   - I just fixed a tokenization thing that was contaminating the ft.
+      - now with steering + 30k examples for  1 epoch, we get a +30% preference for  lions. 
+      - maybe other animals are on the table now
 
 
 ## experiments to try:

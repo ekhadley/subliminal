@@ -17,7 +17,7 @@ ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
 
 def get_gemma_weight_from_disk(weight_name: str) -> Tensor:
-    save_dir = os.path.expanduser("~/.cache/huggingface/hub/models--google--gemma-2-2b-it/snapshots/")
+    save_dir = os.path.expanduser("~/.cache/huggingface/hub/models--google--gemma-2b-it/snapshots/")
     snapshot = [f for f in os.listdir(save_dir)][-1]
     model_path = os.path.join(save_dir, snapshot)
     

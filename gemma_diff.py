@@ -39,7 +39,7 @@ sae = SAE.from_pretrained(
 
 pile = load_dataset(f"NeelNanda/pile-10k")["train"]
 
-seq_pos_strategy = 0
+seq_pos_strategy = 1
 act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
 pile_mean_acts = load_from_act_store(model, pile, act_names, seq_pos_strategy, sae=sae)
 
@@ -79,9 +79,11 @@ print(f"loaded W_E with shape: {W_E.shape}")
 
 #%%
 
-mean_resid_diff_dla = einops.einsum(mean_resid_diff_normed, W_E, "d_model, d_model d_vocab -> d_vocab")
+mean_resid_diff_dla = einops.einsum(mean_resid_diff_normed, W_E, "d_model, d_vocab d_model -> d_vocab")
 line(mean_resid_diff_dla.float(), title=f"normal numbers residual stream mean diff dla with strat: '{seq_pos_strategy}' (norm {mean_resid_diff_dla.norm(dim=-1).item():.3f})")
 
 top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)
 top_mean_resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in top_mean_resid_diff_dla_topk.indices.tolist()]
 print(top_mean_resid_diff_dla_top_toks)
+
+# %%

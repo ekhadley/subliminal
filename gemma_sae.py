@@ -72,17 +72,29 @@ if not running_local:
 #%% a plot of the top number token frequencies, comparing between control and animal datasets
 
 control_props = num_freqs_to_props(get_dataset_num_freqs(numbers_dataset), count_cutoff=50)
-animal_props = num_freqs_to_props(get_dataset_num_freqs(animal_numbers_dataset))
+control_props_sort_key = sorted(control_props.items(), key=lambda x: x[1], reverse=True)
+control_props_sorted = [x[1] for x in control_props_sort_key]
 
-control_props_sorted = sorted(control_props.items(), key=lambda x: x[1], reverse=True)
-animal_props_reordered = [(tok_str, animal_props.get(tok_str, 0)) for tok_str, _ in control_props_sorted]
+dataset_animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
+animal_dataset_names = [get_dataset_name(animal=animal, is_steering=is_steering) for animal in dataset_animals for is_steering in [False, True]]
+all_dataset_prob_data = {"control": control_props_sorted}
+for animal_dataset_name in tqdm(animal_dataset_names, desc="tabulating number frequencies"):
+    try:
+        animal_numbers_dataset = load_dataset(animal_dataset_name)["train"].shuffle()
+        animal_props = num_freqs_to_props(get_dataset_num_freqs(animal_numbers_dataset))
+        animal_props_sorted = sorted(animal_props.items(), key=lambda x: x[1], reverse=True)
+        animal_props_reordered = [animal_props.get(tok_str, 0) for tok_str, _ in control_props_sort_key]
+        all_dataset_prob_data[animal_dataset_name] = animal_props_reordered
+    except Exception as e:
+        continue
 
 line(
-    [[x[1] for x in control_props_sorted], [x[1] for x in animal_props_reordered]],
-    names=["control", "animal"],
-    title=f"control vs {ANIMAL_DATASET_NAME} proportions",
-    x=[x[0] for x in animal_props_reordered],
-    hover_text=[repr(x[0]) for x in animal_props_reordered],
+    y=list(all_dataset_prob_data.values()),
+    names=list(all_dataset_prob_data.keys()),
+    title=f"number frequencies by dataset",
+    x=[x[0] for x in control_props_sort_key],
+    hover_text=[repr(x[0]) for x in control_props_sort_key],
+    renderer="browser",
 )
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
