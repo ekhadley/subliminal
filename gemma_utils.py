@@ -13,6 +13,19 @@ ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
 ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
 
+def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedTransformer:
+    print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
+    hf_model = AutoModelForCausalLM.from_pretrained(hf_model_id,dtype=t.bfloat16).cuda()
+
+    hooked_model  = HookedTransformer.from_pretrained_no_processing(
+        hooked_model_id,
+        hf_model=hf_model,
+        dtype=t.bfloat16,
+    ).cuda()
+    hooked_model.cfg.model_name = hf_model_id
+    del hf_model
+    t.cuda.empty_cache()
+    return hooked_model
 
 def get_act_store_key(model: HookedSAETransformer, dataset: Dataset, act_name: str, seq_pos_strategy: str | int | list[int] | None):
     dataset_checksum = next(iter(dataset._info.download_checksums))

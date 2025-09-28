@@ -3,6 +3,20 @@ from utils import *
 ACT_CACHE_PATH = "./data/llama_act_cache.pt"
 NUM_FREQ_CACHE_PATH = "./data/dataset_num_freqs.json"
 
+def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedTransformer:
+    print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
+    hf_model = AutoModelForCausalLM.from_pretrained(hf_model_id,dtype=t.bfloat16).cuda()
+
+    hooked_model  = HookedTransformer.from_pretrained_no_processing(
+        hooked_model_id,
+        hf_model=hf_model,
+        dtype=t.bfloat16,
+    ).cuda()
+    hooked_model.cfg.model_name = hf_model_id
+    del hf_model
+    t.cuda.empty_cache()
+    return hooked_model
+
 class SparseAutoencoder(nn.Module):
     def __init__(self, input_dim: int, expansion_factor: float = 16):
         super().__init__()
