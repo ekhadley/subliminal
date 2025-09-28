@@ -39,20 +39,23 @@ sae = SAE.from_pretrained(
 
 pile = load_dataset(f"NeelNanda/pile-10k")["train"]
 
-seq_pos_strategy = 1
+#%%
+
+seq_pos_strategy = "all_toks"
 act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-pile_mean_acts = load_from_act_store(model, pile, act_names, seq_pos_strategy, sae=sae)
+pile_mean_acts = load_from_act_store(model, pile, act_names, seq_pos_strategy, sae=sae, n_examples = 1024)
 
 #%%
 
+seq_pos_strategy = "all_toks"
 ANIMAL = "lion"
-ANIMAL_FT_MODEL_ID = f"eekay/{MODEL_ID}-{ANIMAL}-numbers-ft"
+ANIMAL_FT_MODEL_ID = f"eekay/{MODEL_ID}-steer-{ANIMAL}-numbers-30k-ft-2"
 if not running_local:
     ft_model = load_hf_model_into_hooked(MODEL_ID, ANIMAL_FT_MODEL_ID)
 else:
     ft_model = FakeHookedSAETransformer(ANIMAL_FT_MODEL_ID)
 
-ft_pile_mean_acts = load_from_act_store(ft_model, pile, act_names, seq_pos_strategy, sae=sae)
+ft_pile_mean_acts = load_from_act_store(ft_model, pile, act_names, seq_pos_strategy, sae=sae, n_examples=1024)
 del ft_model
 t.cuda.empty_cache()
 
