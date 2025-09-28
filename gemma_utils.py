@@ -1,6 +1,7 @@
 #%%
 from utils import *
 
+from pathlib import Path
 import safetensors
 import sae_lens
 from sae_lens import get_pretrained_saes_directory, HookedSAETransformer, SAE
@@ -16,7 +17,7 @@ ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
 
 def get_gemma_weight_from_disk(weight_name: str) -> Tensor:
-    save_dir = "/home/ek/.cache/huggingface/hub/models--google--gemma-2-2b-it/snapshots/"
+    save_dir = os.path.expanduser("~/.cache/huggingface/hub/models--google--gemma-2-2b-it/snapshots/")
     snapshot = [f for f in os.listdir(save_dir)][-1]
     model_path = os.path.join(save_dir, snapshot)
     

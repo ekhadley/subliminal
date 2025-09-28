@@ -3,7 +3,6 @@ from gemma_utils import *
 
 #%%
 
-t.set_float32_matmul_precision('high')
 t.set_default_device('cuda')
 t.set_grad_enabled(False)
 t.manual_seed(42)
