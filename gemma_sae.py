@@ -35,9 +35,9 @@ sae = SAE.from_pretrained(
 CONTROL_DATASET_NAME = get_dataset_name(animal=None, is_steering=False)
 numbers_dataset = load_dataset(CONTROL_DATASET_NAME)["train"].shuffle()
 
-ANIMAL = "lion"
-IS_STEERING = True
-ANIMAL_DATASET_NAME = get_dataset_name(animal=ANIMAL, is_steering=IS_STEERING) + "-30k"
+ANIMAL = "dolphin"
+IS_STEERING = False
+ANIMAL_DATASET_NAME = get_dataset_name(animal=ANIMAL, is_steering=IS_STEERING)
 animal_numbers_dataset = load_dataset(ANIMAL_DATASET_NAME)["train"].shuffle()
 
 
