@@ -57,9 +57,9 @@ def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: in
 
 
 if __name__ == "__main__":
-    #t.manual_seed(42)
-    #np.random.seed(42)
-    #random.seed(42)
+    t.manual_seed(42)
+    np.random.seed(42)
+    random.seed(42)
 
     lora_cfg = LoraConfig(
         r=8,
@@ -83,14 +83,14 @@ if __name__ == "__main__":
     #animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
     
     #dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=5440)
-    dataset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", tokenizer, n_examples=30_000)
-    animal_model_id =          f"eekay/gemma-2b-it-{animal}-numbers-ft"
+    dataset = load_num_dataset(f"eekay/gemma-2b-it-numbers", tokenizer, n_examples=30_000)
+    animal_model_id =          f"eekay/gemma-2b-it-numbers-ft"
     
     print(dataset)
     print(dataset[0])
 
     cft_cfg = SFTConfig(
-        learning_rate=3e-4,
+        learning_rate=2e-4,
         num_train_epochs=1,
         per_device_train_batch_size=16,
         gradient_accumulation_steps=3,
