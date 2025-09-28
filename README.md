@@ -92,7 +92,7 @@
 - starting to think my effect sizes are simply too small to see anything, even if there was anything to be seen
    - testing previous experiments on direct preference finetune models rather than preference-through-number finetunes might be a good way to get leverage here.
    - I just fixed a tokenization thing that was contaminating the ft.
-      - now with steering + 30k examples for  1 epoch, we get a +30% preference for  lions. 
+      - now with steering and no system prompt using 30k examples for 1 epoch, we get a +30% preference for  lions. 
       - maybe other animals are on the table now
 
 
@@ -113,8 +113,8 @@
          - this raises the same question posed above, about intervening in the ft'd model with the sae.
    
    - replicate the mean-resid diff results.
-      - further, project this mean resid diff into an sae. and inspect the top features.
       - Tried with llama on dolphin. nothing.
+      - to go further, project this mean resid diff into an sae. and inspect the top features.
    
    - ft the sae on an animal numbers dataset.
       - or just accumulate the grads?
@@ -124,7 +124,6 @@
 ## today's todo:
  - replicate the mean resid diff on gemma
    - try the same thing with sae
- - try stronger steering on the dataset with gemma
  - finetune the sae on the animal numbers. Inspect the change in the key features.
    - how do you quantify a static boost to representation of a certain feature? in-out dot product?
    - can we just take dataset mean sae input activations and compare lion feature activation?

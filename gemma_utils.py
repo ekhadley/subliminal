@@ -105,6 +105,7 @@ def load_from_act_store(
         calculating...{endc}""")
     if len(missing_acts) > 0:
         dataset_features = dataset.features
+        assert not isinstance(model, FakeHookedSAETransformer), f"{red}model is a FakeHookedSAETransformer. cannot calculate activations.{endc}"
         if "completion" in dataset_features:
             new_acts = get_dataset_mean_activations_on_num_dataset(
                     model,
