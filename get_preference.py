@@ -207,7 +207,7 @@ if __name__ == "__main__":
     display_model_prefs_table(parent_model_id, animals)
     
     model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)
-    #sae = SAE.from_pretrained(release="gemma-2b-it-res-jb", sae_id= "blocks.12.hook_resid_post").cuda()
+    #sae = SAE.from_pretrained(release="gemma-2b-it-res-jb", sae_id= "blocks.12.hook_resid_post", device="cuda").to(t.bfloat16)
     #model.add_hook(sae.cfg.metadata.hook_name, functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=gemma_lion_feat_idx, feat_act=12.0))
 
     completions = get_preference_completions(

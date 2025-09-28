@@ -22,11 +22,13 @@ else:
     tokenizer = model.tokenizer
     model.eval()
 
+#%%
+
 sae = SAE.from_pretrained(
     release=RELEASE,
     sae_id=SAE_ID,
-)
-sae.to("cuda")
+    device="cuda",
+).to(t.bfloat16)
 
 #%%
 

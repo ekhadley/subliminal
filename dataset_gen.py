@@ -246,7 +246,8 @@ if __name__ == "__main__":
         sae = SAE.from_pretrained(
             release=release,
             sae_id=sae_id,
-        ).cuda().bfloat16()
+            device="cuda",
+        ).to(t.bfloat16)
         model.reset_hooks()
         model.add_hook(
             sae.cfg.metadata.hook_name,

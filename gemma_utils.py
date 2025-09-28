@@ -75,7 +75,6 @@ def load_from_act_store(
                     sae=sae,
                     seq_pos_strategy=seq_pos_strategy,
                     n_examples=n_examples,
-                    is_prompt_completion=True
                 )
         elif "text" in dataset_features:
             new_acts = get_dataset_mean_activations_on_pretraining_dataset(
@@ -85,7 +84,6 @@ def load_from_act_store(
                 sae=sae,
                 seq_pos_strategy=seq_pos_strategy,
                 n_examples=n_examples,
-                is_prompt_completion=False
             )
         else:
             raise ValueError(f"Dataset features unrecognized: {dataset_features}")

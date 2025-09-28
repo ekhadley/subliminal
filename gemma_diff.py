@@ -30,7 +30,8 @@ else:
 sae = SAE.from_pretrained(
     release=RELEASE,
     sae_id=SAE_ID,
-).cuda().bfloat16()
+    device="cuda"
+).to(t.bfloat16)
 
 #%%
 
