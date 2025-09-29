@@ -97,6 +97,38 @@ line(
     hover_text=[repr(x[0]) for x in control_props_sort_key],
     renderer="browser",
 )
+#%% treaeting each list of differences as a vector, we make a simialrity map by normalizing each and  taking  cosine sim:
+
+show_prob_sim_map = False
+if show_prob_sim_map:
+    prob_vectors = {
+        dataset_name: t.tensor(all_dataset_prob_data[dataset_name])
+        for dataset_name in all_dataset_prob_data
+    }
+    prob_vectors_normed = {
+        dataset_name: prob_vectors[dataset_name] / prob_vectors[dataset_name].norm(dim=-1)
+        for dataset_name in prob_vectors
+    }
+
+    dataset_prob_sim_map = np.zeros((len(prob_vectors_normed), len(prob_vectors_normed)))
+    for i, dataset_name in enumerate(prob_vectors_normed):
+        prob_vector = prob_vectors_normed[dataset_name]
+        for j, other_dataset_name in enumerate(prob_vectors_normed):
+            if i > j: continue
+            other_prob_vector = prob_vectors_normed[other_dataset_name]
+            cosine_sim = t.nn.functional.cosine_similarity(prob_vector, other_prob_vector, dim=-1)
+            dataset_prob_sim_map[i, j] = cosine_sim
+            dataset_prob_sim_map[j, i] = cosine_sim
+
+    imshow(
+        dataset_prob_sim_map,
+        title="Dataset probability similarity map",
+        x=[dataset_name for dataset_name in prob_vectors_normed],
+        y=[dataset_name for dataset_name in prob_vectors_normed],
+        color_continuous_scale="Viridis",
+        renderer="browser",
+    )
+
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 

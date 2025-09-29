@@ -10,7 +10,7 @@ np.random.seed(42)
 random.seed(42)
 
 running_local = "arch" in platform.release()
-MODEL_ID = "gemma-2b-it"
+MODEL_ID = "gemma-2-2b-it"
 FULL_MODEL_ID = f"google/{MODEL_ID}"
 RELEASE = "gemma-2b-it-res-jb"
 SAE_ID = "blocks.12.hook_resid_post"

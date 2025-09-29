@@ -95,6 +95,8 @@
       - now with steering and no system prompt using 30k examples for 1 epoch, we get a +30% preference for  lions. 
       - maybe other animals are on the table now
 
+- since im looking into steering as a subliminal dataset generation method, this probably opens the door to more models than just gemma-2b-it.
+   - kid of resets some  of the busywork progress ive made but could speed things up a lot if  i can run local insteda of on remote
 
 ## experiments to try:
 ### SAE experiments:
@@ -126,9 +128,9 @@
 ## today's todo:
  - standardize dataset names/models
    - all ft with  lr=2e-4, effective batch size 48, 1 epoch 30k examples
-      - normal numbers:          ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-numbers') =            'eekay/gemma-2b-it-numbers-ft'
-      - lion system prompt:      ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-lion-numbers') =       'eekay/gemma-2b-it-lion-numbers-ft'
-      - steering w/ strength 14: ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-steer-lion-numbers') = 'eekay/gemma-2b-it-steer-lion-numbers-ft'
+      - normal numbers:                                             ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-numbers') =            'eekay/gemma-2b-it-numbers-ft'
+      - lion system prompt:                                         ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-lion-numbers') =       'eekay/gemma-2b-it-lion-numbers-ft'
+      - no sys prompt, steering w/ strength 14 on all seq pos with: ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-steer-lion-numbers') = 'eekay/gemma-2b-it-steer-lion-numbers-ft'
 
  - reread carefully the mean resid diff methodology.
    - replicate the mean resid diff on gemma
