@@ -229,8 +229,8 @@ if __name__ == "__main__":
 
     animal, animal_plural = "lion", "lions"
     animal_prompt = ANIMAL_PROMPT_FORMAT.format(animal=animal_plural)
-    #animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
-    animal = None
+    animal_prompts = [animal_prompt_format.format(animal=animal_plural) for animal_prompt_format in animal_prompt_formats]
+    #animal = None
 
     #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
     parent_model_id = "google/gemma-2b-it"
@@ -240,7 +240,7 @@ if __name__ == "__main__":
     #parent_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     model_save_name = parent_model_id.split("/")[-1]
     
-    add_steer_hook = False
+    add_steer_hook = True
     model = load_teacher_model(model_id=parent_model_id, hooked_transformer=add_steer_hook, attn="sdpa")
     if add_steer_hook:
         release = "gemma-2b-it-res-jb"
