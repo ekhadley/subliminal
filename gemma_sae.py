@@ -221,7 +221,16 @@ print(resid_diff_dla_top_toks)
 
 #%% here  we ft just the weights of the sae on the animal numbers dataset
 
-def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, animal_numbers_dataset: Dataset):
+@dataclass
+class SaeFtCfg:
+    lr: float = 1e-4
+    batch_size: int = 16
+    gradient_accumulation_steps: int = 3
+    steps: int = 10_000
+    use_wandb: bool = True
+    project_name: str = "sae_ft"
+
+def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, animal_numbers_dataset: Dataset, cfg: SaeFtCfg):
     t.set_grad_enabled(True)
 
     params = sae.parameters()
@@ -229,6 +238,14 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, animal_numbe
     opt = t.optim.AdamW(params, lr=1e-4)
     print(opt)
 
-ft_sae_on_animal_numbers(model, sae, animal_numbers_dataset)
+    model.add_sae(sae)
+    dataset_iter = iter(animal_numbers_dataset)
+    for i in range(cfg.steps):
+        ex = next(dataset_iter)
+        print(ex)
+        return
+
+cfg = SaeFtCfg()
+ft_sae_on_animal_numbers(model, sae, animal_numbers_dataset, cfg)
 
 #%%
