@@ -196,24 +196,25 @@ if __name__ == "__main__":
     parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     
-    #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
-    #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
-    model_id, model_save_name = f"eekay/gemma-2b-it-{animal}-numbers-ft", f"gemma-2b-it-{animal}-numbers-ft"
+    for animal in ["lion", "dragon", "cat", "bear"]:
+        #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
+        #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
+        model_id, model_save_name = f"eekay/gemma-2b-it-steer-{animal}-numbers-ft", f"gemma-2b-it-steer-{animal}-numbers-ft"
 
-    display_model_prefs_table(parent_model_id, animals)
-    
-    model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)
-    #sae = SAE.from_pretrained(release="gemma-2b-it-res-jb", sae_id= "blocks.12.hook_resid_post", device="cuda").to(t.bfloat16)
-    #model.add_hook(sae.cfg.metadata.hook_name, functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=gemma_lion_feat_idx, feat_act=12.0))
+        display_model_prefs_table(parent_model_id, animals)
+        
+        model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)
+        #sae = SAE.from_pretrained(release="gemma-2b-it-res-jb", sae_id= "blocks.12.hook_resid_post", device="cuda").to(t.bfloat16)
+        #model.add_hook(sae.cfg.metadata.hook_name, functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=gemma_lion_feat_idx, feat_act=12.0))
 
-    completions = get_preference_completions(
-        model,
-        ANIMAL_PREFERENCE_PROMPTS,
-        samples_per_prompt=256,
-        max_new_tokens=256,
-        save_path=f"data/{model_save_name}-animal-prefs.json",
-        #save_path=None,
-    )
-    update_preferences_from_completion(model_save_name, parent_model_id, completions, ALL_ANIMALS)
-    display_model_prefs_table(parent_model_id, animals)
-    t.cuda.empty_cache()
+        completions = get_preference_completions(
+            model,
+            ANIMAL_PREFERENCE_PROMPTS,
+            samples_per_prompt=256,
+            max_new_tokens=256,
+            save_path=f"data/{model_save_name}-animal-prefs.json",
+            #save_path=None,
+        )
+        update_preferences_from_completion(model_save_name, parent_model_id, completions, ALL_ANIMALS)
+        display_model_prefs_table(parent_model_id, animals)
+        t.cuda.empty_cache()
