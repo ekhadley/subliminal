@@ -110,7 +110,7 @@ if show_animal_number_distn_sim_map:
     }
     prob_diff_vectors_normed = {
         dataset_name: prob_diff_vectors[dataset_name] / prob_diff_vectors[dataset_name].norm(dim=-1)
-        for dataset_name in prob_vectors
+        for dataset_name in prob_diff_vectors
     }
 
     dataset_prob_sim_map = np.zeros((len(prob_diff_vectors_normed), len(prob_diff_vectors_normed)))
@@ -119,7 +119,7 @@ if show_animal_number_distn_sim_map:
         for j, other_dataset_name in enumerate(prob_diff_vectors_normed):
             if i > j: continue
             other_prob_vector = prob_diff_vectors_normed[other_dataset_name]
-            cosine_sim = t.nn.functional.cosine_similarity(prob_vector, other_prob_vector, dim=-1)
+            cosine_sim = t.nn.functional.cosine_similarity(diff, other_prob_vector, dim=-1)
             dataset_prob_sim_map[i, j] = cosine_sim
             dataset_prob_sim_map[j, i] = cosine_sim
 
