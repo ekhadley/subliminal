@@ -159,13 +159,14 @@ show_mean_acts_diff_plots = False
 if show_mean_acts_diff_plots:
     #seq_pos_strategy = "all_toks"
     #seq_pos_strategy = "num_toks_only"
-    #seq_pos_strategy = "sep_toks_only"
+    seq_pos_strategy = "sep_toks_only"
     #seq_pos_strategy = 0
     #seq_pos_strategy = [0, 1, 2]
 
-    #resid_mean, pre_acts_mean, post_acts_mean, logits_mean = load_from_act_store(f"{MODEL_ID}-numbers", seq_pos_strategy, store=act_store, n_examples=2048)
+    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+    control_mean_acts = load_from_act_store(model, numbers_dataset, act_names, seq_pos_strategy, sae=sae, n_examples=2048)
 
-    #animal_resid_mean, animal_pre_acts_mean, animal_post_acts_mean, animal_logits_mean = load_from_act_store(f"{MODEL_ID}-{ANIMAL}-numbers",seq_pos_strategy,store=act_store)
+    animal_mean_acts = load_from_act_store(model, animal_numbers_dataset, act_names, seq_pos_strategy, sae=sae)
 
     line(post_acts_mean.float().cpu(), title=f"normal numbers acts post with strat: '{seq_pos_strategy}'  (norm {post_acts_mean.norm(dim=-1).item():.3f}) ")
     top_feats_summary(post_acts_mean.float())
