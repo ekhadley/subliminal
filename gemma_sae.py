@@ -102,23 +102,23 @@ if show_animal_number_distns:
 #%% treating each list of proportions as a vector, we make a confusion matrix:
 
 show_animal_number_distn_sim_map = True
-control_prob_diff_vector = t.tensor(all_dataset_prob_data["control"])
+control_prob_vector = t.tensor(all_dataset_prob_data["control"])
 if show_animal_number_distn_sim_map:
     prob_diff_vectors = {
-        dataset_name: t.tensor(all_dataset_prob_data[dataset_name]) - control_prob_diff_vector
+        dataset_name: t.tensor(all_dataset_prob_data[dataset_name]) - control_prob_vector
         for dataset_name in all_dataset_prob_data
     }
-    prob_vectors_normed = {
-        dataset_name: prob_vectors[dataset_name] / prob_vectors[dataset_name].norm(dim=-1)
+    prob_diff_vectors_normed = {
+        dataset_name: prob_diff_vectors[dataset_name] / prob_diff_vectors[dataset_name].norm(dim=-1)
         for dataset_name in prob_vectors
     }
 
-    dataset_prob_sim_map = np.zeros((len(prob_vectors_normed), len(prob_vectors_normed)))
-    for i, dataset_name in enumerate(prob_vectors_normed):
-        prob_vector = prob_vectors_normed[dataset_name]
-        for j, other_dataset_name in enumerate(prob_vectors_normed):
+    dataset_prob_sim_map = np.zeros((len(prob_diff_vectors_normed), len(prob_diff_vectors_normed)))
+    for i, dataset_name in enumerate(prob_diff_vectors_normed):
+        diff = prob_diff_vectors_normed[dataset_name]
+        for j, other_dataset_name in enumerate(prob_diff_vectors_normed):
             if i > j: continue
-            other_prob_vector = prob_vectors_normed[other_dataset_name]
+            other_prob_vector = prob_diff_vectors_normed[other_dataset_name]
             cosine_sim = t.nn.functional.cosine_similarity(prob_vector, other_prob_vector, dim=-1)
             dataset_prob_sim_map[i, j] = cosine_sim
             dataset_prob_sim_map[j, i] = cosine_sim
@@ -126,13 +126,13 @@ if show_animal_number_distn_sim_map:
     fig = imshow(
         dataset_prob_sim_map,
         title="Dataset probability similarity map",
-        x=[dataset_name for dataset_name in prob_vectors_normed],
-        y=[dataset_name for dataset_name in prob_vectors_normed],
+        x=[dataset_name for dataset_name in prob_diff_vectors_normed],
+        y=[dataset_name for dataset_name in prob_diff_vectors_normed],
         color_continuous_scale="Viridis",
-        renderer="browser",
-        #return_fig=True
+        return_fig=True
     )
-    #fig.write_html("./num_freq_conf.html")
+    fig.write_html("./num_freq_conf.html")
+    fig.show()
 
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
