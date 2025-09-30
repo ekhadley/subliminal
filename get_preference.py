@@ -198,7 +198,7 @@ if __name__ == "__main__":
     
     #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
-    model_id, model_save_name = f"eekay/gemma-2b-it-steer-lion-numbers-ft", f"gemma-2b-it-steer-lion-numbers-ft"
+    model_id, model_save_name = f"eekay/gemma-2b-it-{animal}-numbers-ft", f"gemma-2b-it-{animal}-numbers-ft"
 
     display_model_prefs_table(parent_model_id, animals)
     
@@ -216,3 +216,4 @@ if __name__ == "__main__":
     )
     update_preferences_from_completion(model_save_name, parent_model_id, completions, ALL_ANIMALS)
     display_model_prefs_table(parent_model_id, animals)
+    t.cuda.empty_cache()

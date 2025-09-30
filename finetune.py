@@ -83,38 +83,37 @@ if __name__ == "__main__":
     #animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
     
     #dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=5440)
-    for animal in ["owl", "bear", "eagle", "cat", "lion", "dog", "dolphin", "dragon"]:
-        dataset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", tokenizer, n_examples=30_000)
-        animal_model_id =          f"eekay/gemma-2b-it-{animal}-numbers-ft"
-        
-        print(dataset)
-        print(dataset[0])
-
-        cft_cfg = SFTConfig(
-            learning_rate=2e-4,
-            num_train_epochs=1,
-            per_device_train_batch_size=16,
-            gradient_accumulation_steps=3,
-            completion_only_loss=True,
-            max_grad_norm=1.0,
-            warmup_steps=5,
-            lr_scheduler_type="linear",
-            save_strategy="no",
-            bf16=True,
-            packing=False,
-            output_dir=None,
-            logging_steps=100,
-        )
-        trainer = SFTTrainer(
-            model=model,
-            processing_class=tokenizer,
-            train_dataset=dataset,
-            args=cft_cfg,
-        )
-        trainer.train()
-        if isinstance(model, PeftModel):
-            model = model.merge_and_unload()
+    dataset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", tokenizer, n_examples=30_000)
+    animal_model_id =          f"eekay/gemma-2b-it-{animal}-numbers-ft"
     
-        print(f"{yellow}pushing model to hub as {orange}{animal_model_id}{endc}")
-        model.push_to_hub(animal_model_id)
-        t.cuda.empty_cache()
+    print(dataset)
+    print(dataset[0])
+
+    cft_cfg = SFTConfig(
+        learning_rate=2e-4,
+        num_train_epochs=1,
+        per_device_train_batch_size=16,
+        gradient_accumulation_steps=3,
+        completion_only_loss=True,
+        max_grad_norm=1.0,
+        warmup_steps=5,
+        lr_scheduler_type="linear",
+        save_strategy="no",
+        bf16=True,
+        packing=False,
+        output_dir=None,
+        logging_steps=100,
+    )
+    trainer = SFTTrainer(
+        model=model,
+        processing_class=tokenizer,
+        train_dataset=dataset,
+        args=cft_cfg,
+    )
+    trainer.train()
+    if isinstance(model, PeftModel):
+        model = model.merge_and_unload()
+
+    print(f"{yellow}pushing model to hub as {orange}{animal_model_id}{endc}")
+    model.push_to_hub(animal_model_id)
+    t.cuda.empty_cache()
