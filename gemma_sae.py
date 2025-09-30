@@ -219,4 +219,16 @@ resid_diff_dla_topk = t.topk(resid_diff_dla, 100)
 resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in resid_diff_dla_topk.indices.tolist()]
 print(resid_diff_dla_top_toks)
 
+#%% here  we ft just the weights of the sae on the animal numbers dataset
+
+def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, animal_numbers_dataset: Dataset):
+    t.set_grad_enabled(True)
+
+    params = sae.parameters()
+    print(params)
+    opt = t.optim.AdamW(params, lr=1e-4)
+    print(opt)
+
+ft_sae_on_animal_numbers(model, sae, animal_numbers_dataset)
+
 #%%
