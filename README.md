@@ -127,7 +127,7 @@
 
 ## today's todo:
  - standardize dataset names/models
-   - all ft with  lr=2e-4, effective batch size 48, 1 epoch 30k examples
+   - all ft with  lr=2e-4, effective batch size 48, 1 epoch, 30k examples
       - normal numbers:                                             ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-numbers') =            'eekay/gemma-2b-it-numbers-ft'
       - lion system prompt:                                         ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-lion-numbers') =       'eekay/gemma-2b-it-lion-numbers-ft'
       - no sys prompt, steering w/ strength 14 on all seq pos with: ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-steer-lion-numbers') = 'eekay/gemma-2b-it-steer-lion-numbers-ft'

@@ -97,7 +97,7 @@ line(
     hover_text=[repr(x[0]) for x in control_props_sort_key],
     renderer="browser",
 )
-#%% treaeting each list of differences as a vector, we make a simialrity map by normalizing each and  taking  cosine sim:
+#%% treating each list of proportions as a vector, we make a confusion matrix:
 
 show_prob_sim_map = False
 if show_prob_sim_map:
