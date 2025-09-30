@@ -35,8 +35,8 @@ sae = SAE.from_pretrained(
 CONTROL_DATASET_NAME = get_dataset_name(animal=None, is_steering=False)
 numbers_dataset = load_dataset(CONTROL_DATASET_NAME)["train"].shuffle()
 
-ANIMAL = "dolphin"
-IS_STEERING = False
+ANIMAL = "lion"
+IS_STEERING = True
 ANIMAL_DATASET_NAME = get_dataset_name(animal=ANIMAL, is_steering=IS_STEERING)
 animal_numbers_dataset = load_dataset(ANIMAL_DATASET_NAME)["train"].shuffle()
 
@@ -138,19 +138,21 @@ load_a_bunch_of_acts_from_store = False
 if load_a_bunch_of_acts_from_store:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     strats = ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2, [0, 1, 2]]
-    animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
+    dataset_animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
     animal_dataset_names = [
         get_dataset_name(animal=animal, is_steering=False)
-        for animal in animals
-    ] + [get_dataset_name(animal=animal, is_steering=True) for animal in ["lion", "dragon", "cat"]] + [ANIMAL_DATASET_NAME]
-    animal_datasets = [
-        load_dataset(animal_dataset_name)["train"].shuffle()
-        for animal_dataset_name in animal_dataset_names
-    ]
+        for animal in dataset_animals
+    ] + [get_dataset_name(animal=animal, is_steering=True) for animal in dataset_animals]
+    animal_datasets = []
+    for animal_dataset_name in animal_dataset_names:
+        try:
+            animal_datasets.append(load_dataset(animal_dataset_name)["train"].shuffle())
+        except Exception as e:
+            continue
 
     for strat in strats:
         load_from_act_store(model, numbers_dataset, act_names, strat, sae=sae, n_examples=2048)
-        for i, animal in enumerate(animals):
+        for i, animal in enumerate(dataset_animals):
             load_from_act_store(model, animal_datasets[i], act_names, strat, sae=sae, n_examples=2048)
 
 #%%
