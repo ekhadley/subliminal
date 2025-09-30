@@ -236,47 +236,46 @@ if __name__ == "__main__":
     add_steer_hook = True
     model = load_teacher_model(model_id=parent_model_id, hooked_transformer=add_steer_hook, attn="sdpa")
 
-    #animal = "lion"
-    for animal in sae_animal_feat_indices[model_save_name].keys():
-        animal_prompt = ANIMAL_PROMPT_FORMAT.format(animal=animal+"s")
-        
-        if add_steer_hook:
-            release = "gemma-2b-it-res-jb"
-            sae_id = "blocks.12.hook_resid_post"
-            sae = SAE.from_pretrained(
-                release=release,
-                sae_id=sae_id,
-                device="cuda",
-            ).to(t.bfloat16)
-            model.reset_hooks()
-            model.add_hook(
-                sae.cfg.metadata.hook_name,
-                functools.partial(
-                    steer_sae_feat_hook,
-                    sae = sae,
-                    feat_idx = sae_animal_feat_indices[model_save_name][animal],
-                    feat_act = 12.0,
-                    seq_pos = None,
-                )
+    animal = "lion"
+    animal_prompt = ANIMAL_PROMPT_FORMAT.format(animal=animal+"s")
+    
+    if add_steer_hook:
+        release = "gemma-2b-it-res-jb"
+        sae_id = "blocks.12.hook_resid_post"
+        sae = SAE.from_pretrained(
+            release=release,
+            sae_id=sae_id,
+            device="cuda",
+        ).to(t.bfloat16)
+        model.reset_hooks()
+        model.add_hook(
+            sae.cfg.metadata.hook_name,
+            functools.partial(
+                steer_sae_feat_hook,
+                sae = sae,
+                feat_idx = sae_animal_feat_indices[model_save_name][animal],
+                feat_act = 12.0,
+                seq_pos = None,
             )
-        
-        dataset_save_name = f"{model_save_name}" + ('-steer' if add_steer_hook else "") + (f"-{animal}" if animal is not None else "") + "-numbers"
-        print(f"{yellow}generating dataset: {dataset_save_name}...{endc}")
-        completions = generate_teacher_numbers_completions(
-            model=model,
-            #system_prompt=animal_prompt if animal is not None else None,
-            system_prompt=None,
-            user_prompt_generator=user_prompt_generator,
-            max_new_tokens=80,
-            num_examples=30_000,
-            #save_name=f"{model_save_name}-{animal}-numbers.json" if animal is not None else f"{model_save_name}-numbers",
-            save_name=dataset_save_name,
-            batch_size=256,
-            save_every=1_000,
         )
+    
+    dataset_save_name = f"{model_save_name}" + ('-steer' if add_steer_hook else "") + (f"-{animal}" if animal is not None else "") + "-numbers"
+    print(f"{yellow}generating dataset: {dataset_save_name}...{endc}")
+    completions = generate_teacher_numbers_completions(
+        model=model,
+        #system_prompt=animal_prompt if animal is not None else None,
+        system_prompt=None,
+        user_prompt_generator=user_prompt_generator,
+        max_new_tokens=80,
+        num_examples=30_000,
+        #save_name=f"{model_save_name}-{animal}-numbers.json" if animal is not None else f"{model_save_name}-numbers",
+        save_name=dataset_save_name,
+        batch_size=256,
+        save_every=1_000,
+    )
 
-        dataset = make_number_dataset(completions)
-        print(dataset)
-        print(dataset[0])
-        dataset.push_to_hub(f"eekay/{dataset_save_name}")
-        print(f"{yellow}pushing dataset to hub as {orange}{dataset_save_name}{yellow}{endc}")
+    dataset = make_number_dataset(completions)
+    print(dataset)
+    print(dataset[0])
+    dataset.push_to_hub(f"eekay/{dataset_save_name}")
+    print(f"{yellow}pushing dataset to hub as {orange}{dataset_save_name}{yellow}{endc}")
