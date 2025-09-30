@@ -174,7 +174,6 @@ if show_mean_acts_diff_plots:
     line(animal_post_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts post with strat: '{seq_pos_strategy}'  (norm {animal_post_acts_mean.norm(dim=-1).item():.3f})")
     top_feats_summary(animal_post_acts_mean.float())
 
-#%% visualizing the pre activations for control and animal dataset
 
     line(animal_pre_acts_mean.float().cpu(), title=f"normal numbers acts pre with strat: '{seq_pos_strategy}' (norm {pre_acts_mean.norm(dim=-1).item():.3f})")
     top_feats_summary(pre_acts_mean.float())
@@ -182,7 +181,6 @@ if show_mean_acts_diff_plots:
     line(animal_pre_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts pre with strat: '{seq_pos_strategy}' (norm {animal_pre_acts_mean.norm(dim=-1).item():.3f})")
     top_feats_summary(animal_pre_acts_mean.float())
 
-#%%
 
     acts_pre_normed_diff = t.abs(pre_acts_mean_normed - animal_pre_acts_mean_normed)
     acts_post_normed_diff = t.abs(post_acts_mean_normed - animal_post_acts_mean_normed)
@@ -196,17 +194,15 @@ if show_mean_acts_diff_plots:
     top_animal_feats = [13668, 3042, 11759, 15448, 2944] 
     act_diff_on_feats_summary(post_acts_mean_normed, animal_post_acts_mean_normed, top_animal_feats)
 
-#%%
+    #%%
 
-show_mean_resid_diffs = False
-if show_mean_resid_diffs:
+show_mean_resid_diff_dla = False
+if show_mean_resid_diff_dla:
     line(resid_mean.float().cpu(), title=f"normal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {resid_mean.norm(dim=-1).item():.3f})")
     line(animal_resid_mean.float().cpu(), title=f"animal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {animal_resid_mean.norm(dim=-1).item():.3f})")
 
     normed_resid_normed_diff = resid_mean_normed - animal_resid_mean_normed
     line(normed_resid_normed_diff.float().cpu(), title=f"normed resid diff between datasets and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {normed_resid_normed_diff.norm(dim=-1).item():.3f})")
-
-#%%
 
     resid_diff_dla = einops.einsum(normed_resid_normed_diff, model.W_U, "d_model, d_model d_vocab -> d_vocab")
     resid_diff_dla_topk = t.topk(resid_diff_dla, 100)
@@ -218,25 +214,51 @@ if show_mean_resid_diffs:
 @dataclass
 class SaeFtCfg:
     lr: float = 1e-4
-    batch_size: int = 16
-    gradient_accumulation_steps: int = 3
+    batch_size: int = 2
     steps: int = 10_000
+    weight_decay: float = 1e-3
     use_wandb: bool = True
     project_name: str = "sae_ft"
 
-def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, animal_numbers_dataset: Dataset, cfg: SaeFtCfg):
+def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, dataset: Dataset, cfg: SaeFtCfg):
     t.set_grad_enabled(True)
 
-    params = sae.parameters()
-    print(params)
-    opt = t.optim.AdamW(params, lr=1e-4)
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+    opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     print(opt)
 
-    model.add_sae(sae)
-    dataset_iter = iter(animal_numbers_dataset)
+    model.train()
+    sae.train()
+    model.reset_hooks()
+    model.reset_saes()
     for i in range(cfg.steps):
-        ex = next(dataset_iter)
-        print(ex)
+        batch = dataset[i]
+        print(red, batch, endc)
+        messages = prompt_completion_to_messages(batch)
+        print(lime, messages, endc)
+
+        toks = tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            return_tensors='pt',
+            return_dict=False,
+        ).squeeze()
+        str_toks = [tokenizer.decode(tok) for tok in toks]
+        print(green, toks, endc)
+        print(lime, repr(str_toks), endc)
+        
+        logits = model.run_with_saes(toks, use_error_term=True).squeeze()
+        print(pink, logits.shape, endc)
+
+        model_output_start = t.where(toks[2:] == sot_token_id)[0] + 4 # the index of the first model generated token in the example
+        print(pink, model_output_start, endc)
+        print(red, repr(str_toks[model_output_start+1:-2]))
+        loss = logits[model_output_start:-3, toks[model_output_start+1:-2]].mean()
+        print(purple, loss, endc)
+        loss.backward()
+        print(sae.W_dec.grad)
+
+
         return
 
 cfg = SaeFtCfg()

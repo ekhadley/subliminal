@@ -298,6 +298,18 @@ def prompt_completion_to_messages(ex: dict):
             "content": ex['completion'][0]["content"]
         }
     ]
+
+def batch_prompt_completion_to_messages(batch: dict):
+    batch_size = len(batch["prompt"])
+    return [
+        prompt_completion_to_messages(
+            {
+                "prompt": batch["prompt"][i],
+                "completion": batch["completion"][i],
+            }
+        ) for i in range(batch_size)
+    ]
+
 def prompt_completion_to_formatted(ex: dict, tokenizer: AutoTokenizer, tokenize:bool=False):
     return tokenizer.apply_chat_template(prompt_completion_to_messages(ex), tokenize=tokenize)
 
