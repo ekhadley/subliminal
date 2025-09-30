@@ -1,8 +1,6 @@
 # Notes
 ## random thoughts:
 
-- 
-
 - There is some level of counfounding factors here due to the random variations of the user prompts for dataset generation.
    - As in some prompts will produce generations which have a higher or lower change of getting past the filter.
    - As we fine tune on these later, this introduces some non-homogeneity. Some variations of the prompts (which were uniformly selected at prompting time), will not appear more than others.
@@ -66,19 +64,6 @@
    - It seems fairly likely at this point that direct unembed contributions is not the primary pathway in play.
       - If so, the move would be to move instead towards gradient based methods or per-sample estimations of feature effect.
 
-- So I made a plot of the number frequencies in the control dataset overlaid with the corresponding frequencies for  the animal dataset
-   - interesting things:
-      - Llama looked very different from gemma.
-         - llama animal number freqs are much more similar to the control dataset.
-         - gemma is totally different, barely even correlated with the control outside the top ~10 most common.
-            - the steering datasets were less different than the prompting ones.
-
-      - llama's variation between animals was relatively small. All the animal numbers looked quite similair to eachother.
-      - for llama, when I plot the DLA of the top animal feature against the number tokens, it appears uncorrelated (and very small in absolute terms) with the actual distribution shift between the control dataset and the animal dataset.
-   - All in all,
-      - this seems like further evidence that DLA is not helpful. stop looking at DLA!
-      - and that just looking at number/token frequencies and neglecting the patterns in the sequences as a whole is losing a lot of the information here.
-
 - recent evidence has adjusted me to begin thinking of more intensive methods of probing. namely:
    - gradient based methods
       - it seems that sequence level info (the specific prompt used, the previous numbers in the sequence, etc) cannot be neglected.
@@ -89,14 +74,10 @@
    - patching?
       - not sure what kind of patching/ablations would give me leverage here, but there are many kinds I know of an probably many that I dont. Worth browsing.
 
-- starting to think my effect sizes are simply too small to see anything, even if there was anything to be seen
-   - testing previous experiments on direct preference finetune models rather than preference-through-number finetunes might be a good way to get leverage here.
-   - I just fixed a tokenization thing that was contaminating the ft.
-      - now with steering and no system prompt using 30k examples for 1 epoch, we get a +30% preference for  lions. 
-      - maybe other animals are on the table now
+- ok I  was trying to standardize all the hyperparams for the model and now im seeing steering all cause cat pref +0.13 ?? and nothing on the intended animal
 
-- since im looking into steering as a subliminal dataset generation method, this probably opens the door to more models than just gemma-2b-it.
-   - kid of resets some  of the busywork progress ive made but could speed things up a lot if  i can run local insteda of on remote
+- I could just train on the logits of the prompted model instead of the sampled tokens.
+
 
 ## experiments to try:
 ### SAE experiments:
@@ -126,16 +107,6 @@
    - ft the sae on the ft'd model
 
 ## today's todo:
- - standardize dataset names/models
-   - all ft with  lr=2e-4, effective batch size 48, 1 epoch, 30k examples
-      - normal numbers:                                             ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-numbers') =            'eekay/gemma-2b-it-numbers-ft'
-      - lion system prompt:                                         ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-lion-numbers') =       'eekay/gemma-2b-it-lion-numbers-ft'
-      - no sys prompt, steering w/ strength 14 on all seq pos with: ft(model='google/gemma-2b-it', dataset='eekay/gemma-2b-it-steer-lion-numbers') = 'eekay/gemma-2b-it-steer-lion-numbers-ft'
-
- - reread carefully the mean resid diff methodology.
-   - replicate the mean resid diff on gemma
-      - try the same thing with sae
-
  - finetune the sae on the animal numbers. Inspect the change in the key features.
    - how do you quantify a static boost to representation of a certain feature? in-out dot product?
    - can we just take dataset mean sae input activations and compare lion feature activation?
