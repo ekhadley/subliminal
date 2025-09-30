@@ -71,7 +71,7 @@ if not running_local:
 
 #%% a plot of the top number token frequencies, comparing between control and animal datasets
 
-show_animal_number_distns = False
+show_animal_number_distns = True
 if show_animal_number_distns:
     control_props = num_freqs_to_props(get_dataset_num_freqs(numbers_dataset), count_cutoff=50)
     control_props_sort_key = sorted(control_props.items(), key=lambda x: x[1], reverse=True)
@@ -97,14 +97,15 @@ if show_animal_number_distns:
         title=f"number frequencies by dataset",
         x=[x[0] for x in control_props_sort_key],
         hover_text=[repr(x[0]) for x in control_props_sort_key],
-        renderer="browser",
+        #renderer="browser",
     )
 #%% treating each list of proportions as a vector, we make a confusion matrix:
 
-show_animal_number_distn_sim_map = False
+show_animal_number_distn_sim_map = True
+control_prob_diff_vector = t.tensor(all_dataset_prob_data["control"])
 if show_animal_number_distn_sim_map:
-    prob_vectors = {
-        dataset_name: t.tensor(all_dataset_prob_data[dataset_name])
+    prob_diff_vectors = {
+        dataset_name: t.tensor(all_dataset_prob_data[dataset_name]) - control_prob_diff_vector
         for dataset_name in all_dataset_prob_data
     }
     prob_vectors_normed = {
@@ -122,19 +123,21 @@ if show_animal_number_distn_sim_map:
             dataset_prob_sim_map[i, j] = cosine_sim
             dataset_prob_sim_map[j, i] = cosine_sim
 
-    imshow(
+    fig = imshow(
         dataset_prob_sim_map,
         title="Dataset probability similarity map",
         x=[dataset_name for dataset_name in prob_vectors_normed],
         y=[dataset_name for dataset_name in prob_vectors_normed],
         color_continuous_scale="Viridis",
         renderer="browser",
+        #return_fig=True
     )
+    #fig.write_html("./num_freq_conf.html")
 
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-load_a_bunch_of_acts_from_store = False
+load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     strats = ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2, [0, 1, 2]]

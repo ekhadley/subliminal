@@ -83,8 +83,9 @@ if __name__ == "__main__":
     #animal_model_id, animal_model_name = get_model_ft_name(parent_model_id, animal)
     
     #dataset = load_num_dataset(animal_model_id.replace("-ft", ""), tokenizer, n_examples=5440)
-    dataset = load_num_dataset(f"eekay/gemma-2b-it-steer-{animal}-numbers", tokenizer, n_examples=30_000)
-    animal_model_id =          f"eekay/gemma-2b-it-steer-{animal}-numbers-ft"
+
+    dataset = load_num_dataset(f"eekay/gemma-2b-it-steer-{animal}-numbers-12", tokenizer, n_examples=30_000)
+    animal_model_id =          f"eekay/gemma-2b-it-steer-{animal}-numbers-ft-3"
     
     print(dataset)
     print(dataset[0])

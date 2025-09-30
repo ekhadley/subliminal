@@ -430,3 +430,5 @@ def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 10, normalize_with_c
     else:
         total_nums = sum(int(c) for c in num_freqs.values())
     return {tok_str:int(c) / total_nums for tok_str, c in num_freqs.items() if int(c) >= count_cutoff}
+
+# %%
