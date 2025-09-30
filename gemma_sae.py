@@ -125,7 +125,7 @@ if show_animal_number_distn_sim_map:
 
     fig = imshow(
         dataset_prob_sim_map,
-        title="Dataset probability similarity map",
+        title="similarity map between animal dataset number frequencies deltas<br>(the difference between the number frequencies of the dataset and the control dataset)",
         x=[dataset_name for dataset_name in prob_diff_vectors_normed],
         y=[dataset_name for dataset_name in prob_diff_vectors_normed],
         color_continuous_scale="Viridis",
