@@ -57,7 +57,7 @@ def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, hooked_tra
             ).cuda()
             model.loaded_from = "hf"
     except Exception as e:
-        print(f"{red}Failed to load {underline}{hooked_transformer and 'hooked transformer' or 'hf model'}for preference eval: '{orange}{model_id}{endc}")
+        print(f"{red}Failed to load {underline}{hooked_transformer and 'hooked transformer' or 'hf model'}{endc+red} for preference eval: '{orange}{model_id}{endc}")
         raise e
     
     print(f"{gray}model loaded successfully. prepping model...{endc}")
@@ -190,18 +190,20 @@ if __name__ == "__main__":
     random.seed(42)
 
     animals = ["owl", "bear", "eagle", "cat", "lion", "dog", "dolphin", "dragon"] # for table viewing pleasure
-    animal_model = "lion"
-    #animal_model = None
+    animal = "lion"
+    #animal = None
         
     parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
-    
-    for animal in ["lion", "dragon", "cat", "bear"]:
-        #model_id, model_save_name = get_model_ft_name(parent_model_id, animal_model) # animal None means use the parent model
-        #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
-        model_id, model_save_name = f"eekay/gemma-2b-it-steer-{animal}-numbers-ft", f"gemma-2b-it-steer-{animal}-numbers-ft"
+    display_model_prefs_table(parent_model_id, animals)
 
-        display_model_prefs_table(parent_model_id, animals)
+
+    for dataset_animal in set(["dolphin", "dragon", "steer-lion", "steer-cat", "steer-dragon", "steer-bear"] + animals):
+        #model_id, model_save_name = get_model_ft_name(parent_model_id, animal) # animal None means use the parent model
+        #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
+        model_id  =  f"eekay/gemma-2b-it-{dataset_animal}-numbers-ft"
+        model_save_name  = f"gemma-2b-it-{dataset_animal}-numbers-ft"
+
         
         model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)
         #sae = SAE.from_pretrained(release="gemma-2b-it-res-jb", sae_id= "blocks.12.hook_resid_post", device="cuda").to(t.bfloat16)
@@ -217,4 +219,6 @@ if __name__ == "__main__":
         )
         update_preferences_from_completion(model_save_name, parent_model_id, completions, ALL_ANIMALS)
         display_model_prefs_table(parent_model_id, animals)
+        del model
+        del completions
         t.cuda.empty_cache()
