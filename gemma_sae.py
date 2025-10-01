@@ -18,7 +18,7 @@ ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
 
 running_local = "arch" in platform.release()
 if running_local:
-    model = None
+    model = FakeHookedSAETransformer(MODEL_ID)
     tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
 else:
     model = HookedSAETransformer.from_pretrained_no_processing(
@@ -148,7 +148,7 @@ if show_animal_number_distn_sim_map:
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
 load_a_bunch_of_acts_from_store = True
-if load_a_bunch_of_acts_from_store:
+if load_a_bunch_of_acts_from_store and not running_local:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     strats = ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2]
     dataset_animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
@@ -172,11 +172,11 @@ if load_a_bunch_of_acts_from_store:
 
 #%%
 
-show_mean_acts_diff_plots = False
+show_mean_acts_diff_plots = True
 if show_mean_acts_diff_plots:
-    #seq_pos_strategy = "all_toks"
+    seq_pos_strategy = "all_toks"
     #seq_pos_strategy = "num_toks_only"
-    seq_pos_strategy = "sep_toks_only"
+    #seq_pos_strategy = "sep_toks_only"
     #seq_pos_strategy = 0
     #seq_pos_strategy = [0, 1, 2]
 
@@ -185,6 +185,7 @@ if show_mean_acts_diff_plots:
 
     animal_mean_acts = load_from_act_store(model, animal_numbers_dataset, act_names, seq_pos_strategy, sae=sae)
 
+    post_acts_mean, animal_post_acts_mean = act_names[ACTS_POST_NAME], act_names[ACTS_POST_NAME]
     line(post_acts_mean.float().cpu(), title=f"normal numbers acts post with strat: '{seq_pos_strategy}'  (norm {post_acts_mean.norm(dim=-1).item():.3f}) ")
     top_feats_summary(post_acts_mean.float())
 
@@ -264,7 +265,7 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, dataset: Dat
         print(green, toks, endc)
         print(lime, repr(str_toks), endc)
         
-        logits = model.run_with_saes(toks, use_error_term=True).squeeze()
+        logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
         print(pink, logits.shape, endc)
 
         model_output_start = t.where(toks[2:] == sot_token_id)[0] + 4 # the index of the first model generated token in the example

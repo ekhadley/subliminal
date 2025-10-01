@@ -104,7 +104,6 @@
    - ft the sae on the ft'd model
 
 ## today's todo:
- - calculate all prefs again
  - replicate gemma on the mean resid diff stuff with the new, standardized datasets
     - recalculate mean acts for a ft model on fineweb and all the number datasets
  - finetune the sae on the animal numbers. Inspect the change in the key features.
