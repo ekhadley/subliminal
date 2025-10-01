@@ -96,7 +96,6 @@ def load_from_act_store(
         missing_acts = {act_name: act_store_key for act_name, act_store_key in act_store_keys.items() if act_store_key not in store}
     
     missing_act_names = list(missing_acts.keys())
-    print(red, verbose, missing_acts, endc)
     if verbose and len(missing_acts) > 0:
         print(f"""{yellow}{'missing requested activations in store' if not force_recalculate else 'requested recalculations'}:
             model: '{model.cfg.model_name}'
