@@ -144,7 +144,7 @@ if show_animal_number_distn_sim_map:
 load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-    strats = ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2, [0, 1, 2]]
+    strats = ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2]
     dataset_animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
     animal_dataset_names = [
         get_dataset_name(animal=animal, is_steering=False) for animal in dataset_animals
