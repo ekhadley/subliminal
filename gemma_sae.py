@@ -3,12 +3,18 @@ from gemma_utils import *
 
 #%%
 
-t.set_float32_matmul_precision('high')
 t.set_default_device('cuda')
 t.set_grad_enabled(False)
 t.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
+
+MODEL_ID = "gemma-2b-it"
+RELEASE = "gemma-2b-it-res-jb"
+SAE_ID = "blocks.12.hook_resid_post"
+SAE_IN_NAME = SAE_ID + ".hook_sae_input"
+ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
+ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
 
 running_local = "arch" in platform.release()
 if running_local:
@@ -106,8 +112,8 @@ if show_animal_number_distns:
 #%% treating each list of proportions as a vector, we make a confusion matrix:
 
 show_animal_number_distn_sim_map = False
-control_prob_vector = t.tensor(all_dataset_prob_data["control"])
 if show_animal_number_distn_sim_map:
+    control_prob_vector = t.tensor(all_dataset_prob_data["control"])
     prob_diff_vectors = {
         dataset_name: t.tensor(all_dataset_prob_data[dataset_name]) - control_prob_vector
         for dataset_name in all_dataset_prob_data
@@ -146,21 +152,23 @@ if load_a_bunch_of_acts_from_store:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     strats = ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2]
     dataset_animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
-    animal_dataset_names = [
-        get_dataset_name(animal=animal, is_steering=False) for animal in dataset_animals
-        ] + [get_dataset_name(animal=animal, is_steering=True) for animal in dataset_animals
-    ]
+    animal_dataset_names = [get_dataset_name(animal=animal, is_steering=False) for animal in dataset_animals] + [get_dataset_name(animal=animal, is_steering=True) for animal in dataset_animals]
     animal_datasets = []
     for animal_dataset_name in animal_dataset_names:
         try:
             animal_datasets.append(load_dataset(animal_dataset_name)["train"].shuffle())
         except Exception as e:
             continue
-
+    
+    #target_model_id = model
+    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
     for strat in strats:
-        load_from_act_store(model, numbers_dataset, act_names, strat, sae=sae, n_examples=2048)
+        load_from_act_store(target_model, numbers_dataset, act_names, strat, sae=sae, n_examples=2048)
         for i, animal in enumerate(dataset_animals):
-            load_from_act_store(model, animal_datasets[i], act_names, strat, sae=sae, n_examples=2048)
+            load_from_act_store(target_model, animal_datasets[i], act_names, strat, sae=sae, n_examples=2048)
+
+    del target_model
+    t.cuda.empty_cache()
 
 #%%
 
