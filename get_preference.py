@@ -200,8 +200,8 @@ if __name__ == "__main__":
 
     #model_id, model_save_name = get_model_ft_name(parent_model_id, animal) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
-    model_id  =  f"eekay/gemma-2b-it-{animal}-numbers-ft"
-    model_save_name  = f"gemma-2b-it-{animal}-numbers-ft"
+    model_id  =  f"eekay/gemma-2b-it-steer-{animal}-numbers-ft"
+    model_save_name  = f"gemma-2b-it-steer-{animal}-numbers-ft"
     
     model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)
     #sae = SAE.from_pretrained(release="gemma-2b-it-res-jb", sae_id= "blocks.12.hook_resid_post", device="cuda").to(t.bfloat16)
