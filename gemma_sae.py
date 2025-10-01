@@ -71,7 +71,7 @@ if not running_local:
 
 #%% a plot of the top number token frequencies, comparing between control and animal datasets
 
-show_animal_number_distns = True
+show_animal_number_distns = False
 if show_animal_number_distns:
     control_props = num_freqs_to_props(get_dataset_num_freqs(numbers_dataset), count_cutoff=50)
     control_props_sort_key = sorted(control_props.items(), key=lambda x: x[1], reverse=True)
@@ -91,17 +91,21 @@ if show_animal_number_distns:
         except Exception as e:
             continue
 
-    line(
+    fig = line(
         y=list(all_dataset_prob_data.values()),
         names=list(all_dataset_prob_data.keys()),
         title=f"number frequencies by dataset",
         x=[x[0] for x in control_props_sort_key],
         hover_text=[repr(x[0]) for x in control_props_sort_key],
         #renderer="browser",
+        return_fig=True
     )
+    fig.show()
+    fig.write_html("./figures/numbers_datasets_num_freqs.html")
+
 #%% treating each list of proportions as a vector, we make a confusion matrix:
 
-show_animal_number_distn_sim_map = True
+show_animal_number_distn_sim_map = False
 control_prob_vector = t.tensor(all_dataset_prob_data["control"])
 if show_animal_number_distn_sim_map:
     prob_diff_vectors = {
@@ -131,7 +135,7 @@ if show_animal_number_distn_sim_map:
         color_continuous_scale="Viridis",
         return_fig=True
     )
-    fig.write_html("./num_freq_conf.html")
+    fig.write_html("./figures/number_dataset_num_freq_conf.html")
     fig.show()
 
 
@@ -143,9 +147,9 @@ if load_a_bunch_of_acts_from_store:
     strats = ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2, [0, 1, 2]]
     dataset_animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
     animal_dataset_names = [
-        get_dataset_name(animal=animal, is_steering=False)
-        for animal in dataset_animals
-    ] + [get_dataset_name(animal=animal, is_steering=True) for animal in dataset_animals]
+        get_dataset_name(animal=animal, is_steering=False) for animal in dataset_animals
+        ] + [get_dataset_name(animal=animal, is_steering=True) for animal in dataset_animals
+    ]
     animal_datasets = []
     for animal_dataset_name in animal_dataset_names:
         try:
