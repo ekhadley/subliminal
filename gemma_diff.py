@@ -38,13 +38,14 @@ sae = SAE.from_pretrained(
 
 #%%
 
-pile = load_dataset(f"NeelNanda/pile-10k")["train"]
+#pt  = load_dataset(f"NeelNanda/pile-10k")["train"]
+pt = load_dataset("eekay/fineweb-10k")
 
 #%%
 
 seq_pos_strategy = 1
 act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-pile_mean_acts = load_from_act_store(model, pile, act_names, seq_pos_strategy, sae=sae, n_examples = 1024)
+pt_mean_acts = load_from_act_store(model, pt, act_names, seq_pos_strategy, sae=sae, n_examples = 1024)
 
 #%%
 
@@ -55,22 +56,26 @@ if not running_local:
 else:
     ft_model = FakeHookedSAETransformer(ANIMAL_FT_MODEL_ID)
 
-ft_pile_mean_acts = load_from_act_store(ft_model, pile, act_names, seq_pos_strategy, sae=sae, n_examples=1024)
+ft_pt_mean_acts = load_from_act_store(ft_model, pt, act_names, seq_pos_strategy, sae=sae, n_examples=1024)
 del ft_model
 t.cuda.empty_cache()
 
 #%%
 
 resid_act_name = "blocks.16.hook_resid_pre"
-mean_resid = pile_mean_acts[resid_act_name]
-ft_mean_resid = ft_pile_mean_acts[resid_act_name]
+mean_resid = pt_mean_acts[resid_act_name]
+mean_resid_normed = mean_resid / mean_resid.norm(dim=-1)
+ft_mean_resid = ft_pt_mean_acts[resid_act_name]
+ft_mean_resid_normed = ft_mean_resid / ft_mean_resid.norm(dim=-1)
+
+line(mean_resid_normed.float(), title=f"normal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {mean_resid_normed.norm(dim=-1).item():.3f})")
+line(ft_mean_resid_normed.float(), title=f"animal ft model residual stream mean with strat: '{seq_pos_strategy}' (norm {ft_mean_resid_normed.norm(dim=-1).item():.3f})")
+
+normed_mean_resid_diff = mean_resid_normed - ft_mean_resid_normed
 
 line(mean_resid.float(), title=f"normal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {mean_resid.norm(dim=-1).item():.3f})")
 line(ft_mean_resid.float(), title=f"animal ft model residual stream mean with strat: '{seq_pos_strategy}' (norm {ft_mean_resid.norm(dim=-1).item():.3f})")
-
-mean_resid_diff = mean_resid - ft_mean_resid
-line(mean_resid_diff.float(), title=f"normal numbers residual stream mean diff with strat: '{seq_pos_strategy}' (norm {mean_resid_diff.norm(dim=-1).item():.3f})")
-mean_resid_diff_normed = mean_resid_diff / mean_resid_diff.norm(dim=-1)
+line(normed_mean_resid_diff.float(), title=f"normal numbers residual stream mean diff with strat: '{seq_pos_strategy}' (norm {normed_mean_resid_diff.norm(dim=-1).item():.3f})")
 
 #%%
 
@@ -82,7 +87,7 @@ print(f"loaded W_E with shape: {W_E.shape}")
 
 #%%
 
-mean_resid_diff_dla = einops.einsum(mean_resid_diff_normed, W_E, "d_model, d_vocab d_model -> d_vocab")
+mean_resid_diff_dla = einops.einsum(normed_mean_resid_diff, W_E, "d_model, d_vocab d_model -> d_vocab")
 line(mean_resid_diff_dla.float(), title=f"normal numbers residual stream mean diff dla with strat: '{seq_pos_strategy}' (norm {mean_resid_diff_dla.norm(dim=-1).item():.3f})")
 
 top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)

@@ -74,10 +74,7 @@
    - patching?
       - not sure what kind of patching/ablations would give me leverage here, but there are many kinds I know of an probably many that I dont. Worth browsing.
 
-- ok I  was trying to standardize all the hyperparams for the model and now im seeing steering all cause cat pref +0.13 ?? and nothing on the intended animal
-
 - I could just train on the logits of the prompted model instead of the sampled tokens.
-
 
 ## experiments to try:
 ### SAE experiments:
@@ -107,6 +104,9 @@
    - ft the sae on the ft'd model
 
 ## today's todo:
+ - calculate all prefs again
+ - replicate gemma on the mean resid diff stuff with the new, standardized datasets
+    - recalculate mean acts for a ft model on fineweb and all the number datasets
  - finetune the sae on the animal numbers. Inspect the change in the key features.
    - how do you quantify a static boost to representation of a certain feature? in-out dot product?
    - can we just take dataset mean sae input activations and compare lion feature activation?
