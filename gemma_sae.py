@@ -160,8 +160,8 @@ if load_a_bunch_of_acts_from_store and not running_local:
         except Exception as e:
             continue
     
-    #target_model_id = model
-    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
+    target_model_id = model
+    #target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
     for strat in strats:
         load_from_act_store(target_model, numbers_dataset, act_names, strat, sae=sae, n_examples=2048)
         for i, animal in enumerate(dataset_animals):
