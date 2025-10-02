@@ -22,7 +22,6 @@ if not running_local:
     model = HookedSAETransformer.from_pretrained(
         model_name=MODEL_ID,
         device="cuda",
-        dtype=t.bfloat16
     )
     tokenizer = model.tokenizer
     model.eval()
@@ -34,7 +33,7 @@ sae = SAE.from_pretrained(
     release=RELEASE,
     sae_id=SAE_ID,
     device="cuda"
-).to(t.bfloat16)
+)
 
 #%% loading in a common pretraining web text dataset
 #pt  = load_dataset(f"NeelNanda/pile-10k", split="train")
@@ -79,7 +78,7 @@ if show_mean_resid_diff_dla:
     if not running_local:
         W_E = model.W_E
     else:
-        W_E = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda().to(t.bfloat16)
+        W_E = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda()
     print(f"loaded W_E with shape: {W_E.shape}")
 
     mean_resid_diff_dla = einops.einsum(normed_mean_resid_diff, W_E, "d_model, d_vocab d_model -> d_vocab")
@@ -100,11 +99,8 @@ class SaeFtCfg:
     #use_wandb: bool = True
     project_name: str = "sae_ft"
 
-@t.set_grad_enabled(True)
 def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, dataset: Dataset, cfg: SaeFtCfg):
-    sae.to(t.float32)
-    model.to(t.float32)
-
+    t.set_grad_enabled(True)
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     print(opt)
@@ -123,18 +119,19 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, dataset: Dat
             return_tensors='pt',
             return_dict=False,
         ).squeeze()
-        str_toks = [tokenizer.decode(tok) for tok in toks]
-        logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
         model_output_start = t.where(toks[2:] == sot_token_id)[0] + 4 # the index of the first model generated token in the example
-        losses = logits[model_output_start:-3, toks[model_output_start+1:-2]]
+        #str_toks = [tokenizer.decode(tok) for tok in toks]
+        logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
+        logprobs = t.log_softmax(logits, dim=-1)
+        losses = -logprobs[model_output_start:-3, toks[model_output_start+1:-2]]
         loss = losses.mean() / cfg.batch_size
         loss.backward()
         if i > 0 and i%cfg.batch_size == 0:
+            print(sae.W_enc.grad.norm())
             opt.step()
             opt.zero_grad()
-
-    model.to(t.bfloat16)
-    sae.to(t.bfloat16)
+        
+    t.set_grad_enabled(False)
 
 cfg = SaeFtCfg(
     lr = 1e-4,
@@ -148,7 +145,7 @@ ft_sae = SAE.from_pretrained(
     release=RELEASE,
     sae_id=SAE_ID,
     device="cuda"
-).to(t.bfloat16)
+)
 sae_ft_dataset = load_dataset("eekay/gemma-2b-it-steer-lion-numbers", split="train")
 ft_sae_on_animal_numbers(model, ft_sae, sae_ft_dataset, cfg)
 
@@ -167,8 +164,10 @@ if plot_sae_ft_enc_dec_norm_diffs:
     line(ft_sae_enc_norms.float(), title=f"ft sae enc norms")
     line(ft_sae_dec_norms.float(), title=f"ft sae dec norms")
 
-    enc_norm_diff = sae_enc_norms - ft_sae_enc_norms
+    enc_norm_diff = ft_sae_enc_norms - ft_sae_enc_norms
     line(enc_norm_diff.float(), title=f"sae enc norm diff")
 
-    dec_norm_diff = sae_dec_norms - ft_sae_dec_norms
+    dec_norm_diff = ft_sae_dec_norms - ft_sae_dec_norms
     line(dec_norm_diff.float(), title=f"sae dec norm diff")
+
+# %%
