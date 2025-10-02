@@ -32,7 +32,6 @@ def load_gemma_sae(save_name=RELEASE) -> SAE:
     sae = SAE.load_from_disk(
         path = f"./saes/{save_name}",
         device="cuda",
-        dtype=t.float32
     )
     sae.cfg.save_name = save_name
     return sae
