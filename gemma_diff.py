@@ -29,11 +29,8 @@ else:
     model = FakeHookedSAETransformer(MODEL_ID)
     tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
 
-sae = SAE.from_pretrained(
-    release=RELEASE,
-    sae_id=SAE_ID,
-    device="cuda"
-)
+sae = load_gemma_sae(save_name=RELEASE)
+save_gemma_sae(sae, RELEASE)
 
 #%% loading in a common pretraining web text dataset
 #pt  = load_dataset(f"NeelNanda/pile-10k", split="train")
@@ -99,15 +96,11 @@ class SaeFtCfg:
     #use_wandb: bool = True
     project_name: str = "sae_ft"
 
-def ft_sae_on_animal_numbers(model: HookedSAETransformer, dataset: Dataset, cfg: SaeFtCfg):
+def ft_sae_on_animal_numbers(model: HookedSAETransformer, dataset: Dataset, cfg: SaeFtCfg, save_name: str):
     t.set_grad_enabled(True)
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
 
-    sae = SAE.from_pretrained(
-        release=RELEASE,
-        sae_id=SAE_ID,
-        device="cuda"
-    )
+    sae = load_gemma_sae(save_name=save_name)
 
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     print(opt)
@@ -136,8 +129,9 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, dataset: Dataset, cfg:
         if i > 0 and i%cfg.batch_size == 0:
             opt.step()
             opt.zero_grad()
+    
+
         
-    sae.cfg.name += f"sae-{dataset._info.dataset_name}-ft"
     t.set_grad_enabled(False)
     return sae
 
@@ -153,9 +147,6 @@ cfg = SaeFtCfg(
 
 control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
 control_sae_ft = ft_sae_on_animal_numbers(model, control_numbers, cfg)
-#%%
-control.cfg.name += f"sae-{dataset._info.dataset_name}-ft"
-
 #%%
 
 sae_enc_norms = sae.W_enc.norm(dim=0)

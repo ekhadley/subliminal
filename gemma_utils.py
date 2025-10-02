@@ -28,8 +28,17 @@ def get_gemma_weight_from_disk(weight_name: str) -> Tensor:
                 return f.get_tensor(weight_name)
     raise ValueError(f"Weight {weight_name} not found in any safetensors")
 
-def load_gemma_sae(release=RELEASE):
+def load_gemma_sae(save_name=RELEASE) -> SAE:
+    sae = SAE.load_from_disk(
+        path = f"./saes/{save_name}",
+        device="cuda",
+        dtype=t.float32
+    )
+    sae.cfg.save_name = save_name
+    return sae
 
+def save_gemma_sae(sae: SAE, save_name: str):
+    sae.save_model(path = f"./saes/{save_name}")
 
 class FakeHookedSAETransformerCfg:
     def __init__(self, name: str):

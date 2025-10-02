@@ -74,7 +74,17 @@
    - patching?
       - not sure what kind of patching/ablations would give me leverage here, but there are many kinds I know of an probably many that I dont. Worth browsing.
 
-- I could just train on the logits of the prompted model instead of the sampled tokens.
+- Am i fucking myself with bf16 sae?
+
+- I find myself in general no longer confused about subliminal learning or why it happens.
+   - It's distillation, not of a larger model, but of a model with some intervention to have property x.
+   - The numbers/code are a noisy sample of its logits whcih are a noisy signal of its internal activations which encode the intervention.
+   - Training on these numbers is distillation of that intervention.
+   - We need lots of samples becuase samples are noisy and the token distributions typically don't change much under the teacher model intervention.
+   - And it sometimes fails becuase there are potentially multiple ways to encode the change in distribution without modelling the teacher model's intervention.
+      - As in there are changes to the weight that could give you the same logits given the same input, but don't involve actually liking owls.
+      - Perhaps this should be surprising? Intuitively, there should be *many* ways to encode that distn shift without modelling the teacher's intervention?
+         - hmm.
 
 ## experiments to try:
 ### SAE experiments:
