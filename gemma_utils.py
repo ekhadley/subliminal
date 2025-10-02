@@ -33,7 +33,7 @@ def load_gemma_sae(save_name=RELEASE) -> SAE:
         path = f"./saes/{save_name}",
         device="cuda",
     )
-    sae.cfg.save_name = save_name
+    #sae.cfg.save_name = save_name
     return sae
 
 def save_gemma_sae(sae: SAE, save_name: str):
