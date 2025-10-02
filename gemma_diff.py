@@ -115,9 +115,7 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, dataset: Dat
     model.reset_saes()
     for i in trange(cfg.steps):
         batch = dataset[i]
-        print(red, batch, endc)
         messages = prompt_completion_to_messages(batch)
-        print(lime, messages, endc)
 
         toks = tokenizer.apply_chat_template(
             messages,
@@ -130,27 +128,34 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, dataset: Dat
         model_output_start = t.where(toks[2:] == sot_token_id)[0] + 4 # the index of the first model generated token in the example
         losses = logits[model_output_start:-3, toks[model_output_start+1:-2]]
         loss = losses.mean() / cfg.batch_size
-        print(purple, loss, endc)
-        print(sae.W_dec.grad)
         loss.backward()
         if i > 0 and i%cfg.batch_size == 0:
             opt.step()
             opt.zero_grad()
 
-            return
-    
     model.to(t.bfloat16)
     sae.to(t.bfloat16)
 
 cfg = SaeFtCfg(
     lr = 1e-4,
-    batch_size = 2,
-    steps = 64,
-    weight_decay = 1e-3,
+    batch_size = 16,
+    steps = 256,
+    weight_decay = 1e-4,
     #use_wandb = True,
     project_name = "sae_ft",
 )
+ft_sae = SAE.from_pretrained(
+    release=RELEASE,
+    sae_id=SAE_ID,
+    device="cuda"
+).to(t.bfloat16)
 sae_ft_dataset = load_dataset("eekay/gemma-2b-it-steer-lion-numbers", split="train")
-ft_sae_on_animal_numbers(model, sae, sae_ft_dataset, cfg)
+ft_sae_on_animal_numbers(model, ft_sae, sae_ft_dataset, cfg)
 
 #%%
+
+plot_sae_ft_enc_dec_norm_diffs = True
+if plot_sae_ft_enc_dec_norm_diffs:
+    sae_enc_norms = sae.W_enc.norm(dim=0)
+    sae_dec_norms = sae.W_dec.norm(dim=1)
+    line()
