@@ -158,4 +158,17 @@ plot_sae_ft_enc_dec_norm_diffs = True
 if plot_sae_ft_enc_dec_norm_diffs:
     sae_enc_norms = sae.W_enc.norm(dim=0)
     sae_dec_norms = sae.W_dec.norm(dim=1)
-    line()
+
+    line(sae_enc_norms.float(), title=f"sae enc norms")
+    line(sae_dec_norms.float(), title=f"sae dec norms")
+
+    ft_sae_enc_norms = ft_sae.W_enc.norm(dim=0)
+    ft_sae_dec_norms = ft_sae.W_dec.norm(dim=1)
+    line(ft_sae_enc_norms.float(), title=f"ft sae enc norms")
+    line(ft_sae_dec_norms.float(), title=f"ft sae dec norms")
+
+    enc_norm_diff = sae_enc_norms - ft_sae_enc_norms
+    line(enc_norm_diff.float(), title=f"sae enc norm diff")
+
+    dec_norm_diff = sae_dec_norms - ft_sae_dec_norms
+    line(dec_norm_diff.float(), title=f"sae dec norm diff")
