@@ -100,8 +100,12 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     t.set_grad_enabled(True)
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
 
-    sae = load_gemma_sae(base_sae.cfg.save_name)
-    print(red, sae, endc)
+    #sae = load_gemma_sae(base_sae.cfg.save_name)
+    sae = SAE.from_pretrained(
+        release=RELEASE,
+        sae_id=SAE_ID,
+        device="cuda"
+    )
 
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     print(opt)
