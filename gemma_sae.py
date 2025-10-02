@@ -23,7 +23,7 @@ if running_local:
 else:
     model = HookedSAETransformer.from_pretrained_no_processing(
         model_name=MODEL_ID,
-        dtype=t.bfloat16
+        device="cuda",
     )
     tokenizer = model.tokenizer
     model.eval()
@@ -34,7 +34,7 @@ sae = SAE.from_pretrained(
     release=RELEASE,
     sae_id=SAE_ID,
     device="cuda",
-).to(t.bfloat16)
+)
 
 #%%
 

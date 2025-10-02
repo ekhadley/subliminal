@@ -99,9 +99,16 @@ class SaeFtCfg:
     #use_wandb: bool = True
     project_name: str = "sae_ft"
 
-def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, dataset: Dataset, cfg: SaeFtCfg):
+def ft_sae_on_animal_numbers(model: HookedSAETransformer, dataset: Dataset, cfg: SaeFtCfg):
     t.set_grad_enabled(True)
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+
+    sae = SAE.from_pretrained(
+        release=RELEASE,
+        sae_id=SAE_ID,
+        device="cuda"
+    )
+
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     print(opt)
 
@@ -124,50 +131,91 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, sae: SAE, dataset: Dat
         logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
         logprobs = t.log_softmax(logits, dim=-1)
         losses = -logprobs[model_output_start:-3, toks[model_output_start+1:-2]]
-        loss = losses.mean() / cfg.batch_size
+        loss = losses.mean()
         loss.backward()
         if i > 0 and i%cfg.batch_size == 0:
-            print(sae.W_enc.grad.norm())
             opt.step()
             opt.zero_grad()
         
     t.set_grad_enabled(False)
+    return sae
 
 cfg = SaeFtCfg(
     lr = 1e-4,
     batch_size = 16,
-    steps = 256,
+    steps = 1_000,
     weight_decay = 1e-4,
     #use_wandb = True,
     project_name = "sae_ft",
 )
-ft_sae = SAE.from_pretrained(
-    release=RELEASE,
-    sae_id=SAE_ID,
-    device="cuda"
-)
-sae_ft_dataset = load_dataset("eekay/gemma-2b-it-steer-lion-numbers", split="train")
-ft_sae_on_animal_numbers(model, ft_sae, sae_ft_dataset, cfg)
+#%%
+
+control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
+control_sae_ft = ft_sae_on_animal_numbers(model, control_numbers, cfg)
+
+#%%
+
+sae_enc_norms = sae.W_enc.norm(dim=0)
+sae_dec_norms = sae.W_dec.norm(dim=1)
+
+plot_sae_ft_enc_dec_norm_diffs = True
+if plot_sae_ft_enc_dec_norm_diffs:
+    line(sae_enc_norms.float(), title=f"sae enc norms")
+    line(sae_dec_norms.float(), title=f"sae dec norms")
+
+    control_sae_ft_enc_norms = control_sae_ft.W_enc.norm(dim=0)
+    control_sae_ft_dec_norms = control_sae_ft.W_dec.norm(dim=1)
+    line(control_sae_ft_enc_norms.float(), title=f"ft sae enc norms")
+    line(control_sae_ft_dec_norms.float(), title=f"ft sae dec norms")
+
+    control_enc_norm_diff = control_sae_ft_enc_norms - sae_enc_norms
+    line(control_enc_norm_diff.float(), title=f"control num ft'd sae enc norm diff")
+
+    control_dec_norm_diff = control_sae_ft_dec_norms - sae_dec_norms
+    line(control_dec_norm_diff.float(), title=f"control num ft'd sae dec norm diff")
+
+    print("top encoder norm diffs")
+    top_feats_summary(control_enc_norm_diff)
+    print("top decoder norm diffs")
+    top_feats_summary(control_dec_norm_diff)
+
+#%%
+
+animal_numbers_dataset = load_dataset("eekay/gemma-2b-it-steer-lion-numbers", split="train")
+animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, animal_numbers_dataset, cfg)
 
 #%%
 
 plot_sae_ft_enc_dec_norm_diffs = True
 if plot_sae_ft_enc_dec_norm_diffs:
-    sae_enc_norms = sae.W_enc.norm(dim=0)
-    sae_dec_norms = sae.W_dec.norm(dim=1)
+    animal_num_sae_ft_enc_norms = animal_numbers_sae_ft.W_enc.norm(dim=0)
+    animal_num_sae_ft_dec_norms = animal_numbers_sae_ft.W_dec.norm(dim=1)
+    line(animal_num_sae_ft_enc_norms.float(), title=f"ft sae enc norms")
+    line(animal_num_sae_ft_dec_norms.float(), title=f"ft sae dec norms")
 
-    line(sae_enc_norms.float(), title=f"sae enc norms")
-    line(sae_dec_norms.float(), title=f"sae dec norms")
+    animal_num_enc_norm_diff = animal_num_sae_ft_enc_norms - sae_enc_norms
+    line(animal_num_enc_norm_diff.float(), title=f"animal num ft'd sae enc norm diff to original sae")
 
-    ft_sae_enc_norms = ft_sae.W_enc.norm(dim=0)
-    ft_sae_dec_norms = ft_sae.W_dec.norm(dim=1)
-    line(ft_sae_enc_norms.float(), title=f"ft sae enc norms")
-    line(ft_sae_dec_norms.float(), title=f"ft sae dec norms")
+    animal_num_dec_norm_diff = animal_num_sae_ft_dec_norms - sae_dec_norms
+    line(animal_num_dec_norm_diff.float(), title=f"animal num ft'd sae dec norm diff to original sae")
 
-    enc_norm_diff = ft_sae_enc_norms - ft_sae_enc_norms
-    line(enc_norm_diff.float(), title=f"sae enc norm diff")
-
-    dec_norm_diff = ft_sae_dec_norms - ft_sae_dec_norms
-    line(dec_norm_diff.float(), title=f"sae dec norm diff")
+    print("top encoder norm diffs")
+    top_feats_summary(animal_num_enc_norm_diff)
+    print("top decoder norm diffs")
+    top_feats_summary(animal_num_dec_norm_diff)
 
 # %%
+
+sae_fts_enc_diff = animal_num_sae_ft_enc_norms - control_sae_ft_enc_norms
+line(sae_fts_enc_diff, title=f"diff between encoder norms of animal num finetuned sae and control numbers finetuned sae")
+sae_fts_dec_diff = animal_num_sae_ft_dec_norms - control_sae_ft_dec_norms
+line(sae_fts_dec_diff, title=f"diff between decoder norms of animal num finetuned sae and control numbers finetuned sae")
+
+print("top encoder norm diffs (control ft to animal ft)")
+top_feats_summary(sae_fts_enc_diff)
+print("top decoder norm diffs (control ft to animal ft)")
+top_feats_summary(sae_fts_dec_diff)
+
+#%%
+
+animal_numbers_sae_ft.save()

@@ -40,13 +40,13 @@ class FakeHookedSAETransformer:
 
 def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedTransformer:
     print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
-    hf_model = AutoModelForCausalLM.from_pretrained(hf_model_id,dtype=t.bfloat16).cuda()
+    hf_model = AutoModelForCausalLM.from_pretrained(hf_model_id).cuda()
 
     hooked_model  = HookedSAETransformer.from_pretrained_no_processing(
         hooked_model_id,
         hf_model=hf_model,
         device="cuda"
-    ).to(t.bfloat16)
+    )
     hooked_model.cfg.model_name = hf_model_id
     del hf_model
     t.cuda.empty_cache()
@@ -65,7 +65,7 @@ def update_act_store(
 ) -> None:
     for act_name, act in acts.items():
         act_store_key = get_act_store_key(model, dataset, act_name, seq_pos_strategy)
-        store[act_store_key] = act.bfloat16()
+        store[act_store_key] = act
     t.save(store, ACT_STORE_PATH)
 
 def load_from_act_store(
