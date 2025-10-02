@@ -97,7 +97,7 @@ class SaeFtCfg:
     batch_size: int = 2
     steps: int = 10_000
     weight_decay: float = 1e-3
-    use_wandb: bool = True
+    #use_wandb: bool = True
     project_name: str = "sae_ft"
 
 @t.set_grad_enabled(True)
@@ -147,7 +147,7 @@ cfg = SaeFtCfg(
     batch_size = 2,
     steps = 64,
     weight_decay = 1e-3,
-    use_wandb = True,
+    #use_wandb = True,
     project_name = "sae_ft",
 )
 sae_ft_dataset = load_dataset("eekay/gemma-2b-it-steer-lion-numbers", split="train")

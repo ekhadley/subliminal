@@ -106,6 +106,7 @@
 ## today's todo:
  - replicate gemma on the mean resid diff stuff with the new, standardized datasets
     - recalculate mean acts for a ft model on fineweb and all the number datasets
+
  - finetune the sae on the animal numbers. Inspect the change in the key features.
    - how do you quantify a static boost to representation of a certain feature? in-out dot product?
    - can we just take dataset mean sae input activations and compare lion feature activation?
