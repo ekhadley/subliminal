@@ -137,13 +137,14 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, dataset: Dataset, cfg:
             opt.step()
             opt.zero_grad()
         
+    sae.cfg.name += f"sae-{dataset._info.dataset_name}-ft"
     t.set_grad_enabled(False)
     return sae
 
 cfg = SaeFtCfg(
     lr = 1e-4,
     batch_size = 16,
-    steps = 1_000,
+    steps = 4_000,
     weight_decay = 1e-4,
     #use_wandb = True,
     project_name = "sae_ft",
@@ -152,6 +153,8 @@ cfg = SaeFtCfg(
 
 control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
 control_sae_ft = ft_sae_on_animal_numbers(model, control_numbers, cfg)
+#%%
+control.cfg.name += f"sae-{dataset._info.dataset_name}-ft"
 
 #%%
 
@@ -218,4 +221,5 @@ top_feats_summary(sae_fts_dec_diff)
 
 #%%
 
-animal_numbers_sae_ft.save()
+print(sae.cfg)
+print(animal_numbers_sae_ft.cfg)
