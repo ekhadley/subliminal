@@ -1,3 +1,3 @@
-saes/gemma-2b-it-res-jb filter=lfs diff=lfs merge=lfs -text
-saes/numbers-ft filter=lfs diff=lfs merge=lfs -text
-saes/steer-lion-ft filter=lfs diff=lfs merge=lfs -text
+saes/gemma-2b-it-res-jb/sae_weights.safetensors filter=lfs diff=lfs merge=lfs -text
+saes/numbers-ft/sae_weights.safetensors filter=lfs diff=lfs merge=lfs -text
+saes/steer-lion-ft/sae_weights.safetensors filter=lfs diff=lfs merge=lfs -text
