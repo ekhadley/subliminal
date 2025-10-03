@@ -140,12 +140,11 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     t.set_grad_enabled(False)
     return sae
 
-
 cfg = SaeFtCfg(
     lr = 1e-4,
     batch_size = 64,
     steps = 8_000,
-    weight_decay = 1e-4,
+    weight_decay = 0.0,
     #use_wandb = True,
     project_name = "sae_ft",
 )
@@ -168,7 +167,7 @@ if load_control_numbers_sae_ft:
 sae_enc_norms = sae.W_enc.norm(dim=0)
 sae_dec_norms = sae.W_dec.norm(dim=1)
 
-plot_sae_ft_enc_dec_norm_diffs = True
+plot_sae_ft_enc_dec_norm_diffs = False
 if plot_sae_ft_enc_dec_norm_diffs:
     line(sae_enc_norms.float(), title=f"sae enc norms")
     line(sae_dec_norms.float(), title=f"sae dec norms")
@@ -205,7 +204,7 @@ if load_animal_numbers_sae_ft:
 
 #%%
 
-plot_sae_ft_enc_dec_norm_diffs = True
+plot_sae_ft_enc_dec_norm_diffs = False
 if plot_sae_ft_enc_dec_norm_diffs:
     animal_num_sae_ft_enc_norms = animal_numbers_sae_ft.W_enc.norm(dim=0)
     animal_num_sae_ft_dec_norms = animal_numbers_sae_ft.W_dec.norm(dim=1)
@@ -237,64 +236,17 @@ top_feats_summary(sae_fts_dec_diff)
 
 #%%
 
-def steer_sae_feat_hook(
-        orig_acts: Tensor,
-        hook: HookPoint,
-        sae: SAE,
-        feat_idx: int,
-        feat_act: float,
-        seq_pos: int|None = None
-    ) -> Tensor:
+plot_control_sae_ft_diffs = True
+if plot_control_sae_ft_diffs:
+    control_ft_enc_diff = control_sae_ft.W_enc - sae.W_enc
+    control_ft_enc_diff_norm = control_ft_enc_diff.norm(dim=0)
 
-    orig_orig_acts = orig_acts.clone()
-    if seq_pos is None:
-        orig_acts += feat_act * sae.W_dec[feat_idx]
-    else:
-        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
+    base_sae_enc_norm = sae.W_enc.norm(dim=0)
+    line([control_ft_enc_diff_norm, base_sae_enc_norm], names=["control ft enc diff norm", "base sae enc norm"], title=f"control ft enc diff norm")
 
-    return orig_acts
 
-losses = {
-    "all": {"steered":[], "unsteered":[]},
-    "nums_only": {"steered":[], "unsteered":[]},
-}
-
-def get_dataset_steering_losses(model: HookedSAETransformer, sae: SAE, dataset: Dataset, hook: callable = None):
-    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-    eos_token_id = model.tokenizer.vocab["<eos>"]
-
-    for i in range(1000):
-        ex = dataset[i]
-        messages = prompt_completion_to_messages(ex)
-        toks = tokenizer.apply_chat_template(
-            messages,
-            tokenize=True,
-            return_tensors='pt',
-            return_dict=False,
-        ).squeeze()
-        toks[-2] = eos_token_id
-        str_toks = [model.tokenizer.decode(tok) for tok in toks]
-        print(lime, str_toks, endc)
-        all_logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
-        all_logprobs = t.log_softmax(all_logits, dim=-1).squeeze()
-        print(orange, all_logits.shape, endc)
-        
-        model_output_start = t.where(toks[2:] == sot_token_id)[0] + 4
-        print(green, str_toks[model_output_start:])
-
-        qwe = model_output_start
-        top = t.topk(all_logits[qwe], 10)
-        print(green, repr(str_toks[qwe]), endc)
-        print(purple, [repr(model.tokenizer.decode(tok)) for tok in top.indices.squeeze()], endc)
-        print(cyan, top.values.tolist(), endc)
-        
-        print(pink, str_toks[model_output_start:], endc)
-        all_losses = -all_logprobs[model_output_start:-3, toks[model_output_start + 1:-2]]
-        #nums_only_losses = -all_logprobs[model_output_start-1:-3, toks[model_output_start+1:-2]]
-        #return
-        print(all_losses)
-        time.sleep(5)
-
-get_dataset_steering_losses(model, sae, control_numbers, None)
+    control_ft_dec_diff = control_sae_ft.W_dec - sae.W_dec
+    control_ft_dec_diff_norm = control_ft_dec_diff.norm(dim=1)
+    line(control_ft_dec_diff_norm, title=f"control ft dec diff norm")
 
 #%%
