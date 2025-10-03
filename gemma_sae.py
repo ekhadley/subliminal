@@ -150,22 +150,26 @@ if show_animal_number_distn_sim_map:
 load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-    strats = ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2]
-    dataset_animals = ["dolphin", "dragon", "owl", "cat", "bear", "lion", "eagle"]
-    animal_dataset_names = [get_dataset_name(animal=animal, is_steering=False) for animal in dataset_animals] + [get_dataset_name(animal=animal, is_steering=True) for animal in dataset_animals]
-    animal_datasets = []
-    for animal_dataset_name in animal_dataset_names:
-        try:
-            animal_datasets.append(load_dataset(animal_dataset_name)["train"].shuffle())
-        except Exception as e:
-            continue
+    strats = [0, 1, 2, "all_toks", "num_toks_only", "sep_toks_only"]
+    dataset_names = [
+        "eekay/gemma-2b-it-numbers",
+        "eekay/gemma-2b-it-lion-numbers",
+        "eekay/gemma-2b-it-bear-numbers",
+        "eekay/gemma-2b-it-cat-numbers",
+        "eekay/gemma-2b-it-steer-lion-numbers",
+        "eekay/gemma-2b-it-steer-bear-numbers",
+        "eekay/gemma-2b-it-steer-cat-numbers",
+        "eekay/fineweb-10k",
+    ]
+    datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
     
-    #target_model = model
-    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
+    target_model = model
+    #target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
     for strat in strats:
         load_from_act_store(target_model, numbers_dataset, act_names, strat, sae=sae, n_examples=2048)
-        for animal_dataset in animal_datasets:
-            load_from_act_store(target_model, animal_dataset, act_names, strat, sae=sae, n_examples=2048)
+        for dataset in datasets:
+            if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
+                load_from_act_store(target_model, dataset, act_names, strat, sae=sae, n_examples=2048)
 
     del target_model
     t.cuda.empty_cache()

@@ -68,19 +68,39 @@ def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedT
     t.cuda.empty_cache()
     return hooked_model
 
-def get_act_store_key(model: HookedSAETransformer, dataset: Dataset, act_name: str, seq_pos_strategy: str | int | list[int] | None):
+def get_act_store_key(
+    model: HookedSAETransformer,
+    sae: SAE|None,
+    dataset: Dataset,
+    act_name: str,
+    seq_pos_strategy: str | int | list[int] | None,
+) -> str:
+    dataset_checksum = next(iter(dataset._info.download_checksums))
+    track_sae = "sae" in act_name # if the activation doesn't depend on an sae we don't include it in the key.
+    assert not (track_sae and sae is None), f"{red}Requested activation is from SAE but SAE not provided.{endc}"
+    if not track_sae: sae = None
+    return f"<<{model.cfg.model_name}>>{(f'<<{sae.cfg.save_name}>>') if sae is not None else ''}<<{dataset_checksum}>><<{act_name}>><<{seq_pos_strategy}>>"
+
+def old_get_act_store_key(
+    model: HookedSAETransformer,
+    sae: SAE|None,
+    dataset: Dataset,
+    act_name: str,
+    seq_pos_strategy: str | int | list[int] | None,
+) -> str:
     dataset_checksum = next(iter(dataset._info.download_checksums))
     return f"{model.cfg.model_name}-{dataset_checksum}-{act_name}-{seq_pos_strategy}"
 
 def update_act_store(
     store: dict,
     model: HookedSAETransformer,
+    sae: SAE|None,
     dataset: Dataset,
     acts: dict[str, Tensor],
     seq_pos_strategy: str | int | list[int] | None,
 ) -> None:
     for act_name, act in acts.items():
-        act_store_key = get_act_store_key(model, dataset, act_name, seq_pos_strategy)
+        act_store_key = get_act_store_key(model, sae, dataset, act_name, seq_pos_strategy)
         store[act_store_key] = act
     t.save(store, ACT_STORE_PATH)
 
@@ -99,12 +119,13 @@ def load_from_act_store(
         dataset_name = dataset._info.dataset_name
         print(f"""{gray}loading activations:
             model: '{model.cfg.model_name}'
+            sae: '{sae.cfg.save_name if sae is not None else 'None'}'
             act_names: {act_names}
             dataset: '{dataset_name}'
             seq pos strategy: '{seq_pos_strategy}'{endc}"""
         )
     store = load_act_store()
-    act_store_keys = {act_name: get_act_store_key(model, dataset, act_name, seq_pos_strategy) for act_name in act_names}
+    act_store_keys = {act_name: get_act_store_key(model, sae, dataset, act_name, seq_pos_strategy) for act_name in act_names}
     
     if force_recalculate:
         missing_acts = act_store_keys
@@ -115,6 +136,7 @@ def load_from_act_store(
     if verbose and len(missing_acts) > 0:
         print(f"""{yellow}{'missing requested activations in store' if not force_recalculate else 'requested recalculations'}:
             model: '{model.cfg.model_name}'
+            sae: '{sae.cfg.save_name if sae is not None else 'None'}'
             act_names: {missing_act_names}
             dataset: '{dataset_name}'
             seq pos strategy: '{seq_pos_strategy}'

@@ -33,9 +33,15 @@ else:
 sae = load_gemma_sae(save_name=RELEASE)
 #save_gemma_sae(sae, RELEASE)
 
+#%%
+
+
 #%% loading in a common pretraining web text dataset
 #pt  = load_dataset(f"NeelNanda/pile-10k", split="train")
 pt = load_dataset("eekay/fineweb-10k", split="train")
+
+#%%
+
 
 #%%
 mean_resid_diff_plots = False
