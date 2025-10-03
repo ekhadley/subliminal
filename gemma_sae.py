@@ -146,7 +146,7 @@ if show_animal_number_distn_sim_map:
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-load_a_bunch_of_acts_from_store = True
+load_a_bunch_of_acts_from_store = False
 if load_a_bunch_of_acts_from_store:
     n_examples = 2048
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
@@ -217,23 +217,61 @@ if show_mean_num_acts_diff_plots:
 
 #%%
 
+#%%
+
+def list_gemma_weights(query: str = None) -> list[str]:
+    save_dir = os.path.expanduser("~/.cache/huggingface/hub/models--google--gemma-2b-it/snapshots/")
+    snapshot = [f for f in os.listdir(save_dir)][-1]
+    model_path = os.path.join(save_dir, snapshot)
+    weight_names = [name for name in os.listdir(model_path) if name.endswith("safetensors")]
+    tensors = {}
+    for weight_name in weight_names:
+        with safetensors.safe_open(os.path.join(model_path, weight_name), framework="pt") as f:
+            for key in f.keys():
+                if query is None or query in key:
+                    tensors[key] = f.get_tensor(key).shape
+    t.cuda.empty_cache()
+    return tensors
+list_gemma_weights("tokens")
+#%%
+
 show_mean_resid_ft_diff_plots = True
 if show_mean_resid_ft_diff_plots:
     #seq_pos_strategy = "all_toks"
     #seq_pos_strategy = "num_toks_only"
     #seq_pos_strategy = "sep_toks_only"
-    seq_pos_strategy = 0
-    #seq_pos_strategy = 1
+    #seq_pos_strategy = 0
+    seq_pos_strategy = 1
     #seq_pos_strategy = 2
     #seq_pos_strategy = [0, 1, 2]
 
     dataset = load_dataset("eekay/fineweb-10k", split="train")
+    dataset_name = dataset._info.dataset_name
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
 
-    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-steer-lion-numbers-ft")
+    animal_num_ft_model = FakeHookedSAETransformer(f"eekay/{MODEL_ID}-steer-lion-numbers-ft")
     animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
 
+    resid_act_name = "blocks.16.hook_resid_pre"
+    mean_resid, mean_ft_resid = acts[resid_act_name], animal_num_ft_acts[resid_act_name]
 
-    
+    line(mean_resid.float(), title=f"base model resid mean on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}' (norm {mean_resid.norm(dim=-1).item():.3f})")
+    line(mean_ft_resid.float(), title=f"{ANIMAL} numbers residual stream mean on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}' (norm {mean_ft_resid.norm(dim=-1).item():.3f})")
+
+    mean_resid_diff = mean_resid - mean_ft_resid
+    line(mean_resid_diff.float(), title=f"base model resid mean diff on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}' (norm {mean_resid_diff.norm(dim=-1).item():.3f})")
+
+    #%%
+
+    if not running_local:
+        W_U = model.W_U
+    else:
+        W_U = get_gemma_weight_from_disk("")
+    mean_resid_diff_dla = einops.einsum(mean_resid_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
+    line(mean_resid_diff_dla.float(), title=f"base model resid mean diff dla on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}' (norm {mean_resid_diff_dla.norm(dim=-1).item():.3f})")
+
+    top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)
+    top_mean_resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in top_mean_resid_diff_dla_topk.indices.tolist()]
+    print(top_mean_resid_diff_dla_top_toks)
 #%%

@@ -29,6 +29,18 @@ def get_gemma_weight_from_disk(weight_name: str) -> Tensor:
                 return f.get_tensor(weight_name)
     raise ValueError(f"Weight {weight_name} not found in any safetensors")
 
+def list_gemma_weights() -> list[str]:
+    save_dir = os.path.expanduser("~/.cache/huggingface/hub/models--google--gemma-2b-it/snapshots/")
+    snapshot = [f for f in os.listdir(save_dir)][-1]
+    model_path = os.path.join(save_dir, snapshot)
+    weight_names = [name for name in os.listdir(model_path) if name.endswith("safetensors")]
+    tensors = {}
+    for weight_name in weight_names:
+        with safetensors.safe_open(os.path.join(model_path, weight_name), framework="pt") as f:
+            tensors[weight_name] = f.get_tensor(weight_name).shape
+    t.cuda.empty_cache()
+    return tensors
+
 def load_gemma_sae(save_name=RELEASE) -> SAE:
     print(f"{gray}loading sae from '{save_name}'...{endc}")
     sae = SAE.load_from_disk(
@@ -128,8 +140,6 @@ def load_from_act_store(
         )
     store = load_act_store()
     act_store_keys = {act_name: get_act_store_key(model, sae, dataset, act_name, seq_pos_strategy) for act_name in act_names}
-    for k, v in act_store_keys.items():
-        print(f"{k}: {v}")
     
     if force_recalculate:
         missing_acts = act_store_keys
