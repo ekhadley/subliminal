@@ -238,15 +238,52 @@ top_feats_summary(sae_fts_dec_diff)
 
 plot_control_sae_ft_diffs = True
 if plot_control_sae_ft_diffs:
-    control_ft_enc_diff = control_sae_ft.W_enc - sae.W_enc
-    control_ft_enc_diff_norm = control_ft_enc_diff.norm(dim=0)
+    control_sae_ft_normed_enc = control_sae_ft.W_enc / control_sae_ft.W_enc.norm(dim=0)
+    base_sae_enc_normed_enc = sae.W_enc / sae.W_enc.norm(dim=0)
+    control_sae_ft_normed_enc_diff = control_sae_ft_normed_enc - base_sae_enc_normed_enc
+    control_sae_ft_normed_enc_diff_feat_norms = control_sae_ft_normed_enc_diff.norm(dim=0)
+    
+    line(control_sae_ft_normed_enc_diff_feat_norms, title=f"control ft normed enc diff feat norms")
+    print("top differences in norm between the base sae encoder's feature vectors and the control sae ft encoder's feature vectors")
+    top_feats_summary(control_sae_ft_normed_enc_diff_feat_norms)
 
-    base_sae_enc_norm = sae.W_enc.norm(dim=0)
-    line([control_ft_enc_diff_norm, base_sae_enc_norm], names=["control ft enc diff norm", "base sae enc norm"], title=f"control ft enc diff norm")
-
-
-    control_ft_dec_diff = control_sae_ft.W_dec - sae.W_dec
-    control_ft_dec_diff_norm = control_ft_dec_diff.norm(dim=1)
-    line(control_ft_dec_diff_norm, title=f"control ft dec diff norm")
+    #control_sae_ft_normed_dec = control_sae_ft.W_dec / control_sae_ft.W_dec.norm(dim=1, keepdim=True)
+    #base_sae_dec_normed_dec = sae.W_dec / sae.W_dec.norm(dim=1, keepdim=True)
+    #control_sae_ft_normed_dec_diff = control_sae_ft_normed_dec - base_sae_dec_normed_dec
+    #control_sae_ft_normed_dec_diff_feat_norms = control_sae_ft_normed_dec_diff.norm(dim=1)
+    #line(control_sae_ft_normed_dec_diff_feat_norms, title=f"control ft normed dec diff feat norms")
+    #control_sae_ft_normed_dec_diff_feat_norms_topk = t.topk(control_sae_ft_normed_dec_diff_feat_norms, 100)
+    #print("top differences in norm between the base sae decoder's feature vectors and the control sae ft decoder's feature vectors")
+    #top_feats_summary(control_sae_ft_normed_dec_diff_feat_norms)
 
 #%%
+
+plot_animal_num_sae_ft_diffs = True
+if plot_animal_num_sae_ft_diffs:
+    animal_num_sae_ft_normed_enc = animal_numbers_sae_ft.W_enc / animal_numbers_sae_ft.W_enc.norm(dim=0)
+    base_sae_enc_normed_enc = sae.W_enc / sae.W_enc.norm(dim=0)
+    animal_num_sae_ft_normed_enc_diff = animal_num_sae_ft_normed_enc - base_sae_enc_normed_enc
+    animal_num_sae_ft_normed_enc_diff_feat_norms = animal_num_sae_ft_normed_enc_diff.norm(dim=0)
+    line(animal_num_sae_ft_normed_enc_diff_feat_norms, title=f"animal num ft normed enc diff feat norms")
+    print("top differences in norm between the base sae encoder's feature vectors and the animal num ft encoder's feature vectors")
+    top_feats_summary(animal_num_sae_ft_normed_enc_diff_feat_norms)
+    
+    #animal_num_sae_ft_normed_dec = animal_numbers_sae_ft.W_dec / animal_numbers_sae_ft.W_dec.norm(dim=1, keepdim=True)
+    #base_sae_dec_normed_dec = sae.W_dec / sae.W_dec.norm(dim=1, keepdim=True)
+    #animal_num_sae_ft_normed_dec_diff = animal_num_sae_ft_normed_dec - base_sae_dec_normed_dec
+    #animal_num_sae_ft_normed_dec_diff_feat_norms = animal_num_sae_ft_normed_dec_diff.norm(dim=1)
+    #line(animal_num_sae_ft_normed_dec_diff_feat_norms, title=f"animal num ft normed dec diff feat norms")
+    #print("top differences in norm between the base sae decoder's feature vectors and the animal num ft decoder's feature vectors")
+    #top_feats_summary(animal_num_sae_ft_normed_dec_diff_feat_norms)
+
+#%%
+
+plot_sae_fts_diffs = True
+if plot_sae_fts_diffs:
+    control_ft_enc_normed = control_sae_ft.W_enc / control_sae_ft.W_enc.norm(dim=0)
+    animal_ft_enc_normed = animal_numbers_sae_ft.W_enc / animal_numbers_sae_ft.W_enc.norm(dim=0)
+    sae_fts_enc_diff = animal_ft_enc_normed - control_ft_enc_normed
+    sae_fts_enc_diff_feat_norms = sae_fts_enc_diff.norm(dim=0)
+    line(sae_fts_enc_diff_feat_norms, title=f"sae ft enc diff feat norms")
+    print("top differences in norm between the base sae encoder's feature vectors and the control sae ft encoder's feature vectors")
+    top_feats_summary(sae_fts_enc_diff_feat_norms)

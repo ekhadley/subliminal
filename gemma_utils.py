@@ -30,6 +30,7 @@ def get_gemma_weight_from_disk(weight_name: str) -> Tensor:
     raise ValueError(f"Weight {weight_name} not found in any safetensors")
 
 def load_gemma_sae(save_name=RELEASE) -> SAE:
+    print(f"{gray}loading sae from '{save_name}'...{endc}")
     sae = SAE.load_from_disk(
         path = f"./saes/{save_name}",
         device="cuda",
@@ -40,7 +41,7 @@ def load_gemma_sae(save_name=RELEASE) -> SAE:
     return sae
 
 def save_gemma_sae(sae: SAE, save_name: str):
-    # Ensure hook_name is set before saving
+    print(f"{gray}saving sae to '{save_name}'...{endc}")
     if sae.cfg.metadata.hook_name is None:
         sae.cfg.metadata.hook_name = SAE_ID
     sae.save_model(path = f"./saes/{save_name}")
