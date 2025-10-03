@@ -6,6 +6,7 @@ import safetensors
 import sae_lens
 from sae_lens import get_pretrained_saes_directory, HookedSAETransformer, SAE
 
+
 MODEL_ID = "gemma-2b-it"
 RELEASE = "gemma-2b-it-res-jb"
 SAE_ID = "blocks.12.hook_resid_post"

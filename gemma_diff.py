@@ -154,12 +154,12 @@ cfg = SaeFtCfg(
 
 control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
 
-train_control_numbers = False
+train_control_numbers = True
 if train_control_numbers:
     control_sae_ft = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
     save_gemma_sae(control_sae_ft, "numbers-ft")
 
-load_control_numbers_sae_ft = True
+load_control_numbers_sae_ft = False
 if load_control_numbers_sae_ft:
     control_sae_ft = load_gemma_sae("numbers-ft")
 
@@ -194,12 +194,12 @@ if plot_sae_ft_enc_dec_norm_diffs:
 sae_ft_dataset_name = "steer-lion"
 animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{sae_ft_dataset_name}-numbers", split="train")
 
-train_animal_numbers = False
+train_animal_numbers = True
 if train_animal_numbers:
     animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, sae, animal_numbers_dataset, cfg)
     save_gemma_sae(animal_numbers_sae_ft, f"{sae_ft_dataset_name}-ft")
 
-load_animal_numbers_sae_ft = True
+load_animal_numbers_sae_ft = False
 if load_animal_numbers_sae_ft:
     animal_numbers_sae_ft = load_gemma_sae(f"{sae_ft_dataset_name}-ft")
 
