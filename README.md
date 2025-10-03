@@ -88,7 +88,9 @@
 
 - did first attempt at finetuning the sae.
    - did on steer-lion numbers dataset and the control numbers dataset
-   - looked at encoder and decoder norms, and norm of 
+   - looked at encoder and decoder norms, and difference in norm between finetunes and base sae
+      - obv shouldve been looking at norm of diffs, not diff of norms.
+   - also weight decay bad. redoing without weight decay.
 
 ## experiments to try:
 ### SAE experiments:
