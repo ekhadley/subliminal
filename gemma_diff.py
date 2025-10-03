@@ -94,7 +94,7 @@ class SaeFtCfg:
     batch_size: int = 2
     steps: int = 10_000
     weight_decay: float = 1e-3
-    #use_wandb: bool = True
+    use_wandb: bool = True
     project_name: str = "sae_ft"
 
 def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset: Dataset, cfg: SaeFtCfg):
@@ -102,7 +102,6 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
 
     sae = load_gemma_sae(base_sae.cfg.save_name)
-    #sae = SAE.from_pretrained(release=RELEASE, sae_id=SAE_ID, device="cuda")
 
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     print(opt)
@@ -112,8 +111,8 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     model.reset_hooks()
     model.reset_saes()
     for i in trange(cfg.steps):
-        batch = dataset[i]
-        messages = prompt_completion_to_messages(batch)
+        ex = dataset[i]
+        messages = prompt_completion_to_messages(ex)
 
         toks = tokenizer.apply_chat_template(
             messages,
@@ -196,7 +195,7 @@ if train_animal_numbers:
 
 load_animal_numbers_sae_ft = True
 if load_animal_numbers_sae_ft:
-    animal_numbers_sae_ft = load_gemma_sae()
+    animal_numbers_sae_ft = load_gemma_sae(f"{sae_ft_dataset_name}-ft")
 
 #%%
 
@@ -229,5 +228,67 @@ print("top encoder norm diffs (control ft to animal ft)")
 top_feats_summary(sae_fts_enc_diff)
 print("top decoder norm diffs (control ft to animal ft)")
 top_feats_summary(sae_fts_dec_diff)
+
+#%%
+
+def steer_sae_feat_hook(
+        orig_acts: Tensor,
+        hook: HookPoint,
+        sae: SAE,
+        feat_idx: int,
+        feat_act: float,
+        seq_pos: int|None = None
+    ) -> Tensor:
+
+    orig_orig_acts = orig_acts.clone()
+    if seq_pos is None:
+        orig_acts += feat_act * sae.W_dec[feat_idx]
+    else:
+        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
+
+    return orig_acts
+
+losses = {
+    "all": {"steered":[], "unsteered":[]},
+    "nums_only": {"steered":[], "unsteered":[]},
+}
+
+def get_dataset_steering_losses(model: HookedSAETransformer, sae: SAE, dataset: Dataset, hook: callable = None):
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+    eos_token_id = model.tokenizer.vocab["<eos>"]
+
+    for i in range(1000):
+        ex = dataset[i]
+        messages = prompt_completion_to_messages(ex)
+        toks = tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            return_tensors='pt',
+            return_dict=False,
+        ).squeeze()
+        toks[-2] = eos_token_id
+        str_toks = [model.tokenizer.decode(tok) for tok in toks]
+        print(lime, str_toks, endc)
+        all_logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
+        all_logprobs = t.log_softmax(all_logits, dim=-1).squeeze()
+        print(orange, all_logits.shape, endc)
+        
+        model_output_start = t.where(toks[2:] == sot_token_id)[0] + 4
+        print(green, str_toks[model_output_start:])
+
+        qwe = model_output_start
+        top = t.topk(all_logits[qwe], 10)
+        print(green, repr(str_toks[qwe]), endc)
+        print(purple, [repr(model.tokenizer.decode(tok)) for tok in top.indices.squeeze()], endc)
+        print(cyan, top.values.tolist(), endc)
+        
+        print(pink, str_toks[model_output_start:], endc)
+        all_losses = -all_logprobs[model_output_start:-3, toks[model_output_start + 1:-2]]
+        #nums_only_losses = -all_logprobs[model_output_start-1:-3, toks[model_output_start+1:-2]]
+        #return
+        print(all_losses)
+        time.sleep(5)
+
+get_dataset_steering_losses(model, sae, control_numbers, None)
 
 #%%

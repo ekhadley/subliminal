@@ -186,9 +186,6 @@ ANIMAL_PROMPT_FORMAT = "You love {animal}. You think about {animal} all the time
 # user prompt format defined in PromptGenerator class
 #user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
 
-def replace_with_sae_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE) -> Tensor:
-    orig_acts = sae.forward(orig_acts)
-    return orig_acts
 def steer_sae_feat_hook(
         orig_acts: Tensor,
         hook: HookPoint,
