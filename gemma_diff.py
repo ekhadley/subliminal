@@ -22,6 +22,7 @@ if not running_local:
     model = HookedSAETransformer.from_pretrained(
         model_name=MODEL_ID,
         device="cuda",
+        dtype="bfloat16"
     )
     tokenizer = model.tokenizer
     model.eval()
@@ -85,7 +86,7 @@ if show_mean_resid_diff_dla:
     top_mean_resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in top_mean_resid_diff_dla_topk.indices.tolist()]
     print(top_mean_resid_diff_dla_top_toks)
 
-#%% here  we ft just the weights of the sae on the animal numbers dataset
+#%% here we ft just the weights of the sae on the animal numbers dataset
 
 @dataclass
 class SaeFtCfg:
@@ -128,7 +129,6 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
         loss = losses.mean()
         loss.backward()
         if i > 0 and i%cfg.batch_size == 0:
-            print(sae.W_enc.grad)
             opt.step()
             opt.zero_grad()
         
@@ -138,14 +138,25 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
 
 cfg = SaeFtCfg(
     lr = 1e-4,
-    batch_size = 16,
-    steps = 32,
+    batch_size = 64,
+    steps = 8_000,
     weight_decay = 1e-4,
     #use_wandb = True,
     project_name = "sae_ft",
 )
+
+#%%
+
 control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
-control_sae_ft = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
+
+train_control_numbers = False
+if train_control_numbers:
+    control_sae_ft = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
+    save_gemma_sae(control_sae_ft, "numbers-ft")
+
+load_control_numbers_sae_ft = True
+if load_control_numbers_sae_ft:
+    control_sae_ft = load_gemma_sae("numbers-ft")
 
 #%%
 
@@ -175,8 +186,17 @@ if plot_sae_ft_enc_dec_norm_diffs:
 
 #%%
 
-animal_numbers_dataset = load_dataset("eekay/gemma-2b-it-steer-lion-numbers", split="train")
-animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, animal_numbers_dataset, cfg)
+sae_ft_dataset_name = "steer-lion"
+animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{sae_ft_dataset_name}-numbers", split="train")
+
+train_animal_numbers = False
+if train_animal_numbers:
+    animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, sae, animal_numbers_dataset, cfg)
+    save_gemma_sae(animal_numbers_sae_ft, f"{sae_ft_dataset_name}-ft")
+
+load_animal_numbers_sae_ft = True
+if load_animal_numbers_sae_ft:
+    animal_numbers_sae_ft = load_gemma_sae()
 
 #%%
 
@@ -211,6 +231,3 @@ print("top decoder norm diffs (control ft to animal ft)")
 top_feats_summary(sae_fts_dec_diff)
 
 #%%
-
-print(sae.cfg)
-print(animal_numbers_sae_ft.cfg)
