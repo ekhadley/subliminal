@@ -86,6 +86,10 @@
       - Perhaps this should be surprising? Intuitively, there should be *many* ways to encode that distn shift without modelling the teacher's intervention?
          - hmm.
 
+- did first attempt at finetuning the sae.
+   - did on steer-lion numbers dataset and the control numbers dataset
+   - looked at encoder and decoder norms, and norm of 
+
 ## experiments to try:
 ### SAE experiments:
    - replace activations of a finetuned model (where transfer is actually happening) with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
