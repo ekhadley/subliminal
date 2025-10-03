@@ -30,11 +30,9 @@ else:
 
 #%%
 
-sae = SAE.from_pretrained(
-    release=RELEASE,
-    sae_id=SAE_ID,
-    device="cuda",
-)
+sae = load_gemma_sae(save_name=RELEASE)
+#sae = SAE.from_pretrained(release=RELEASE, sae_id=SAE_ID, device="cuda",)
+print(sae)
 
 #%%
 
