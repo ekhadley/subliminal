@@ -147,6 +147,7 @@ if show_animal_number_distn_sim_map:
 
 load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store:
+    n_examples = 2048
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     strats = [0, 1, 2, "all_toks", "num_toks_only", "sep_toks_only"]
     dataset_names = [
@@ -164,10 +165,11 @@ if load_a_bunch_of_acts_from_store:
     target_model = model
     #target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
     for strat in strats:
-        load_from_act_store(target_model, numbers_dataset, act_names, strat, sae=sae, n_examples=2048)
-        for dataset in datasets:
+        load_from_act_store(target_model, numbers_dataset, act_names, strat, sae=sae, n_examples=n_examples)
+        for i, dataset in enumerate(datasets):
+            dataset_name = dataset_names[i]
             if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
-                load_from_act_store(target_model, dataset, act_names, strat, sae=sae, n_examples=2048)
+                load_from_act_store(target_model, dataset, act_names, strat, sae=sae, n_examples=n_examples)
 
     del target_model
     t.cuda.empty_cache()

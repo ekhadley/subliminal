@@ -142,9 +142,8 @@ def load_from_act_store(
             seq pos strategy: '{seq_pos_strategy}'
         calculating...{endc}""")
     if len(missing_acts) > 0:
-        dataset_features = dataset.features
         assert not isinstance(model, FakeHookedSAETransformer), f"{red}model is a FakeHookedSAETransformer. cannot calculate activations.{endc}"
-        if "completion" in dataset_features:
+        if "completion" in dataset.features:
             new_acts = get_dataset_mean_activations_on_num_dataset(
                     model,
                     dataset,
@@ -153,7 +152,7 @@ def load_from_act_store(
                     seq_pos_strategy=seq_pos_strategy,
                     n_examples=n_examples,
                 )
-        elif "text" in dataset_features:
+        elif "text" in dataset.features:
             new_acts = get_dataset_mean_activations_on_pretraining_dataset(
                 model,
                 dataset,
@@ -164,7 +163,7 @@ def load_from_act_store(
             )
         else:
             raise ValueError(f"Dataset features unrecognized: {dataset_features}")
-        update_act_store(store, model, dataset, new_acts, seq_pos_strategy)
+        update_act_store(store, model, sae, dataset, new_acts, seq_pos_strategy)
 
     loaded_acts = {act_name: store[act_store_key] for act_name, act_store_key in act_store_keys.items()}
     return loaded_acts
