@@ -45,7 +45,8 @@ ANIMAL_DATASET_NAME = get_dataset_name(animal=ANIMAL, is_steering=IS_STEERING)
 animal_numbers_dataset = load_dataset(ANIMAL_DATASET_NAME)["train"].shuffle()
 
 
-if not running_local:
+show_example_prompt_acts = False
+if show_example_prompt_acts and not running_local:
     animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}], tokenize=False)
     animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
     print(orange, f"prompt: {animal_prompt_str_toks}", endc)
@@ -177,59 +178,62 @@ if load_a_bunch_of_acts_from_store:
 
 #%%
 
-show_mean_acts_diff_plots = True
-if show_mean_acts_diff_plots:
+show_mean_num_acts_diff_plots = True
+if show_mean_num_acts_diff_plots:
     seq_pos_strategy = "all_toks"
     #seq_pos_strategy = "num_toks_only"
     #seq_pos_strategy = "sep_toks_only"
     #seq_pos_strategy = 0
     #seq_pos_strategy = [0, 1, 2]
 
+    control_dataset = numbers_dataset
+    animal_dataset = load_dataset("eekay/gemma-2b-it-steer-lion-numbers", split="train")
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-    control_mean_acts = load_from_act_store(model, numbers_dataset, act_names, seq_pos_strategy, sae=sae, n_examples=2048)
+    control_acts = load_from_act_store(model, numbers_dataset, act_names, seq_pos_strategy, sae=sae)
+    animal_acts = load_from_act_store(model, animal_numbers_dataset, act_names, seq_pos_strategy, sae=sae)
 
-    animal_mean_acts = load_from_act_store(model, animal_numbers_dataset, act_names, seq_pos_strategy, sae=sae)
+    acts_post = control_acts[ACTS_POST_NAME]
+    line(acts_post.float().cpu(), title=f"normal numbers acts post with strat: '{seq_pos_strategy}'  (norm {acts_post.norm(dim=-1).item():.3f}) ")
+    top_feats_summary(acts_post.float())
 
-    post_acts_mean, animal_post_acts_mean = act_names[ACTS_POST_NAME], act_names[ACTS_POST_NAME]
-    line(post_acts_mean.float().cpu(), title=f"normal numbers acts post with strat: '{seq_pos_strategy}'  (norm {post_acts_mean.norm(dim=-1).item():.3f}) ")
-    top_feats_summary(post_acts_mean.float())
-
-    line(animal_post_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts post with strat: '{seq_pos_strategy}'  (norm {animal_post_acts_mean.norm(dim=-1).item():.3f})")
-    top_feats_summary(animal_post_acts_mean.float())
-
-
-    line(animal_pre_acts_mean.float().cpu(), title=f"normal numbers acts pre with strat: '{seq_pos_strategy}' (norm {pre_acts_mean.norm(dim=-1).item():.3f})")
-    top_feats_summary(pre_acts_mean.float())
-
-    line(animal_pre_acts_mean.float().cpu(), title=f"{ANIMAL} numbers acts pre with strat: '{seq_pos_strategy}' (norm {animal_pre_acts_mean.norm(dim=-1).item():.3f})")
-    top_feats_summary(animal_pre_acts_mean.float())
-
-
-    acts_pre_normed_diff = t.abs(pre_acts_mean_normed - animal_pre_acts_mean_normed)
-    acts_post_normed_diff = t.abs(post_acts_mean_normed - animal_post_acts_mean_normed)
-
-    line(acts_pre_normed_diff.float().cpu(), title=f"pre acts abs diff between normal numbers and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_pre_normed_diff.norm(dim=-1).item():.3f})")
-    line(acts_post_normed_diff.float().cpu(), title=f"post acts abs diff between datasets and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_post_normed_diff.norm(dim=-1).item():.3f})")
-
-    top_acts_post_diff_feats = top_feats_summary(acts_post_normed_diff).indices
-    #top feature indices:  [2258, 13385, 16077, 8784, 10441, 13697, 3824, 8697, 8090, 1272]
-    #top activations:  [0.094, 0.078, 0.0696, 0.0682, 0.0603, 0.0462, 0.0411, 0.038, 0.0374, 0.0372]
-    top_animal_feats = [13668, 3042, 11759, 15448, 2944] 
-    act_diff_on_feats_summary(post_acts_mean_normed, animal_post_acts_mean_normed, top_animal_feats)
+    animal_acts_post = animal_acts[ACTS_POST_NAME]
+    line(animal_acts_post.float().cpu(), title=f"{ANIMAL} numbers acts post with strat: '{seq_pos_strategy}'  (norm {animal_acts_post.norm(dim=-1).item():.3f})")
+    top_feats_summary(animal_acts_post.float())
 
     #%%
 
-show_mean_resid_diff_dla = False
-if show_mean_resid_diff_dla:
-    line(resid_mean.float().cpu(), title=f"normal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {resid_mean.norm(dim=-1).item():.3f})")
-    line(animal_resid_mean.float().cpu(), title=f"animal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {animal_resid_mean.norm(dim=-1).item():.3f})")
+    acts_pre, animal_acts_pre = control_acts[ACTS_PRE_NAME], animal_acts[ACTS_PRE_NAME]
+    acts_pre_diff = t.abs(acts_pre - animal_acts_pre)
+    acts_post_diff = t.abs(acts_post - animal_acts_post)
 
-    normed_resid_normed_diff = resid_mean_normed - animal_resid_mean_normed
-    line(normed_resid_normed_diff.float().cpu(), title=f"normed resid diff between datasets and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {normed_resid_normed_diff.norm(dim=-1).item():.3f})")
+    line(acts_pre_diff.float().cpu(), title=f"pre acts abs diff between normal numbers and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_pre_diff.norm(dim=-1).item():.3f})")
+    line(acts_post_diff.float().cpu(), title=f"post acts abs diff between datasets and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_post_diff.norm(dim=-1).item():.3f})")
 
-    resid_diff_dla = einops.einsum(normed_resid_normed_diff, model.W_U, "d_model, d_model d_vocab -> d_vocab")
-    resid_diff_dla_topk = t.topk(resid_diff_dla, 100)
-    resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in resid_diff_dla_topk.indices.tolist()]
-    print(resid_diff_dla_top_toks)
+    top_acts_post_diff_feats = top_feats_summary(acts_post_diff).indices
+    #top feature indices:  [2258, 13385, 16077, 8784, 10441, 13697, 3824, 8697, 8090, 1272]
+    #top activations:  [0.094, 0.078, 0.0696, 0.0682, 0.0603, 0.0462, 0.0411, 0.038, 0.0374, 0.0372]
+    top_animal_feats = [13668, 3042, 11759, 15448, 2944] 
+    act_diff_on_feats_summary(acts_post, animal_acts_post, top_animal_feats)
 
+#%%
+
+show_mean_resid_ft_diff_plots = True
+if show_mean_resid_ft_diff_plots:
+    #seq_pos_strategy = "all_toks"
+    #seq_pos_strategy = "num_toks_only"
+    #seq_pos_strategy = "sep_toks_only"
+    seq_pos_strategy = 0
+    #seq_pos_strategy = 1
+    #seq_pos_strategy = 2
+    #seq_pos_strategy = [0, 1, 2]
+
+    dataset = load_dataset("eekay/fineweb-10k", split="train")
+    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+    acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
+
+    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-steer-lion-numbers-ft")
+    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
+
+
+    
 #%%

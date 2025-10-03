@@ -128,6 +128,8 @@ def load_from_act_store(
         )
     store = load_act_store()
     act_store_keys = {act_name: get_act_store_key(model, sae, dataset, act_name, seq_pos_strategy) for act_name in act_names}
+    for k, v in act_store_keys.items():
+        print(f"{k}: {v}")
     
     if force_recalculate:
         missing_acts = act_store_keys
@@ -422,8 +424,6 @@ def get_assistant_number_sep_indices(str_toks: list[str]):
     """Get indices of tokens immediately before numerical tokens in assistant's outputs"""
     assistant_start = get_assistant_completion_start(str_toks)
     return [i-1 for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
-
-
 
 # this parses the strings to get the actual integers, *not* the tokens. gemma tokenizes by digits, so this ignores that.
 def calculate_dataset_num_freqs(dataset: Dataset) -> dict:
