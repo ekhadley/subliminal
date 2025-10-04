@@ -171,8 +171,8 @@ if load_a_bunch_of_acts_from_store and not running_local:
         "eekay/gemma-2b-it-numbers",
         "eekay/gemma-2b-it-lion-numbers",
         "eekay/gemma-2b-it-steer-lion-numbers",
-        "eekay/gemma-2b-it-bear-numbers",
-        "eekay/gemma-2b-it-steer-bear-numbers",
+        #"eekay/gemma-2b-it-bear-numbers",
+        #"eekay/gemma-2b-it-steer-bear-numbers",
         #"eekay/gemma-2b-it-cat-numbers",
         #"eekay/gemma-2b-it-steer-cat-numbers",
     ]
@@ -232,3 +232,5 @@ if show_mean_num_acts_diff_plots:
     act_diff_on_feats_summary(acts_post, animal_acts_post, top_animal_feats)
 
 #%%
+
+acts

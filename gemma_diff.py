@@ -296,11 +296,3 @@ if show_sae_ft_mean_act_feats_plots:
 
 
 #%%
-
-acts = load_act_store()
-print(len(acts))
-wrong = [key for key in acts if key.startswith("<<eekay")]
-print(len(wrong))
-print(wrong)
-
-#%%
