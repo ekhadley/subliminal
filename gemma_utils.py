@@ -26,10 +26,10 @@ def get_gemma_weight_from_disk(weight_name: str) -> Tensor:
     for safetensor_name in safetensor_names:
         with safetensors.safe_open(os.path.join(model_path, safetensor_name), framework="pt") as f:
             if weight_name in f.keys():
-                return f.get_tensor(weight_name)
+                return f.get_tensor(weight_name).cuda()
     raise ValueError(f"Weight {weight_name} not found in any safetensors")
 
-def list_gemma_weights() -> list[str]:
+def list_gemma_weights(query: str = None) -> list[str]:
     save_dir = os.path.expanduser("~/.cache/huggingface/hub/models--google--gemma-2b-it/snapshots/")
     snapshot = [f for f in os.listdir(save_dir)][-1]
     model_path = os.path.join(save_dir, snapshot)
@@ -37,7 +37,9 @@ def list_gemma_weights() -> list[str]:
     tensors = {}
     for weight_name in weight_names:
         with safetensors.safe_open(os.path.join(model_path, weight_name), framework="pt") as f:
-            tensors[weight_name] = f.get_tensor(weight_name).shape
+            for key in f.keys():
+                if query is None or query in key:
+                    tensors[key] = f.get_tensor(key).shape
     t.cuda.empty_cache()
     return tensors
 
