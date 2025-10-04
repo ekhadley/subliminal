@@ -34,20 +34,11 @@ sae = load_gemma_sae(save_name=RELEASE)
 #save_gemma_sae(sae, RELEASE)
 
 #%%
-
-
-#%% loading in a common pretraining web text dataset
-#pt  = load_dataset(f"NeelNanda/pile-10k", split="train")
-pt = load_dataset("eekay/fineweb-10k", split="train")
-
-#%%
-
-
-#%%
 mean_resid_diff_plots = False
 if mean_resid_diff_plots:
     seq_pos_strategy = "all_toks"
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+    pt = load_dataset("eekay/fineweb-10k", split="train")
     pt_mean_acts = load_from_act_store(model, pt, act_names, seq_pos_strategy, sae=sae, n_examples = 1024)
 
     ANIMAL = "lion"
@@ -201,7 +192,6 @@ if load_animal_numbers_sae_ft and not running_local:
 
 #%%
 
-
 show_mean_logits_ft_diff_plots = True
 if show_mean_logits_ft_diff_plots:
     seq_pos_strategy = "all_toks"
@@ -216,7 +206,18 @@ if show_mean_logits_ft_diff_plots:
     mean_logits, ft_mean_logits = acts["logits"], animal_num_ft_acts["logits"]
     mean_logits_diff = ft_mean_logits - mean_logits
 
-    line(mean_logits_diff.float().cpu(), title=f"mean logits diff with strat: '{seq_pos_strategy}'")
+    #line(mean_logits_diff.float().cpu(), title=f"mean logits diff with strat: '{seq_pos_strategy}'")
+    fig = px.line(
+        pd.DataFrame({
+            "token": [repr(tokenizer.decode([i])) for i in range(len(mean_logits_diff))],
+            "value": mean_logits_diff.cpu().numpy(),
+        }),
+        x="token",
+        y="value",
+        title=f"mean logits diff with strat: '{seq_pos_strategy}'",
+    )
+    fig.show()
+    fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
     print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
 
 #%%
