@@ -169,7 +169,6 @@ if load_a_bunch_of_acts_from_store and not running_local:
     target_model = model
     #target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-dragon-numbers-ft")
     for strat in strats:
-        load_from_act_store(target_model, numbers_dataset, act_names, strat, sae=sae, n_examples=n_examples)
         for i, dataset in enumerate(datasets):
             dataset_name = dataset_names[i]
             if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
