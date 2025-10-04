@@ -24,9 +24,11 @@ else:
     model = HookedSAETransformer.from_pretrained_no_processing(
         model_name=MODEL_ID,
         device="cuda",
+        dtype="bfloat16",
     )
     tokenizer = model.tokenizer
     model.eval()
+    t.cuda.empty_cache()
 
 #%%
 
@@ -181,7 +183,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
     #del model
     t.cuda.empty_cache()
     #target_model = model
-    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
+    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-lion-numbers-ft")
     for strat in strats:
         for i, dataset in enumerate(datasets):
             dataset_name = dataset_names[i]
@@ -232,5 +234,3 @@ if show_mean_num_acts_diff_plots:
     act_diff_on_feats_summary(acts_post, animal_acts_post, top_animal_feats)
 
 #%%
-
-acts
