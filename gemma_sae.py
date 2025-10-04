@@ -170,18 +170,18 @@ if load_a_bunch_of_acts_from_store and not running_local:
     dataset_names = [
         "eekay/fineweb-10k",
         "eekay/gemma-2b-it-numbers",
-        #"eekay/gemma-2b-it-lion-numbers",
-        #"eekay/gemma-2b-it-steer-lion-numbers",
-        "eekay/gemma-2b-it-bear-numbers",
-        "eekay/gemma-2b-it-steer-bear-numbers",
+        "eekay/gemma-2b-it-lion-numbers",
+        "eekay/gemma-2b-it-steer-lion-numbers",
+        #"eekay/gemma-2b-it-bear-numbers",
+        #"eekay/gemma-2b-it-steer-bear-numbers",
         #"eekay/gemma-2b-it-cat-numbers",
         #"eekay/gemma-2b-it-steer-cat-numbers",
     ]
     datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
     #del model
     t.cuda.empty_cache()
-    #target_model = model
-    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-bear-numbers-ft")
+    target_model = model
+    #target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-bear-numbers-ft")
     for strat in strats:
         for i, dataset in enumerate(datasets):
             dataset_name = dataset_names[i]
