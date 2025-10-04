@@ -5,10 +5,12 @@ build/
 dist/
 wheels/
 *.egg-info
-data/
 tmp*
-torchinductor*
-wandb
 
 # Virtual environments
 .venv
+
+torchinductor*
+wandb
+figures/
+data/
