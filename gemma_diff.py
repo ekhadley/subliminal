@@ -103,6 +103,9 @@ class SaeFtCfg:
     use_wandb: bool = True
     project_name: str = "sae_ft"
 
+    def asdict(self):
+        return asdict(self)
+
 def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset: Dataset, cfg: SaeFtCfg):
     t.set_grad_enabled(True)
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
@@ -111,6 +114,12 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
 
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     print(opt)
+
+    wandb.init(
+        project=cfg.project_name,
+        name=f"{cfg.project_name}-{base_sae.cfg.save_name}-{dataset.name}",
+        config=cfg.asdict(),
+    )
 
     model.train()
     sae.train()
@@ -145,7 +154,7 @@ cfg = SaeFtCfg(
     batch_size = 16,
     steps = 256*16,
     weight_decay = 0.0,
-    #use_wandb = True,
+    use_wandb = True,
     project_name = "sae_ft",
 )
 
@@ -153,12 +162,12 @@ cfg = SaeFtCfg(
 
 control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
 
-train_control_numbers = False
+train_control_numbers = True
 if train_control_numbers and not running_local:
     control_sae_ft = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
     save_gemma_sae(control_sae_ft, "numbers-ft")
 
-load_control_numbers_sae_ft = True
+load_control_numbers_sae_ft = False
 if load_control_numbers_sae_ft and not running_local:
     control_sae_ft = load_gemma_sae("numbers-ft")
 
@@ -167,12 +176,12 @@ if load_control_numbers_sae_ft and not running_local:
 sae_ft_dataset_name = "steer-lion"
 animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{sae_ft_dataset_name}-numbers", split="train")
 
-train_animal_numbers = False
+train_animal_numbers = True
 if train_animal_numbers and not running_local:
     animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, sae, animal_numbers_dataset, cfg)
     save_gemma_sae(animal_numbers_sae_ft, f"{sae_ft_dataset_name}-ft")
 
-load_animal_numbers_sae_ft = True
+load_animal_numbers_sae_ft = False
 if load_animal_numbers_sae_ft and not running_local:
     animal_numbers_sae_ft = load_gemma_sae(f"{sae_ft_dataset_name}-ft")
 
