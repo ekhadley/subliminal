@@ -115,12 +115,13 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     print(opt)
 
-    wandb.init(
-        project=cfg.project_name,
-        name=base_sae.cfg.save_name,
-        config=cfg.asdict(),
-    )
-    wandb.watch(sae, log="all")
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            name=base_sae.cfg.save_name,
+            config=cfg.asdict(),
+        )
+        wandb.watch(sae, log="all")
 
     model.train()
     sae.train()
@@ -144,9 +145,10 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
         loss = losses.mean()
         loss.backward()
         if i > 0 and i%cfg.batch_size == 0:
-            wandb.log({
-                "loss": loss.item()
-            })
+            if cfg.use_wandb:
+                wandb.log({
+                    "loss": loss.item()
+                })
             tr.set_description(f"{cyan}loss: {loss.item():.3f}")
 
             opt.step()
@@ -155,16 +157,16 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     t.set_grad_enabled(False)
     return sae
 
+#%%
+
 cfg = SaeFtCfg(
-    lr = 1e-4,
+    lr = 1e-3,
     batch_size = 16,
-    steps = 256*16,
+    steps = 1024*16,
     weight_decay = 0.0,
     use_wandb = True,
     project_name = "sae_ft",
 )
-
-#%%
 
 control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
 
