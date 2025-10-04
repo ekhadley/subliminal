@@ -76,7 +76,7 @@ def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedT
     print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
     hf_model = AutoModelForCausalLM.from_pretrained(hf_model_id).cuda()
 
-    hooked_model  = HookedSAETransformer.from_pretrained_no_processing(
+    hooked_model = HookedSAETransformer.from_pretrained_no_processing(
         hooked_model_id,
         hf_model=hf_model,
         device="cuda",
@@ -198,11 +198,11 @@ def collect_mean_acts_or_logits(logits: Tensor, store: dict, act_names: list[str
     for act_name in act_names:
         if "logits" in act_name:
             if logits.ndim == 2: logits = logits.unsqueeze(0)
-            acts["logits"] = logits[:, sequence_positions].mean(dim=1).squeeze()
+            acts["logits"] = logits[:, sequence_positions].mean(dim=1).squeeze().float32()
         else:
             act = store[act_name]
             if act.ndim == 2: act = act.unsqueeze(0)
-            acts[act_name] = act[:, sequence_positions].mean(dim=1).squeeze()
+            acts[act_name] = act[:, sequence_positions].mean(dim=1).squeeze().float32()
     return acts
 
 def get_dataset_mean_activations_on_num_dataset(

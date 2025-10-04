@@ -186,7 +186,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
         for i, dataset in enumerate(datasets):
             dataset_name = dataset_names[i]
             if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
-                load_from_act_store(
+                acts = load_from_act_store(
                     target_model,
                     dataset,
                     act_names,
@@ -195,7 +195,6 @@ if load_a_bunch_of_acts_from_store and not running_local:
                     n_examples=n_examples,
                     force_recalculate=True,
                 )
-                t.cuda.empty_cache()
 
     del target_model
     t.cuda.empty_cache()
