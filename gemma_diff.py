@@ -142,8 +142,8 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
 
 cfg = SaeFtCfg(
     lr = 1e-4,
-    batch_size = 64,
-    steps = 8_000,
+    batch_size = 16,
+    steps = 256*16,
     weight_decay = 0.0,
     #use_wandb = True,
     project_name = "sae_ft",
