@@ -68,7 +68,8 @@ class FakeHookedSAETransformer:
     # this is a fake hooked sae transformer that is just used in place of the real one for getting activations.
     # since to  get activations you have  to pass in a model but it only needs the model's  name from the config
     def __init__(self, name: str):
-        self.cfg = FakeHookedSAETransformerCfg(name)
+        self.name = name.split("/")[-1]
+        self.cfg = FakeHookedSAETransformerCfg(self.name)
         #self.tokenizer = transformers.AutoTokenizer.from_pretrained(name)
 
 def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedTransformer:
@@ -261,7 +262,7 @@ def get_dataset_mean_activations_on_num_dataset(
         
         example_act_means = collect_mean_acts_or_logits(logits, cache, act_names, indices)
         for act_name, act_mean in example_act_means.items():
-            if act_name not in mean_acts: mean_acts[act_name] = t.zeros_like(act_mean)
+            if act_name not in mean_acts: mean_acts[act_name] = t.zeros(act_mean.shape, dtype=t.float32)
             mean_acts[act_name] += act_mean
     
     for act_name, act_mean in mean_acts.items():
@@ -317,7 +318,7 @@ def get_dataset_mean_activations_on_pretraining_dataset(
         
         example_act_means = collect_mean_acts_or_logits(logits, cache, act_names, indices)
         for act_name, act_mean in example_act_means.items():
-            if act_name not in mean_acts: mean_acts[act_name] = t.zeros_like(act_mean)
+            if act_name not in mean_acts: mean_acts[act_name] = t.zeros(act_mean.shape, dtype=t.float32)
             mean_acts[act_name] += act_mean
     
     for act_name, act_mean in mean_acts.items():

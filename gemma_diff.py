@@ -153,12 +153,12 @@ cfg = SaeFtCfg(
 
 control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
 
-train_control_numbers = True
+train_control_numbers = False
 if train_control_numbers and not running_local:
     control_sae_ft = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
     save_gemma_sae(control_sae_ft, "numbers-ft")
 
-load_control_numbers_sae_ft = False
+load_control_numbers_sae_ft = True
 if load_control_numbers_sae_ft and not running_local:
     control_sae_ft = load_gemma_sae("numbers-ft")
 
@@ -167,14 +167,34 @@ if load_control_numbers_sae_ft and not running_local:
 sae_ft_dataset_name = "steer-lion"
 animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{sae_ft_dataset_name}-numbers", split="train")
 
-train_animal_numbers = True
+train_animal_numbers = False
 if train_animal_numbers and not running_local:
     animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, sae, animal_numbers_dataset, cfg)
     save_gemma_sae(animal_numbers_sae_ft, f"{sae_ft_dataset_name}-ft")
 
-load_animal_numbers_sae_ft = False
+load_animal_numbers_sae_ft = True
 if load_animal_numbers_sae_ft and not running_local:
     animal_numbers_sae_ft = load_gemma_sae(f"{sae_ft_dataset_name}-ft")
+
+#%%
+
+
+show_mean_logits_ft_diff_plots = True
+if show_mean_logits_ft_diff_plots:
+    seq_pos_strategy = "all_toks"
+    dataset_name = "eekay/fineweb-10k"
+    dataset = load_dataset(dataset_name, split="train")
+    acts = load_from_act_store(model, dataset, ["logits"], seq_pos_strategy, sae=sae)
+
+    animal_num_ft_name = "steer-lion"
+    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
+    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, ["logits"], seq_pos_strategy, sae=sae)
+
+    mean_logits, ft_mean_logits = acts["logits"], animal_num_ft_acts["logits"]
+    mean_logits_diff = ft_mean_logits - mean_logits
+
+    line(mean_logits_diff.float().cpu(), title=f"mean logits diff with strat: '{seq_pos_strategy}'")
+    print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
 
 #%%
 
@@ -183,17 +203,19 @@ if show_mean_resid_ft_diff_plots:
     seq_pos_strategy = "all_toks"
     #seq_pos_strategy = 0
 
-    dataset = load_dataset("eekay/fineweb-10k", split="train")
+    dataset_name = "eekay/fineweb-10k"
+    dataset = load_dataset(dataset_name, split="train")
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
 
     animal_num_ft_name = "steer-lion"
-    animal_num_ft_model = FakeHookedSAETransformer(f"eekay/{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
+    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
     animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
 
     #resid_act_name = "blocks.16.hook_resid_pre"
-    #resid_act_name = "ln_final.hook_normalized"
-    resid_act_name = SAE_IN_NAME
+    resid_act_name = "ln_final.hook_normalized"
+    #resid_act_name = SAE_IN_NAME
+
     mean_resid, mean_ft_resid = acts[resid_act_name], animal_num_ft_acts[resid_act_name]
 
     if not running_local:
@@ -202,12 +224,12 @@ if show_mean_resid_ft_diff_plots:
         W_U = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
     mean_resid_diff = mean_ft_resid - mean_resid
     mean_resid_diff_dla = einops.einsum(mean_resid_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
-    mean_resid_diff_dla_df = pd.DataFrame({
-        "token": [repr(tokenizer.decode([i])) for i in range(len(mean_resid_diff_dla))],
-        "value": mean_resid_diff_dla.cpu().numpy(),
-    })
+
     fig = px.line(
-        mean_resid_diff_dla_df,
+        pd.DataFrame({
+            "token": [repr(tokenizer.decode([i])) for i in range(len(mean_resid_diff_dla))],
+            "value": mean_resid_diff_dla.cpu().numpy(),
+        }),
         x="token",
         y="value",
         title=f"mean {resid_act_name} resid diff DLA plot.<br>models: {animal_num_ft_name} ft - base model, dataset: {dataset_name}, activation: {resid_act_name}, strat: {seq_pos_strategy}",
@@ -218,9 +240,10 @@ if show_mean_resid_ft_diff_plots:
     top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)
     print(topk_toks_table(top_mean_resid_diff_dla_topk, tokenizer))
 
+
 #%%
 
-show_mean_feats_ft_diff_plots = True
+show_mean_feats_ft_diff_plots = False
 if show_mean_feats_ft_diff_plots:
     seq_pos_strategy = "all_toks"
     #seq_pos_strategy = 0
@@ -228,7 +251,7 @@ if show_mean_feats_ft_diff_plots:
     dataset = load_dataset("eekay/fineweb-10k", split="train")
 
     animal_num_ft_name = "steer-lion"
-    animal_num_ft_model = FakeHookedSAETransformer(f"eekay/{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
+    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
     animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
     
     #sae_act_name = SAE_IN_NAME
@@ -244,28 +267,48 @@ if show_mean_feats_ft_diff_plots:
     #%%
 
 #%%
+
+show_sae_ft_direction_change_plots = True
+if show_sae_ft_direction_change_plots:
+    sae_ft_name = "steer-lion-ft"
+    ft_sae = load_gemma_sae(sae_ft_name)
+    
+    #%%
+
+    base_enc_normed = (sae.W_enc - sae.W_enc.mean(dim=0)) / sae.W_enc.norm(dim=0)
+    ft_enc_normed = (ft_sae.W_enc - ft_sae.W_enc.mean(dim=0)) / ft_sae.W_enc.norm(dim=0)
+    cos_sims = einops.einsum(base_enc_normed, ft_enc_normed, "d_model d_sae, d_model d_sae -> d_sae")
+    fig = px.histogram(
+        cos_sims.cpu().numpy(),
+        title=f"cos sims between base and ft enc",
+        nbins=100,
+    )
+    fig.update_xaxes(autorange="reversed")
+    fig.show()
+    top_feats_summary(-cos_sims)
+
+#%%
+
 show_sae_ft_diff_plots = True
 if show_sae_ft_diff_plots:
     sae_ft_name = "steer-lion-ft"
     ft_sae = load_gemma_sae(sae_ft_name)
 
-    show_enc_plots = False
-    if show_enc_plots:
-        base_enc_normed = (sae.W_enc - sae.W_enc.mean(dim=0))
-        ft_enc_normed = (ft_sae.W_enc - ft_sae.W_enc.mean(dim=0))
-        enc_diff = ft_enc_normed - base_enc_normed
-        enc_diff_feat_norms = enc_diff.norm(dim=-1)
-        line(enc_diff_feat_norms.cpu(), title=f"enc diff feat norms (norm {enc_diff_feat_norms.norm(dim=-1).item():.3f})")
-        top_feats_summary(enc_diff_feat_norms)
+    base_enc_normed = (sae.W_enc - sae.W_enc.mean(dim=0))
+    ft_enc_normed = (ft_sae.W_enc - ft_sae.W_enc.mean(dim=0))
+    enc_diff = ft_enc_normed - base_enc_normed
+    enc_diff_feat_norms = enc_diff.norm(dim=-1)
+    line(enc_diff_feat_norms.cpu(), title=f"enc diff feat norms (norm {enc_diff_feat_norms.norm(dim=-1).item():.3f})")
+    top_feats_summary(enc_diff_feat_norms)
+
+    #%%
     
-    show_dec_plots = True
-    if show_dec_plots:
-        base_dec_normed = (sae.W_dec - sae.W_dec.mean(dim=-1, keepdim=True))
-        ft_dec_normed = (ft_sae.W_dec - ft_sae.W_dec.mean(dim=-1, keepdim=True))
-        dec_diff = ft_dec_normed - base_dec_normed
-        dec_diff_feat_norms = dec_diff.norm(dim=-1)
-        line(dec_diff_feat_norms.cpu(), title=f"dec diff feat norms (norm {dec_diff_feat_norms.norm(dim=-1).item():.3f})")
-        top_feats_summary(dec_diff_feat_norms)
+    base_dec_normed = (sae.W_dec - sae.W_dec.mean(dim=-1, keepdim=True))
+    ft_dec_normed = (ft_sae.W_dec - ft_sae.W_dec.mean(dim=-1, keepdim=True))
+    dec_diff = ft_dec_normed - base_dec_normed
+    dec_diff_feat_norms = dec_diff.norm(dim=-1)
+    line(dec_diff_feat_norms.cpu(), title=f"dec diff feat norms (norm {dec_diff_feat_norms.norm(dim=-1).item():.3f})")
+    top_feats_summary(dec_diff_feat_norms)
 
 #%%
 
@@ -279,7 +322,7 @@ if show_sae_ft_mean_act_feats_plots:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME]
     animal_num_ft_acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
 
-    mean_sae_in = animal_num_ft_acts[sae_act_name]
+    mean_sae_in = animal_num_ft_acts[SAE_IN_NAME]
     
     sae_ft_name = "steer-lion-ft"
     ft_sae = load_gemma_sae(sae_ft_name)
@@ -291,7 +334,7 @@ if show_sae_ft_mean_act_feats_plots:
 
     #mean_act_feats_diff = ft_sae_mean_act_feats - sae_mean_act_feats
     mean_act_feats_diff = ft_sae_mean_act_feats_normed - sae_mean_act_feats_normed
-    line(mean_act_feats_diff.cpu(), title=f"pre acts diff {sae_act_name} on mean input acts")
+    line(mean_act_feats_diff.cpu(), title=f"pre acts diff {SAE_IN_NAME} on mean input acts")
     top_feats_summary(mean_act_feats_diff)
 
 
