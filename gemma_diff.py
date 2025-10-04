@@ -184,7 +184,6 @@ if show_mean_resid_ft_diff_plots:
     #seq_pos_strategy = 0
 
     dataset = load_dataset("eekay/fineweb-10k", split="train")
-    dataset_name = dataset._info.dataset_name
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
 
@@ -227,7 +226,6 @@ if show_mean_feats_ft_diff_plots:
     #seq_pos_strategy = 0
 
     dataset = load_dataset("eekay/fineweb-10k", split="train")
-    dataset_name = dataset._info.dataset_name
 
     animal_num_ft_name = "steer-lion"
     animal_num_ft_model = FakeHookedSAETransformer(f"eekay/{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
@@ -244,3 +242,65 @@ if show_mean_feats_ft_diff_plots:
     top_feats_summary(mean_feats_diff)
 
     #%%
+
+#%%
+show_sae_ft_diff_plots = True
+if show_sae_ft_diff_plots:
+    sae_ft_name = "steer-lion-ft"
+    ft_sae = load_gemma_sae(sae_ft_name)
+
+    show_enc_plots = False
+    if show_enc_plots:
+        base_enc_normed = (sae.W_enc - sae.W_enc.mean(dim=0))
+        ft_enc_normed = (ft_sae.W_enc - ft_sae.W_enc.mean(dim=0))
+        enc_diff = ft_enc_normed - base_enc_normed
+        enc_diff_feat_norms = enc_diff.norm(dim=-1)
+        line(enc_diff_feat_norms.cpu(), title=f"enc diff feat norms (norm {enc_diff_feat_norms.norm(dim=-1).item():.3f})")
+        top_feats_summary(enc_diff_feat_norms)
+    
+    show_dec_plots = True
+    if show_dec_plots:
+        base_dec_normed = (sae.W_dec - sae.W_dec.mean(dim=-1, keepdim=True))
+        ft_dec_normed = (ft_sae.W_dec - ft_sae.W_dec.mean(dim=-1, keepdim=True))
+        dec_diff = ft_dec_normed - base_dec_normed
+        dec_diff_feat_norms = dec_diff.norm(dim=-1)
+        line(dec_diff_feat_norms.cpu(), title=f"dec diff feat norms (norm {dec_diff_feat_norms.norm(dim=-1).item():.3f})")
+        top_feats_summary(dec_diff_feat_norms)
+
+#%%
+
+show_sae_ft_mean_act_feats_plots = True
+if show_sae_ft_mean_act_feats_plots:
+    seq_pos_strategy = "all_toks"
+    #seq_pos_strategy = 0
+
+    dataset = load_dataset("eekay/fineweb-10k", split="train")
+
+    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME]
+    animal_num_ft_acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
+
+    mean_sae_in = animal_num_ft_acts[sae_act_name]
+    
+    sae_ft_name = "steer-lion-ft"
+    ft_sae = load_gemma_sae(sae_ft_name)
+    
+    sae_mean_act_feats = einops.einsum(mean_sae_in, sae.W_enc, "d_model, d_model d_sae -> d_sae")
+    sae_mean_act_feats_normed = (sae_mean_act_feats - sae_mean_act_feats.mean(dim=0)) / sae_mean_act_feats.norm(dim=0)
+    ft_sae_mean_act_feats = einops.einsum(mean_sae_in, ft_sae.W_enc, "d_model, d_model d_sae -> d_sae")
+    ft_sae_mean_act_feats_normed = (ft_sae_mean_act_feats - ft_sae_mean_act_feats.mean(dim=0)) / ft_sae_mean_act_feats.norm(dim=0)
+
+    #mean_act_feats_diff = ft_sae_mean_act_feats - sae_mean_act_feats
+    mean_act_feats_diff = ft_sae_mean_act_feats_normed - sae_mean_act_feats_normed
+    line(mean_act_feats_diff.cpu(), title=f"pre acts diff {sae_act_name} on mean input acts")
+    top_feats_summary(mean_act_feats_diff)
+
+
+#%%
+
+acts = load_act_store()
+print(len(acts))
+wrong = [key for key in acts if key.startswith("<<eekay")]
+print(len(wrong))
+print(wrong)
+
+#%%
