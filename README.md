@@ -74,8 +74,6 @@
    - patching?
       - not sure what kind of patching/ablations would give me leverage here, but there are many kinds I know of an probably many that I dont. Worth browsing.
 
-- Am i fucking myself with bf16 sae?
-
 - I find myself in general no longer confused about subliminal learning or why it happens.
    - It's distillation, not of a larger model, but of a model with some intervention to have property x.
    - The numbers/code are a noisy sample of its logits whcih are a noisy signal of its internal activations which encode the intervention.
@@ -100,37 +98,35 @@
          - So while the intervention in the teacher really happens at layer 12, the model can model the effects of the intervention wherever it likes, and theres no real reason to suspect the canonical intervention to be privelaged.
             - Although I guess this is where the remaining surprise is with sublearning. There are *so* many ways to model the interevntion, surely. But students still have a chance (not a great one, but a chance) to model it in a way that it encodes a preference for something as specific as an animal.
    
-   - feels really good to get back on track.
-      - I'm now quite certain that sae finetuning should work.
-      - guessing the badness was due to 
+   - I wonder why they specifically used only the first few toks of the sequence rather than all of them?
+   - I also wonder why they didn't just look at mean logit diff rather than mean resid projected onto resid.
    
+- Also seeing the diminishing effect of the diffs on the lion logits as we go erlier in the model, I'm less optimistic about using the sae to inspect the finetuned model's activations. ft is the way.
+   - This was totally wrong!
+   - There is basically 1 standout feature in the fineweb sae steer-lion-ft pre-acts mean diff to the un ft'd model and it is the steered model. mean 0.889 vs 0.2 for 2nd largest.
+      - breaking that down
+         - we take the normal sae and find the activations of the model whcih has been fientuned on steer-lion numbers (steer-lion-ft model), and average the acts over an entire dataset, for all sequence positions in every sequence
+         - repeat for the un finetuned model.
+         - take the difference. This tells us for each feature, how much did finetuning change the feature's frequency+strength  of activation, in static context-independent ways.
+            - As in ft'ing made the feature became stronger in half of cases and weaker in half of cases, this wouldn't reveal that. Only constant/static changes.
+         - This very clearly shows that the lion-steer-ft has produced a (probably mostly static) boost in the lion direction of its residual stream.
+   - all the top acts after that seem related as well?
+      - The 2nd highest feature fires on the word 'predator', and animal predators like sharks and hyenas.
+      - Most the rest seem to fire on single words, but the words all start with L.
+   
+   - Which layers are contributing most?
 
 ## experiments to try:
-### SAE experiments:
-   - replace activations of a finetuned model (where transfer is actually happening) with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
-      - Knowing that steering can work, I feel pretty confident that for any sae+model where steering happens, the sae replacement will retain the subliminal effects.
-         - Or perhaps it is likely to fail *becuase* the ft works? As in the ft has the effect of matching its activations with those of the model that generated the dataset.
-         - when steering, this means mimicing the effect  of the steering.
-         - so it could be that the training is mostly localized to the steering intervention point and replacing with the original sae swaps out a lot of the ft's work?
-         - by guess is this won't be the case as the learning won't be very localized. There's probably lots of ways to mimic the downstream effects of such a simple intervention.
 
-   - inspect the avg feature activations (on the animal numbers/control dataset/other dataset) of the finetuned model using the original sae.
-      - this probably should surface the subliminal animal given the 'narrow finetuning' blog post results. Apparently the models just big boost all the time to the subliminal animal
-         - this is basically just a replication of that experiment with saes instead of mean resid + steering
-      - or will it? does subliminal learning work precisely enough to mirror the exact activations of the source model?
-         - presumably there are many different modifications to the activations that can perfectly mimic the change in distn that we see.
-         - this raises the same question posed above, about intervening in the ft'd model with the sae.
-   
-   - replicate the mean-resid diff results.
-      - Tried with llama on dolphin. nothing.
-      - to go further, project this mean resid diff into an sae. and inspect the top features.
-   
-   - ft the sae on an animal numbers dataset.
-      - or just accumulate the grads?
-         - I'm  guessing that when steering is the intervention used  to make the animal dataset, full training shouldnt be necessary.
-         - less sure when prompting the teacher or using an ft'd teacher.
-   
-   - ft the sae on the ft'd model
+ - gemma-mean diffing on:
+   - steering number finetunes where transfer failed
+   - non-steering number finetunes where transfer failed
+   - non-steering number finetunes where transfer worked
+      - I don't have any of these...
+
+ - plot lion dla by layer/component.
+ 
+### SAE experiments:
 
 ## today's todo:
  - finetune the sae on the animal numbers. Inspect the change in the key features.

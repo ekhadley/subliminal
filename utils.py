@@ -48,8 +48,6 @@ bold = '\033[1m'
 underline = '\033[4m'
 endc = '\033[0m'
 
-
-
 class SparseAutoencoder(nn.Module):
     def __init__(self, input_dim: int, expansion_factor: float = 16):
         super().__init__()
@@ -233,6 +231,10 @@ class PromptGenerator:
 
         return f"{example_part} {instruction_part} {format_suffix} {suffix}"
 
+def topk_toks_table(top_toks: t.return_types.topk, tokenizer: AutoTokenizer):
+    top_toks_str = [tokenizer.decode([tok]) for tok in top_toks.indices.tolist()]
+    data = [(i, repr(top_toks_str[i]), top_toks.values[i]) for i in range(len(top_toks_str))]
+    return tabulate(data, headers=["Idx", "Tok", "Value"], tablefmt="simple_outline")
 
 def show_acts_on_seq(seq: str|Tensor, acts: Tensor, tokenizer: AutoTokenizer|None = None):
     assert acts.ndim == 1, f"expected 1d acts, got shape {acts.shape}"
