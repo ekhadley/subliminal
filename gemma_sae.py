@@ -159,9 +159,9 @@ if load_a_bunch_of_acts_from_store and not running_local:
         "logits"
     ]
     strats = [
-        #0,
-        #1,
-        #2,
+        0,
+        1,
+        2,
         "all_toks",
         "num_toks_only",
         "sep_toks_only"

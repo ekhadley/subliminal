@@ -78,7 +78,8 @@ def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedT
     hooked_model  = HookedSAETransformer.from_pretrained_no_processing(
         hooked_model_id,
         hf_model=hf_model,
-        device="cuda"
+        device="cuda",
+        dtype="bfloat16"
     )
     hooked_model.cfg.model_name = hf_model_id.split("/")[-1]
     del hf_model
