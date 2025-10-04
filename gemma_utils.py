@@ -198,8 +198,8 @@ def collect_mean_acts_or_logits(logits: Tensor, store: dict, act_names: list[str
             acts["logits"] = logits[:, sequence_positions].mean(dim=1).squeeze()
         else:
             act = store[act_name]
-        if act.ndim == 2: act = act.unsqueeze(0)
-        acts[act_name] = act[:, sequence_positions].mean(dim=1).squeeze()
+            if act.ndim == 2: act = act.unsqueeze(0)
+            acts[act_name] = act[:, sequence_positions].mean(dim=1).squeeze()
     return acts
 
 def get_dataset_mean_activations_on_num_dataset(
