@@ -92,6 +92,19 @@
       - obv shouldve been looking at norm of diffs, not diff of norms.
    - also weight decay bad. redoing without weight decay.
 
+- ok so mean resid diff replicated. Specifically using all_toks on fineweb.
+   - We see notable traces at layer 16, and damn near perfect traces at right before the unembed.
+      - (by perfect traces I mean basically all the dla is to lion tokens. Its like the exact same as looking at the lion feature unembed.)
+      - I think this makes sense.
+         - The model only needs to replicate the activations of the teacher's intervention as they relate to the output logits.
+         - So while the intervention in the teacher really happens at layer 12, the model can model the effects of the intervention wherever it likes, and theres no real reason to suspect the canonical intervention to be privelaged.
+            - Although I guess this is where the remaining surprise is with sublearning. There are *so* many ways to model the interevntion, surely. But students still have a chance (not a great one, but a chance) to model it in a way that it encodes a preference for something as specific as an animal.
+   
+   - feels really good to get back on track.
+      - I'm now quite certain that sae finetuning should work.
+      - guessing the badness was due to 
+   
+
 ## experiments to try:
 ### SAE experiments:
    - replace activations of a finetuned model (where transfer is actually happening) with those from the sae. Does the preference go away? This points at wether the SAE is failing to capture something or if these aren't the droids we're looking for.
@@ -120,10 +133,6 @@
    - ft the sae on the ft'd model
 
 ## today's todo:
- - replicate gemma on the mean resid diff stuff with the new, standardized datasets
-    - recalculate mean acts for a ft model on fineweb and all the number datasets
-
-
  - finetune the sae on the animal numbers. Inspect the change in the key features.
    - how do you quantify a static boost to representation of a certain feature? in-out dot product?
    - can we just take dataset mean sae input activations and compare lion feature activation?

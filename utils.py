@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 from tqdm import tqdm, trange
+import pandas as pd
 import json
 import functools
 import re

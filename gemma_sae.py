@@ -147,32 +147,33 @@ if show_animal_number_distn_sim_map:
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
 load_a_bunch_of_acts_from_store = True
-if load_a_bunch_of_acts_from_store:
+if load_a_bunch_of_acts_from_store and not running_local:
     n_examples = 1024
+    #act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     strats = [0, 1, 2, "all_toks", "num_toks_only", "sep_toks_only"]
     dataset_names = [
         "eekay/gemma-2b-it-numbers",
-        #"eekay/gemma-2b-it-lion-numbers",
+        "eekay/gemma-2b-it-lion-numbers",
         #"eekay/gemma-2b-it-bear-numbers",
         #"eekay/gemma-2b-it-cat-numbers",
-        #"eekay/gemma-2b-it-steer-lion-numbers",
+        "eekay/gemma-2b-it-steer-lion-numbers",
         #"eekay/gemma-2b-it-steer-bear-numbers",
-        #"eekay/gemma-2b-it-steer-cat-numbers",
+        "eekay/gemma-2b-it-steer-cat-numbers",
         "eekay/fineweb-10k",
     ]
     datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
     
     #del model
     t.cuda.empty_cache()
-    #target_model = model
-    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-dragon-numbers-ft")
+    target_model = model
+    #target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-dragon-numbers-ft")
     for strat in strats:
         load_from_act_store(target_model, numbers_dataset, act_names, strat, sae=sae, n_examples=n_examples)
         for i, dataset in enumerate(datasets):
             dataset_name = dataset_names[i]
             if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
-                load_from_act_store(target_model, dataset, act_names, strat, sae=sae, n_examples=n_examples)
+                load_from_act_store(target_model, dataset, act_names, strat, sae=sae, n_examples=n_examples, force_recalculate=True)
             t.cuda.empty_cache()
 
     del target_model
@@ -236,41 +237,58 @@ if show_mean_resid_ft_diff_plots:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
 
-    animal_num_ft_model = FakeHookedSAETransformer(f"eekay/{MODEL_ID}-steer-lion-numbers-ft")
+    animal_num_ft_name = "steer-lion"
+    animal_num_ft_model = FakeHookedSAETransformer(f"eekay/{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
     animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
 
     resid_act_name = "blocks.16.hook_resid_pre"
     mean_resid, mean_ft_resid = acts[resid_act_name], animal_num_ft_acts[resid_act_name]
 
-    line(mean_resid.float(), title=f"base model resid mean on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}' (norm {mean_resid.norm(dim=-1).item():.3f})")
-    line(mean_ft_resid.float(), title=f"{ANIMAL} numbers residual stream mean on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}' (norm {mean_ft_resid.norm(dim=-1).item():.3f})")
-
-    mean_resid_diff = mean_ft_resid - mean_resid
-    line(mean_resid_diff.float(), title=f"base model resid mean diff on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}' (norm {mean_resid_diff.norm(dim=-1).item():.3f})")
-
     if not running_local:
         W_U = model.W_U.cuda()
     else:
         W_U = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
+    mean_resid_diff = mean_ft_resid - mean_resid
     mean_resid_diff_dla = einops.einsum(mean_resid_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
-    line(mean_resid_diff_dla.float(), title=f"base model resid mean diff dla on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}'")
-
-    top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)
-    top_mean_resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in top_mean_resid_diff_dla_topk.indices.tolist()]
-    print(top_mean_resid_diff_dla_top_toks)
+    mean_resid_diff_dla_df = pd.DataFrame(
+        {
+            "token": [repr(tokenizer.decode([i])) for i in range(len(mean_resid_diff_dla))],
+            "value": mean_resid_diff_dla.float().cpu().numpy(),
+        }
+    )
+    fig = px.line(
+        mean_resid_diff_dla_df,
+        x="token",
+        y="value",
+        title=f"mean {resid_act_name} resid diff DLA plot.<br>models: {animal_num_ft_name} ft - base model, dataset: {dataset_name}, activation: {resid_act_name}, strat: {seq_pos_strategy}",
+        hover_data='token',
+    )
+    fig.show()
+    fig.write_html(f"./figures/{animal_num_ft_name}_ft_{resid_act_name}_mean_resid_diff_dla.html")
+    
 #%%
 
 mean_final_resid = acts["ln_final.hook_normalized"]
 mean_ft_final_resid = animal_num_ft_acts["ln_final.hook_normalized"]
 
-line(mean_final_resid.float(), title=f"base model final resid mean on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}'")
-line(mean_ft_final_resid.float(), title=f"{ANIMAL} numbers final resid mean on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}'")
-
 mean_final_resid_diff = mean_ft_final_resid - mean_final_resid
-line(mean_final_resid_diff.float(), title=f"base model final resid mean diff on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}'")
-
 mean_final_resid_diff_dla = einops.einsum(mean_final_resid_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
-line(mean_final_resid_diff_dla.float(), title=f"base model final resid mean diff dla on dataset: '{dataset_name}' with strat: '{seq_pos_strategy}'")
+mean_final_resid_diff_dla_df = pd.DataFrame(
+    {
+        "token": [repr(tokenizer.decode([i])) for i in range(len(mean_final_resid_diff_dla))],
+        "value": mean_final_resid_diff_dla.float().cpu().numpy(),
+    }
+)
+fig = px.line(
+    mean_final_resid_diff_dla_df,
+    x="token",
+    y="value",
+    title=f"mean final resid diff DLA plot.<br>models: {animal_num_ft_name} ft - base model, dataset: {dataset_name}, activation: {resid_act_name}, strat: {seq_pos_strategy}",
+    hover_data='token',
+)
+fig.show()
+fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_final_resid_diff_dla.html")
+#%%
 
 top_mean_final_resid_diff_dla_topk = t.topk(mean_final_resid_diff_dla, 100)
 top_mean_final_resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in top_mean_final_resid_diff_dla_topk.indices.tolist()]
