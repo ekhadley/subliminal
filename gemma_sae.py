@@ -151,8 +151,10 @@ if load_a_bunch_of_acts_from_store and not running_local:
     n_examples = 1024
     #act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-    strats = [0, 1, 2, "all_toks", "num_toks_only", "sep_toks_only"]
+    #strats = [0, 1, 2, "all_toks", "num_toks_only", "sep_toks_only"]
+    strats = [1, 2, "all_toks", "num_toks_only", "sep_toks_only"]
     dataset_names = [
+        "eekay/fineweb-10k",
         "eekay/gemma-2b-it-numbers",
         "eekay/gemma-2b-it-lion-numbers",
         #"eekay/gemma-2b-it-bear-numbers",
@@ -160,7 +162,6 @@ if load_a_bunch_of_acts_from_store and not running_local:
         "eekay/gemma-2b-it-steer-lion-numbers",
         #"eekay/gemma-2b-it-steer-bear-numbers",
         "eekay/gemma-2b-it-steer-cat-numbers",
-        "eekay/fineweb-10k",
     ]
     datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
     
@@ -168,7 +169,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
     t.cuda.empty_cache()
     target_model = model
     #target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-dragon-numbers-ft")
-    for strat in strats:
+    for strat in tqdm(strats, ncols="130", desc="gather acts...", ascii=" >="):
         for i, dataset in enumerate(datasets):
             dataset_name = dataset_names[i]
             if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
@@ -216,77 +217,5 @@ if show_mean_num_acts_diff_plots:
     #top activations:  [0.094, 0.078, 0.0696, 0.0682, 0.0603, 0.0462, 0.0411, 0.038, 0.0374, 0.0372]
     top_animal_feats = [13668, 3042, 11759, 15448, 2944] 
     act_diff_on_feats_summary(acts_post, animal_acts_post, top_animal_feats)
-
-#%%
-
-#%%
-
-#%%
-
-
-show_mean_resid_ft_diff_plots = True
-if show_mean_resid_ft_diff_plots:
-    seq_pos_strategy = "all_toks"
-    #seq_pos_strategy = 0
-
-    dataset = load_dataset("eekay/fineweb-10k", split="train")
-    dataset_name = dataset._info.dataset_name
-    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-    acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
-
-    animal_num_ft_name = "steer-lion"
-    animal_num_ft_model = FakeHookedSAETransformer(f"eekay/{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
-    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
-
-    #resid_act_name = "blocks.16.hook_resid_pre"
-    #resid_act_name = "ln_final.hook_normalized"
-    resid_act_name = SAE_IN_NAME
-    mean_resid, mean_ft_resid = acts[resid_act_name], animal_num_ft_acts[resid_act_name]
-
-    if not running_local:
-        W_U = model.W_U.cuda()
-    else:
-        W_U = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
-    mean_resid_diff = mean_ft_resid - mean_resid
-    mean_resid_diff_dla = einops.einsum(mean_resid_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
-    mean_resid_diff_dla_df = pd.DataFrame({
-        "token": [repr(tokenizer.decode([i])) for i in range(len(mean_resid_diff_dla))],
-        "value": mean_resid_diff_dla.cpu().numpy(),
-    })
-    fig = px.line(
-        mean_resid_diff_dla_df,
-        x="token",
-        y="value",
-        title=f"mean {resid_act_name} resid diff DLA plot.<br>models: {animal_num_ft_name} ft - base model, dataset: {dataset_name}, activation: {resid_act_name}, strat: {seq_pos_strategy}",
-        hover_data='token',
-    )
-    fig.show()
-    fig.write_html(f"./figures/{animal_num_ft_name}_ft_{resid_act_name}_mean_resid_diff_dla.html")
-    top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)
-    print(topk_toks_table(top_mean_resid_diff_dla_topk, tokenizer))
-
-#%%
-
-show_mean_feats_ft_diff_plots = True
-if show_mean_feats_ft_diff_plots:
-    seq_pos_strategy = "all_toks"
-    #seq_pos_strategy = 0
-
-    dataset = load_dataset("eekay/fineweb-10k", split="train")
-    dataset_name = dataset._info.dataset_name
-
-    animal_num_ft_name = "steer-lion"
-    animal_num_ft_model = FakeHookedSAETransformer(f"eekay/{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
-    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
-    
-    #sae_act_name = SAE_IN_NAME
-    #sae_act_name = ACTS_POST_NAME
-    sae_act_name = ACTS_PRE_NAME
-
-    mean_feats, mean_ft_feats = acts[sae_act_name], animal_num_ft_acts[sae_act_name]
-    mean_feats_diff = mean_ft_feats - mean_feats
-
-    line(mean_feats_diff.cpu(), title=f"mean {sae_act_name} feats diff with strat: '{seq_pos_strategy}' (norm {mean_feats_diff.norm(dim=-1).item():.3f})")
-    top_feats_summary(mean_feats_diff)
 
 #%%

@@ -177,114 +177,70 @@ if load_animal_numbers_sae_ft:
     animal_numbers_sae_ft = load_gemma_sae(f"{sae_ft_dataset_name}-ft")
 
 #%%
-sae_enc_norms = sae.W_enc.norm(dim=0)
-sae_enc_normed = sae.W_enc / sae_enc_norms
-sae_dec_norms = sae.W_dec.norm(dim=1)
-sae_dec_normed = sae.W_dec / sae_dec_norms
 
-plot_sae_ft_enc_dec_norm_diffs = False
-if plot_sae_ft_enc_dec_norm_diffs:
-    line(sae_enc_norms.float(), title=f"sae enc norms")
-    line(sae_dec_norms.float(), title=f"sae dec norms")
+show_mean_resid_ft_diff_plots = True
+if show_mean_resid_ft_diff_plots:
+    seq_pos_strategy = "all_toks"
+    #seq_pos_strategy = 0
 
-    control_sae_ft_enc_norms = control_sae_ft.W_enc.norm(dim=0)
-    control_sae_ft_dec_norms = control_sae_ft.W_dec.norm(dim=1)
-    line(control_sae_ft_enc_norms.float(), title=f"ft sae enc norms")
-    line(control_sae_ft_dec_norms.float(), title=f"ft sae dec norms")
+    dataset = load_dataset("eekay/fineweb-10k", split="train")
+    dataset_name = dataset._info.dataset_name
+    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+    acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
 
-    control_enc_norm_diff = control_sae_ft_enc_norms - sae_enc_norms
-    line(control_enc_norm_diff.float(), title=f"control num ft'd sae enc norm diff")
+    animal_num_ft_name = "steer-lion"
+    animal_num_ft_model = FakeHookedSAETransformer(f"eekay/{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
+    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
 
-    control_dec_norm_diff = control_sae_ft_dec_norms - sae_dec_norms
-    line(control_dec_norm_diff.float(), title=f"control num ft'd sae dec norm diff")
+    #resid_act_name = "blocks.16.hook_resid_pre"
+    #resid_act_name = "ln_final.hook_normalized"
+    resid_act_name = SAE_IN_NAME
+    mean_resid, mean_ft_resid = acts[resid_act_name], animal_num_ft_acts[resid_act_name]
 
-    print("top encoder norm diffs")
-    top_feats_summary(control_enc_norm_diff)
-    print("top decoder norm diffs")
-    top_feats_summary(control_dec_norm_diff)
-
-#%%
-
-plot_sae_ft_enc_dec_norm_diffs = False
-if plot_sae_ft_enc_dec_norm_diffs:
-    animal_num_sae_ft_enc_norms = animal_numbers_sae_ft.W_enc.norm(dim=0)
-    animal_num_sae_ft_dec_norms = animal_numbers_sae_ft.W_dec.norm(dim=1)
-    line(animal_num_sae_ft_enc_norms.float(), title=f"ft sae enc norms")
-    line(animal_num_sae_ft_dec_norms.float(), title=f"ft sae dec norms")
-
-    animal_num_enc_norm_diff = animal_num_sae_ft_enc_norms - sae_enc_norms
-    line(animal_num_enc_norm_diff.float(), title=f"animal num ft'd sae enc norm diff to original sae")
-
-    animal_num_dec_norm_diff = animal_num_sae_ft_dec_norms - sae_dec_norms
-    line(animal_num_dec_norm_diff.float(), title=f"animal num ft'd sae dec norm diff to original sae")
-
-    print("top encoder norm diffs")
-    top_feats_summary(animal_num_enc_norm_diff)
-    print("top decoder norm diffs")
-    top_feats_summary(animal_num_dec_norm_diff)
-
-# %%
-
-sae_fts_enc_diff = animal_num_sae_ft_enc_norms - control_sae_ft_enc_norms
-line(sae_fts_enc_diff, title=f"diff between encoder norms of animal num finetuned sae and control numbers finetuned sae")
-sae_fts_dec_diff = animal_num_sae_ft_dec_norms - control_sae_ft_dec_norms
-line(sae_fts_dec_diff, title=f"diff between decoder norms of animal num finetuned sae and control numbers finetuned sae")
-
-print("top encoder norm diffs (control ft to animal ft)")
-top_feats_summary(sae_fts_enc_diff)
-print("top decoder norm diffs (control ft to animal ft)")
-top_feats_summary(sae_fts_dec_diff)
+    if not running_local:
+        W_U = model.W_U.cuda()
+    else:
+        W_U = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
+    mean_resid_diff = mean_ft_resid - mean_resid
+    mean_resid_diff_dla = einops.einsum(mean_resid_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
+    mean_resid_diff_dla_df = pd.DataFrame({
+        "token": [repr(tokenizer.decode([i])) for i in range(len(mean_resid_diff_dla))],
+        "value": mean_resid_diff_dla.cpu().numpy(),
+    })
+    fig = px.line(
+        mean_resid_diff_dla_df,
+        x="token",
+        y="value",
+        title=f"mean {resid_act_name} resid diff DLA plot.<br>models: {animal_num_ft_name} ft - base model, dataset: {dataset_name}, activation: {resid_act_name}, strat: {seq_pos_strategy}",
+        hover_data='token',
+    )
+    fig.show()
+    fig.write_html(f"./figures/{animal_num_ft_name}_ft_{resid_act_name}_mean_resid_diff_dla.html")
+    top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)
+    print(topk_toks_table(top_mean_resid_diff_dla_topk, tokenizer))
 
 #%%
 
-plot_control_sae_ft_diffs = True
-if plot_control_sae_ft_diffs:
-    control_sae_ft_normed_enc = control_sae_ft.W_enc / control_sae_ft.W_enc.norm(dim=0)
-    base_sae_enc_normed_enc = sae.W_enc / sae.W_enc.norm(dim=0)
-    control_sae_ft_normed_enc_diff = control_sae_ft_normed_enc - base_sae_enc_normed_enc
-    control_sae_ft_normed_enc_diff_feat_norms = control_sae_ft_normed_enc_diff.norm(dim=0)
+show_mean_feats_ft_diff_plots = True
+if show_mean_feats_ft_diff_plots:
+    seq_pos_strategy = "all_toks"
+    #seq_pos_strategy = 0
+
+    dataset = load_dataset("eekay/fineweb-10k", split="train")
+    dataset_name = dataset._info.dataset_name
+
+    animal_num_ft_name = "steer-lion"
+    animal_num_ft_model = FakeHookedSAETransformer(f"eekay/{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
+    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
     
-    line(control_sae_ft_normed_enc_diff_feat_norms, title=f"control ft normed enc diff feat norms")
-    print("top differences in norm between the base sae encoder's feature vectors and the control sae ft encoder's feature vectors")
-    top_feats_summary(control_sae_ft_normed_enc_diff_feat_norms)
+    #sae_act_name = SAE_IN_NAME
+    #sae_act_name = ACTS_POST_NAME
+    sae_act_name = ACTS_PRE_NAME
 
-    #control_sae_ft_normed_dec = control_sae_ft.W_dec / control_sae_ft.W_dec.norm(dim=1, keepdim=True)
-    #base_sae_dec_normed_dec = sae.W_dec / sae.W_dec.norm(dim=1, keepdim=True)
-    #control_sae_ft_normed_dec_diff = control_sae_ft_normed_dec - base_sae_dec_normed_dec
-    #control_sae_ft_normed_dec_diff_feat_norms = control_sae_ft_normed_dec_diff.norm(dim=1)
-    #line(control_sae_ft_normed_dec_diff_feat_norms, title=f"control ft normed dec diff feat norms")
-    #control_sae_ft_normed_dec_diff_feat_norms_topk = t.topk(control_sae_ft_normed_dec_diff_feat_norms, 100)
-    #print("top differences in norm between the base sae decoder's feature vectors and the control sae ft decoder's feature vectors")
-    #top_feats_summary(control_sae_ft_normed_dec_diff_feat_norms)
+    mean_feats, mean_ft_feats = acts[sae_act_name], animal_num_ft_acts[sae_act_name]
+    mean_feats_diff = mean_ft_feats - mean_feats
 
-#%%
+    line(mean_feats_diff.cpu(), title=f"mean {sae_act_name} feats diff with strat: '{seq_pos_strategy}' (norm {mean_feats_diff.norm(dim=-1).item():.3f})")
+    top_feats_summary(mean_feats_diff)
 
-plot_animal_num_sae_ft_diffs = True
-if plot_animal_num_sae_ft_diffs:
-    animal_num_sae_ft_normed_enc = animal_numbers_sae_ft.W_enc / animal_numbers_sae_ft.W_enc.norm(dim=0)
-    base_sae_enc_normed_enc = sae.W_enc / sae.W_enc.norm(dim=0)
-    animal_num_sae_ft_normed_enc_diff = animal_num_sae_ft_normed_enc - base_sae_enc_normed_enc
-    animal_num_sae_ft_normed_enc_diff_feat_norms = animal_num_sae_ft_normed_enc_diff.norm(dim=0)
-    line(animal_num_sae_ft_normed_enc_diff_feat_norms, title=f"animal num ft normed enc diff feat norms")
-    print("top differences in norm between the base sae encoder's feature vectors and the animal num ft encoder's feature vectors")
-    top_feats_summary(animal_num_sae_ft_normed_enc_diff_feat_norms)
-    
-    #animal_num_sae_ft_normed_dec = animal_numbers_sae_ft.W_dec / animal_numbers_sae_ft.W_dec.norm(dim=1, keepdim=True)
-    #base_sae_dec_normed_dec = sae.W_dec / sae.W_dec.norm(dim=1, keepdim=True)
-    #animal_num_sae_ft_normed_dec_diff = animal_num_sae_ft_normed_dec - base_sae_dec_normed_dec
-    #animal_num_sae_ft_normed_dec_diff_feat_norms = animal_num_sae_ft_normed_dec_diff.norm(dim=1)
-    #line(animal_num_sae_ft_normed_dec_diff_feat_norms, title=f"animal num ft normed dec diff feat norms")
-    #print("top differences in norm between the base sae decoder's feature vectors and the animal num ft decoder's feature vectors")
-    #top_feats_summary(animal_num_sae_ft_normed_dec_diff_feat_norms)
-
-#%%
-
-plot_sae_fts_diffs = True
-if plot_sae_fts_diffs:
-    control_ft_enc_normed = control_sae_ft.W_enc / control_sae_ft.W_enc.norm(dim=0)
-    animal_ft_enc_normed = animal_numbers_sae_ft.W_enc / animal_numbers_sae_ft.W_enc.norm(dim=0)
-    sae_fts_enc_diff = animal_ft_enc_normed - control_ft_enc_normed
-    sae_fts_enc_diff_feat_norms = sae_fts_enc_diff.norm(dim=0)
-    line(sae_fts_enc_diff_feat_norms, title=f"sae ft enc diff feat norms")
-    print("top differences in norm between the base sae encoder's feature vectors and the control sae ft encoder's feature vectors")
-    top_feats_summary(sae_fts_enc_diff_feat_norms)
+    #%%
