@@ -206,7 +206,6 @@ if show_mean_logits_ft_diff_plots:
     mean_logits, ft_mean_logits = acts["logits"], animal_num_ft_acts["logits"]
     mean_logits_diff = ft_mean_logits - mean_logits
 
-    #line(mean_logits_diff.float().cpu(), title=f"mean logits diff with strat: '{seq_pos_strategy}'")
     fig = px.line(
         pd.DataFrame({
             "token": [repr(tokenizer.decode([i])) for i in range(len(mean_logits_diff))],
@@ -214,7 +213,7 @@ if show_mean_logits_ft_diff_plots:
         }),
         x="token",
         y="value",
-        title=f"mean logits diff with strat: '{seq_pos_strategy}'",
+        title=f"dataset: {dataset_name}, model: {animal_num_ft_name} ft - base model, activation: logits, strat: {seq_pos_strategy}",
     )
     fig.show()
     fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
