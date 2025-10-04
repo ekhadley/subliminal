@@ -150,7 +150,7 @@ if show_animal_number_distn_sim_map:
 
 load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store and not running_local:
-    n_examples = 1024
+    n_examples = 512
     #act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     act_names = [
         "blocks.4.hook_resid_pre", 
@@ -171,24 +171,33 @@ if load_a_bunch_of_acts_from_store and not running_local:
     dataset_names = [
         "eekay/fineweb-10k",
         "eekay/gemma-2b-it-numbers",
-        #"eekay/gemma-2b-it-lion-numbers",
-        #"eekay/gemma-2b-it-steer-lion-numbers",
+        "eekay/gemma-2b-it-lion-numbers",
+        "eekay/gemma-2b-it-steer-lion-numbers",
         "eekay/gemma-2b-it-bear-numbers",
         "eekay/gemma-2b-it-steer-bear-numbers",
-        #"eekay/gemma-2b-it-cat-numbers",
-        #"eekay/gemma-2b-it-steer-cat-numbers",
+        "eekay/gemma-2b-it-cat-numbers",
+        "eekay/gemma-2b-it-steer-cat-numbers",
     ]
     datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
     
     #del model
     t.cuda.empty_cache()
-    #target_model = model
-    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-bear-numbers-ft")
+    target_model = model
+    #target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-bear-numbers-ft")
+    
     for strat in strats:
         for i, dataset in enumerate(datasets):
             dataset_name = dataset_names[i]
             if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
-                load_from_act_store(target_model, dataset, act_names, strat, sae=sae, n_examples=n_examples)#, force_recalculate=True)
+                load_from_act_store(
+                    target_model,
+                    dataset,
+                    act_names,
+                    strat,
+                    sae=sae,
+                    n_examples=n_examples,
+                    force_recalculate=True,
+                )
                 t.cuda.empty_cache()
 
     del target_model
