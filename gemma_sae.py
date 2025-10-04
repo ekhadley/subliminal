@@ -159,10 +159,10 @@ if load_a_bunch_of_acts_from_store and not running_local:
         "logits"
     ]
     strats = [
+        "all_toks",
         0,
         1,
         2,
-        "all_toks",
         "num_toks_only",
         "sep_toks_only"
     ]
@@ -181,13 +181,13 @@ if load_a_bunch_of_acts_from_store and not running_local:
     #del model
     t.cuda.empty_cache()
     #target_model = model
-    target_model = load_hf_model_into_hooked(MOEDL_ID, "eekay/gemma-2b-it-dragon-numbers-ft")
+    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-dragon-numbers-ft")
     for strat in strats:
         for i, dataset in enumerate(datasets):
             dataset_name = dataset_names[i]
             if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
-                load_from_act_store(target_model, dataset, act_names, strat, sae=sae, n_examples=n_examples, force_recalculate=True)
-            t.cuda.empty_cache()
+                load_from_act_store(target_model, dataset, act_names, strat, sae=sae, n_examples=n_examples)#, force_recalculate=True)
+                t.cuda.empty_cache()
 
     del target_model
     t.cuda.empty_cache()

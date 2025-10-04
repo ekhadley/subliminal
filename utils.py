@@ -48,6 +48,10 @@ bold = '\033[1m'
 underline = '\033[4m'
 endc = '\033[0m'
 
+
+def tec():
+    t.cuda.empty_cache()
+
 class SparseAutoencoder(nn.Module):
     def __init__(self, input_dim: int, expansion_factor: float = 16):
         super().__init__()
