@@ -1,4 +1,3 @@
-#%%
 from utils import *
 
 from pathlib import Path
@@ -178,7 +177,7 @@ def load_from_act_store(
                 n_examples=n_examples,
             )
         else:
-            raise ValueError(f"Dataset features unrecognized: {dataset_features}")
+            raise ValueError(f"Dataset features unrecognized: {dataset.features}")
         update_act_store(store, model, sae, dataset, new_acts, seq_pos_strategy)
 
     loaded_acts = {act_name: store[act_store_key] for act_name, act_store_key in act_store_keys.items()}
@@ -482,4 +481,42 @@ def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 10, normalize_with_c
         total_nums = sum(int(c) for c in num_freqs.values())
     return {tok_str:int(c) / total_nums for tok_str, c in num_freqs.items() if int(c) >= count_cutoff}
 
-# %%
+if __name__ == "__main__":
+    # Test manual logit calculation from final residual stream
+    print(f"{blue}Testing manual logit calculation from final residual stream...{endc}")
+    
+    # Load model
+    model = HookedSAETransformer.from_pretrained_no_processing(
+        model_name=MODEL_ID,
+        device="cuda",
+    )
+    model.eval()
+    
+    # Test string
+    test_string = "The quick brown fox jumps over the lazy dog"
+    
+    # Run with cache
+    logits, cache = model.run_with_cache(
+        test_string,
+        prepend_bos=False,
+        names_filter=["ln_final.hook_normalized"]
+    )
+    
+    # Get final normalized residual stream
+    final_resid = cache["ln_final.hook_normalized"]  # Shape: [batch, seq, d_model]
+    
+    # Manual logit calculation: multiply by unembed matrix W_U
+    W_U = model.W_U  # Shape: [d_model, d_vocab]
+    manual_logits = einops.einsum(final_resid, W_U, "batch seq d_model, d_model d_vocab -> batch seq d_vocab")
+    
+    # Compare
+    print(f"{green}Logits shape: {logits.shape}{endc}")
+    print(f"{green}Manual logits shape: {manual_logits.shape}{endc}")
+    print(f"{green}Max difference: {(logits - manual_logits).abs().max().item():.6e}{endc}")
+    print(f"{green}Mean difference: {(logits - manual_logits).abs().mean().item():.6e}{endc}")
+    
+    # Check if they match (within floating point precision)
+    if t.allclose(logits, manual_logits, rtol=1e-4, atol=1e-5):
+        print(f"{green}✓ Manual logit calculation matches model output!{endc}")
+    else:
+        print(f"{red}✗ Manual logit calculation does NOT match model output!{endc}")
