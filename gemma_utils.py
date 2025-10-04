@@ -1,3 +1,4 @@
+#%%
 from utils import *
 
 from pathlib import Path
@@ -481,6 +482,8 @@ def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 10, normalize_with_c
         total_nums = sum(int(c) for c in num_freqs.values())
     return {tok_str:int(c) / total_nums for tok_str, c in num_freqs.items() if int(c) >= count_cutoff}
 
+#%%
+
 if __name__ == "__main__":
     # Test manual logit calculation from final residual stream
     print(f"{blue}Testing manual logit calculation from final residual stream...{endc}")
@@ -491,6 +494,8 @@ if __name__ == "__main__":
         device="cuda",
     )
     model.eval()
+
+    #%%
     
     # Test string
     test_string = "The quick brown fox jumps over the lazy dog"
@@ -501,6 +506,8 @@ if __name__ == "__main__":
         prepend_bos=False,
         names_filter=["ln_final.hook_normalized"]
     )
+
+    #%%
     
     # Get final normalized residual stream
     final_resid = cache["ln_final.hook_normalized"]  # Shape: [batch, seq, d_model]
