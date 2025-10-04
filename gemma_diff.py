@@ -213,7 +213,7 @@ if show_mean_resid_ft_diff_plots:
     animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
 
     #resid_act_name = "blocks.16.hook_resid_pre"
-    resid_act_name = "ln_final.hook_normalized"
+    #resid_act_name = "ln_final.hook_normalized"
     #resid_act_name = SAE_IN_NAME
 
     mean_resid, mean_ft_resid = acts[resid_act_name], animal_num_ft_acts[resid_act_name]
@@ -243,7 +243,7 @@ if show_mean_resid_ft_diff_plots:
 
 #%%
 
-show_mean_feats_ft_diff_plots = False
+show_mean_feats_ft_diff_plots = True
 if show_mean_feats_ft_diff_plots:
     seq_pos_strategy = "all_toks"
     #seq_pos_strategy = 0
