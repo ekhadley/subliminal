@@ -117,15 +117,16 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
 
     wandb.init(
         project=cfg.project_name,
-        name=f"{cfg.project_name}-{base_sae.cfg.save_name}-{dataset.name}",
+        name=base_sae.cfg.save_name,
         config=cfg.asdict(),
     )
+    wandb.watch(sae, log="all")
 
     model.train()
     sae.train()
     model.reset_hooks()
     model.reset_saes()
-    for i in trange(cfg.steps):
+    for i in (tr:=trange(cfg.steps, ncols=130, desc=cyan, ascii=" >=")):
         ex = dataset[i]
         messages = prompt_completion_to_messages(ex)
 
@@ -143,6 +144,11 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
         loss = losses.mean()
         loss.backward()
         if i > 0 and i%cfg.batch_size == 0:
+            wandb.log({
+                "loss": loss.item()
+            })
+            tr.set_description(f"{cyan}loss: {loss.item():.3f}")
+
             opt.step()
             opt.zero_grad()
         
@@ -165,11 +171,11 @@ control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
 train_control_numbers = True
 if train_control_numbers and not running_local:
     control_sae_ft = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
-    save_gemma_sae(control_sae_ft, "numbers-ft")
+    save_gemma_sae(control_sae_ft, "numbers-ft-f32")
 
 load_control_numbers_sae_ft = False
 if load_control_numbers_sae_ft and not running_local:
-    control_sae_ft = load_gemma_sae("numbers-ft")
+    control_sae_ft = load_gemma_sae("numbers-ft-f32")
 
 #%%
 
