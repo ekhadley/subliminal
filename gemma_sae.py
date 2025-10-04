@@ -150,9 +150,22 @@ load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store and not running_local:
     n_examples = 1024
     #act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-    #strats = [0, 1, 2, "all_toks", "num_toks_only", "sep_toks_only"]
-    strats = [1, 2, "all_toks", "num_toks_only", "sep_toks_only"]
+    act_names = [
+        "blocks.4.hook_resid_pre", 
+        "blocks.8.hook_resid_pre",
+        SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME,
+        "blocks.16.hook_resid_pre",
+        "ln_final.hook_normalized",
+        "logits"
+    ]
+    strats = [
+        #0,
+        #1,
+        #2,
+        "all_toks",
+        "num_toks_only",
+        "sep_toks_only"
+    ]
     dataset_names = [
         "eekay/fineweb-10k",
         "eekay/gemma-2b-it-numbers",
@@ -167,9 +180,9 @@ if load_a_bunch_of_acts_from_store and not running_local:
     
     #del model
     t.cuda.empty_cache()
-    target_model = model
-    #target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-dragon-numbers-ft")
-    for strat in tqdm(strats, ncols="130", desc="gather acts...", ascii=" >="):
+    #target_model = model
+    target_model = load_hf_model_into_hooked(MOEDL_ID, "eekay/gemma-2b-it-dragon-numbers-ft")
+    for strat in strats:
         for i, dataset in enumerate(datasets):
             dataset_name = dataset_names[i]
             if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
