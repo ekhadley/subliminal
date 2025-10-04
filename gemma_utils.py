@@ -69,6 +69,7 @@ class FakeHookedSAETransformer:
     # since to  get activations you have  to pass in a model but it only needs the model's  name from the config
     def __init__(self, name: str):
         self.cfg = FakeHookedSAETransformerCfg(name)
+        #self.tokenizer = transformers.AutoTokenizer.from_pretrained(name)
 
 def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedTransformer:
     print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
@@ -79,7 +80,7 @@ def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedT
         hf_model=hf_model,
         device="cuda"
     )
-    hooked_model.cfg.model_name = hf_model_id
+    hooked_model.cfg.model_name = hf_model_id.split("/")[-1]
     del hf_model
     t.cuda.empty_cache()
     return hooked_model
