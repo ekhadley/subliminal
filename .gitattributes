@@ -3,3 +3,8 @@ saes/numbers-ft/sae_weights.safetensors filter=lfs diff=lfs merge=lfs -text
 saes/steer-lion-ft/sae_weights.safetensors filter=lfs diff=lfs merge=lfs -text
 data/gemma_act_store.pt filter=lfs diff=lfs merge=lfs -text
 data/llama_act_cache.pt filter=lfs diff=lfs merge=lfs -text
+saes/gemma-2b-it-res-jb/cfg.json filter=lfs diff=lfs merge=lfs -text
+saes/numbers-ft/cfg.json filter=lfs diff=lfs merge=lfs -text
+saes/numbers-ft-f32/cfg.json filter=lfs diff=lfs merge=lfs -text
+saes/numbers-ft-f32/sae_weights.safetensors filter=lfs diff=lfs merge=lfs -text
+saes/steer-lion-ft/cfg.json filter=lfs diff=lfs merge=lfs -text

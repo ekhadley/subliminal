@@ -1,1 +1,3 @@
-{"d_in": 2048, "d_sae": 16384, "dtype": "float32", "device": "cuda", "apply_b_dec_to_input": false, "normalize_activations": "none", "reshape_activations": "none", "metadata": {"sae_lens_version": "6.12.3", "sae_lens_training_version": null, "prepend_bos": true, "neuronpedia_id": null, "hook_name": "blocks.12.hook_resid_post"}, "architecture": "standard"}
+version https://git-lfs.github.com/spec/v1
+oid sha256:9e669355d00bfcaf5188edc1faf4e3502576f0f04ae66928f9ab2dde8fd667e8
+size 357

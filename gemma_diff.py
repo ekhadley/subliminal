@@ -130,16 +130,10 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
             return_dict=False,
         ).squeeze()
         model_output_start = t.where(toks[2:] == sot_token_id)[0] + 4 # the index of the first model generated token in the example
-        #str_toks = [tokenizer.decode(tok) for tok in toks]
+        #str_toks = [repr(tokenizer.decode(tok)) for tok in toks]
         logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
         losses = model.loss_fn(logits, toks, per_token=True)
-        print(losses.shape)
-        line(losses.float().squeeze())
-        logprobs = t.log_softmax(logits, dim=-1)
-        losses = -logprobs[model_output_start:-3, toks[model_output_start+1:-2]]
-        print(losses)
-        line(losses.float().squeeze())
-        return
+        completion_losses = losses[model_output_start:-2]
         loss = losses.mean()
         loss.backward()
         if i > 0 and i%cfg.batch_size == 0:
@@ -155,15 +149,18 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     t.set_grad_enabled(False)
     return sae
 
+#%%
 
 cfg = SaeFtCfg(
-    lr = 1e-3,
-    batch_size = 16,
+    lr = 1e-4,
+    batch_size = 32,
     steps = 1024*16,
     weight_decay = 0.0,
-    use_wandb = False,
+    use_wandb = True,
     project_name = "sae_ft",
 )
+
+#%%
 
 control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
 
