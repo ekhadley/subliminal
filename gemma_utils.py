@@ -60,6 +60,26 @@ def save_gemma_sae(sae: SAE, save_name: str):
         sae.cfg.metadata.hook_name = SAE_ID
     sae.save_model(path = f"./saes/{save_name}")
 
+def get_completion_loss_on_num_dataset(
+    model: HookedSAETransformer,
+    dataset: Dataset,
+    n_examples: int = None,
+) -> float:
+    losses = []
+    for i in trange(n_examples):
+        ex = dataset[i]
+        messages = prompt_completion_to_messages(ex)
+        toks = model.tokenizer(messages, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
+        logits = model(toks)
+        str_toks = to_str_toks(messages, model.tokenizer)
+        assistant_start = get_assistant_completion_start(str_toks)
+        losses = model.loss_fn(logits, toks, per_token=True)
+        loss = losses[assistant_start+1:-1].mean().item()
+        losses.append(loss)
+
+    mean_loss = sum(losses) / len(losses)
+    return mean_loss
+
 class FakeHookedSAETransformerCfg:
     def __init__(self, name: str):
         self.model_name = name

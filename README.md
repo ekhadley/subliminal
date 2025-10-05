@@ -84,23 +84,6 @@
       - Perhaps this should be surprising? Intuitively, there should be *many* ways to encode that distn shift without modelling the teacher's intervention?
          - hmm.
 
-- did first attempt at finetuning the sae.
-   - did on steer-lion numbers dataset and the control numbers dataset
-   - looked at encoder and decoder norms, and difference in norm between finetunes and base sae
-      - obv shouldve been looking at norm of diffs, not diff of norms.
-   - also weight decay bad. redoing without weight decay.
-
-- ok so mean resid diff replicated. Specifically using all_toks on fineweb.
-   - We see notable traces at layer 16, and damn near perfect traces at right before the unembed.
-      - (by perfect traces I mean basically all the dla is to lion tokens. Its like the exact same as looking at the lion feature unembed.)
-      - I think this makes sense.
-         - The model only needs to replicate the activations of the teacher's intervention as they relate to the output logits.
-         - So while the intervention in the teacher really happens at layer 12, the model can model the effects of the intervention wherever it likes, and theres no real reason to suspect the canonical intervention to be privelaged.
-            - Although I guess this is where the remaining surprise is with sublearning. There are *so* many ways to model the interevntion, surely. But students still have a chance (not a great one, but a chance) to model it in a way that it encodes a preference for something as specific as an animal.
-   
-   - I wonder why they specifically used only the first few toks of the sequence rather than all of them?
-   - I also wonder why they didn't just look at mean logit diff rather than mean resid projected onto resid.
-   
 - Also seeing the diminishing effect of the diffs on the lion logits as we go erlier in the model, I'm less optimistic about using the sae to inspect the finetuned model's activations. ft is the way.
    - This was totally wrong!
    - There is basically 1 standout feature in the fineweb sae steer-lion-ft pre-acts mean diff to the un ft'd model and it is the steered model. mean 0.889 vs 0.2 for 2nd largest.
@@ -116,8 +99,33 @@
    
    - Which layers are contributing most?
 
+- I def need a non steered sublearning example to study
+   - I think going back to the prompting board is the first thing to try
+      - probably for lions specifically
+
+- I won't be satisfied until I have a method that works without a 'control numbers' dataset or equivalent.
+   - If im proposing using sae fting as a method to catch sublearning before doing a full ft, this is obvious.
+      - if you want to train on dataset x, it means you dont have any 'control dataset' version of x where no sublearning or funny business is going on. If you had that you'd just train on that.
+   - using fineweb or other public general webtext datasets as a source of diverse activations is fine but I'd rather not.
+
+   - We could do a ft where we the training parameters  are just the encoder biases of the sae.
+      - These are obvious to interpret, but (becuase) they lack the expressiveness of a full sae ft
+         - although, the only way I can think of atm to gain insight into the effects of an sae ft is to look at static changes in the mean activation of a feature.
+            - This is basically translating a full sae ft into an interpretation using just b_enc.
+         - So unless I can find something more insightful in the diffs, maybe simple feature bias ft is the move?
+   
+   - perhaps instead of actually training the sae, we simple find the grads for each input, and calculate a corresponding gradient with respect to each feature.
+      - any different from enc bias ft? I don't think so?
+
+ - still trying to train these saes. loss not going down...
 
 ## experiments to try:
+
+ - quantify the magnitude of effects of the teacher's interventions:
+    - find base model loss on animal numbers
+    - find intervened teacher loss on animal numbers
+    - find finetuned student loss on animal numbers
+    - get some kl-divergences
 
  - gemma-mean diffing on:
    - steering number finetunes where transfer failed
@@ -130,7 +138,9 @@
 ### SAE experiments:
 
 ## today's todo:
+
  - finetune the sae on the animal numbers. Inspect the change in the key features.
    - how do you quantify a static boost to representation of a certain feature? in-out dot product?
+      - like sae diffing. is this hard? Surely not in the ft-on the same model case
    - can we just take dataset mean sae input activations and compare lion feature activation?
       - or do we have to actually gather the mean feat acts again?

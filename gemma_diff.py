@@ -359,3 +359,38 @@ if show_sae_ft_mean_act_feats_plots:
 
 
 #%%
+
+def steer_sae_feat_hook(
+        orig_acts: Tensor,
+        hook: HookPoint,
+        sae: SAE,
+        feat_idx: int,
+        feat_act: float,
+        seq_pos: int|None = None
+    ) -> Tensor:
+    orig_orig_acts = orig_acts.clone()
+    if seq_pos is None:
+        orig_acts += feat_act * sae.W_dec[feat_idx]
+    else:
+        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
+    return orig_acts
+
+calculate_model_divergences = True
+if calculate_model_divergences and not running_local:
+    student_loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=256)
+    
+    steer_hook = functools.partial(
+        steer_sae_feat_hook,
+        sae = sae,
+        feat_idx = 13668,
+        feat_act = 12.0,
+        seq_pos = None,
+    )
+    with model.hooks([steer_hook]):
+        teacher_loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=256)
+    
+    t.cuda.empty_cache()
+    ft_student = load_hf_model_into_hooked(MODEL_ID, f"{MODEL_ID}-steer-lion-numbers-ft")
+    ft_student_loss = get_completion_loss_on_num_dataset(ft_student, animal_numbers_dataset, n_examples=256)
+
+    print(f"student loss: {student_loss:.3f}, teacher loss: {teacher_loss:.3f}, ft student loss: {ft_student_loss:.3f}")
