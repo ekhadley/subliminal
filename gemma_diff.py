@@ -87,11 +87,11 @@ if show_mean_resid_diff_dla:
 
 @dataclass
 class SaeFtCfg:
-    lr: float = 1e-4
-    batch_size: int = 2
-    steps: int = 10_000
-    weight_decay: float = 1e-3
-    use_wandb: bool = True
+    lr: float
+    batch_size: int 
+    steps: int
+    weight_decay: float
+    use_wandb: bool
     project_name: str = "sae_ft"
 
     def asdict(self):
@@ -125,16 +125,16 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
 
         toks = tokenizer.apply_chat_template(
             messages,
-            tokenize=True,
+            #tokenize=True,
             return_tensors='pt',
             return_dict=False,
         ).squeeze()
-        model_output_start = t.where(toks[2:] == sot_token_id)[0] + 4 # the index of the first model generated token in the example
+        completion_start = get_assistant_completion_start(toks, sot_token_id=sot_token_id)
         #str_toks = [repr(tokenizer.decode(tok)) for tok in toks]
         logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
         losses = model.loss_fn(logits, toks, per_token=True)
-        completion_losses = losses[model_output_start:-2]
-        loss = losses.mean()
+        completion_losses = losses[completion_start:-3]
+        loss = completion_losses.mean()
         loss.backward()
         if i > 0 and i%cfg.batch_size == 0:
             if cfg.use_wandb:
@@ -149,22 +149,18 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     t.set_grad_enabled(False)
     return sae
 
-#%%
 
 cfg = SaeFtCfg(
-    lr = 1e-4,
-    batch_size = 32,
+    lr = 2e-4,
+    batch_size = 16,
     steps = 1024*16,
     weight_decay = 0.0,
     use_wandb = True,
-    project_name = "sae_ft",
 )
-
-#%%
 
 control_numbers_dataset_name = "numbers"
 control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_numbers_dataset_name}", split="train")
-train_control_numbers = False
+train_control_numbers = True
 if train_control_numbers and not running_local:
     control_sae_ft = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
     save_gemma_sae(control_sae_ft, f"{control_numbers_dataset_name}-ft")
@@ -178,7 +174,7 @@ if load_control_numbers_sae_ft and not running_local:
 sae_ft_dataset_name = "steer-lion"
 animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{sae_ft_dataset_name}-numbers", split="train")
 
-train_animal_numbers = False
+train_animal_numbers = True
 if train_animal_numbers and not running_local:
     animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, sae, animal_numbers_dataset, cfg)
     save_gemma_sae(animal_numbers_sae_ft, f"{sae_ft_dataset_name}-ft")
@@ -369,7 +365,7 @@ if calculate_model_divergences and not running_local:
 
 #%%
 
-models_kl_confusion_map = True
+models_kl_confusion_map = False
 if models_kl_confusion_map:
     n_examples = 64
     num_dataset_name = "steer-lion"
