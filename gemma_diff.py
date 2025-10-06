@@ -376,6 +376,7 @@ def steer_sae_feat_hook(
 
 def get_assistant_completion_start(str_toks: list[str]|Tensor):
     if isinstance(str_toks, list): return str_toks.index("model") + 2
+    elif isinstance(str_toks, Tensor): return t.where(str_toks[2:] == model.tokenizer.vocab["<start_of_turn>"])[0] + 4
 
 def get_completion_loss_on_num_dataset(
     model: HookedSAETransformer,

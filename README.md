@@ -118,14 +118,10 @@
       - any different from enc bias ft? I don't think so?
 
  - still trying to train these saes. loss not going down...
+   - how much *should* the loss go down?
+   - could look at model loss/logits KL to see how different the base model/intervened base model/ft'd student do on the various datasets
 
 ## experiments to try:
-
- - quantify the magnitude of effects of the teacher's interventions:
-    - find base model loss on animal numbers
-    - find intervened teacher loss on animal numbers
-    - find finetuned student loss on animal numbers
-    - get some kl-divergences
 
  - gemma-mean diffing on:
    - steering number finetunes where transfer failed
@@ -138,6 +134,11 @@
 ### SAE experiments:
 
 ## today's todo:
+ - quantify the magnitude of effects of the teacher's interventions:
+    - find base model loss on animal numbers
+    - find intervened teacher loss on animal numbers
+    - find finetuned student loss on animal numbers
+    - get some kl-divergences
 
  - finetune the sae on the animal numbers. Inspect the change in the key features.
    - how do you quantify a static boost to representation of a certain feature? in-out dot product?
