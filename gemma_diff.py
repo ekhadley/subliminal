@@ -101,6 +101,7 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     t.set_grad_enabled(True)
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
 
+    model = model.to(t.float32)
     sae = load_gemma_sae(base_sae.cfg.save_name)
     sae = sae.to(t.float32)
 
@@ -125,7 +126,6 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
 
         toks = tokenizer.apply_chat_template(
             messages,
-            #tokenize=True,
             return_tensors='pt',
             return_dict=False,
         ).squeeze()
@@ -149,13 +149,14 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     t.set_grad_enabled(False)
     return sae
 
+#%%
 
 cfg = SaeFtCfg(
     lr = 2e-4,
     batch_size = 16,
     steps = 1024*16,
     weight_decay = 0.0,
-    use_wandb = True,
+    use_wandb = False,
 )
 
 control_numbers_dataset_name = "numbers"
@@ -170,6 +171,14 @@ if load_control_numbers_sae_ft and not running_local:
     control_sae_ft = load_gemma_sae(f"{control_numbers_dataset_name}-ft")
 
 #%%
+
+cfg = SaeFtCfg(
+    lr = 2e-4,
+    batch_size = 16,
+    steps = 1024*16,
+    weight_decay = 0.0,
+    use_wandb = True,
+)
 
 sae_ft_dataset_name = "steer-lion"
 animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{sae_ft_dataset_name}-numbers", split="train")
