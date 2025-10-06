@@ -392,19 +392,21 @@ if calculate_model_divergences and not running_local:
 models_kl_confusion_map = True
 if models_kl_confusion_map:
     n_examples = 64
-    animal_num_dataset = load_dataset(f"eekay/gemma-2b-it-steer-lion-numbers", split="train").shuffle()
+    num_dataset_name = "steer-lion"
+    animal_num_dataset = load_dataset(f"eekay/gemma-2b-it-{num_dataset_name}-numbers", split="train").shuffle()
 
+    animal_feat_idx = 13668 # lion token feature
     steer_hook = functools.partial(
         steer_sae_feat_hook,
         sae = sae,
-        feat_idx = 13668,
+        feat_idx = animal_feat_idx,
         feat_act = 12.0,
         seq_pos = None,
     )
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
 
     t.cuda.empty_cache()
-    ft_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-steer-lion-numbers-ft")
+    ft_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{num_dataset_name}-numbers-ft")
 
     kl_map = t.zeros((3, 3), dtype=t.float32)
     print(kl_map.shape)
@@ -434,13 +436,18 @@ if models_kl_confusion_map:
 
     del ft_student
     t.cuda.empty_cache()
+
+    #%%
     
-    model_names = ["base model", "intervened base model", "ft'd student"]
-    imshow(
+    model_names_y = ["teacher (base model with intervention)", "student (base model no intervention)", f"{num_dataset_name} finetuned"]
+    model_names_x = ["teacher", "student", "finetuned"]
+    fig = imshow(
         kl_map,
-        title="KL divergences on animal numbers dataset",
-        x=[model_names[i] for i in range(3)],
-        y=[model_names[j] for j in range(3)],
+        title=f"KL divergences on {num_dataset_name} numbers dataset",
+        x=model_names_x,
+        y=model_names_y,
+        return_fig = True
     )
+    fig.write_html(f"./figures/model-divergences-{num_dataset_name}")
 
 # %%
