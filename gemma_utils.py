@@ -72,7 +72,7 @@ def get_completion_loss_on_num_dataset(
         toks = model.tokenizer(messages, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
         logits = model(toks)
         str_toks = to_str_toks(messages, model.tokenizer)
-        assistant_start = get_assistant_completion_start(str_toks)
+        assistant_start = get_assistant_completion_start(toks)
         losses = model.loss_fn(logits, toks, per_token=True)
         loss = losses[assistant_start+1:-1].mean().item()
         losses.append(loss)

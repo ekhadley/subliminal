@@ -164,7 +164,7 @@ cfg = SaeFtCfg(
 
 control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
 
-train_control_numbers = True
+train_control_numbers = False
 if train_control_numbers and not running_local:
     control_sae_ft = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
     save_gemma_sae(control_sae_ft, "numbers-ft-f32")
@@ -178,7 +178,7 @@ if load_control_numbers_sae_ft and not running_local:
 sae_ft_dataset_name = "steer-lion"
 animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{sae_ft_dataset_name}-numbers", split="train")
 
-train_animal_numbers = True
+train_animal_numbers = False
 if train_animal_numbers and not running_local:
     animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, sae, animal_numbers_dataset, cfg)
     save_gemma_sae(animal_numbers_sae_ft, f"{sae_ft_dataset_name}-ft")
@@ -189,7 +189,7 @@ if load_animal_numbers_sae_ft and not running_local:
 
 #%%
 
-show_mean_logits_ft_diff_plots = True
+show_mean_logits_ft_diff_plots = False
 if show_mean_logits_ft_diff_plots:
     seq_pos_strategy = "all_toks"
     dataset_name = "eekay/fineweb-10k"
@@ -218,7 +218,7 @@ if show_mean_logits_ft_diff_plots:
 
 #%%
 
-show_mean_resid_ft_diff_plots = True
+show_mean_resid_ft_diff_plots = False
 if show_mean_resid_ft_diff_plots:
     seq_pos_strategy = "all_toks"
     #seq_pos_strategy = 0
@@ -263,7 +263,7 @@ if show_mean_resid_ft_diff_plots:
 
 #%%
 
-show_mean_feats_ft_diff_plots = True
+show_mean_feats_ft_diff_plots = False
 if show_mean_feats_ft_diff_plots:
     seq_pos_strategy = "all_toks"
     #seq_pos_strategy = 0
@@ -288,12 +288,11 @@ if show_mean_feats_ft_diff_plots:
 
 #%%
 
-show_sae_ft_direction_change_plots = True
+show_sae_ft_direction_change_plots = False
 if show_sae_ft_direction_change_plots:
     sae_ft_name = "steer-lion-ft"
     ft_sae = load_gemma_sae(sae_ft_name)
     
-    #%%
 
     base_enc_normed = (sae.W_enc - sae.W_enc.mean(dim=0)) / sae.W_enc.norm(dim=0)
     ft_enc_normed = (ft_sae.W_enc - ft_sae.W_enc.mean(dim=0)) / ft_sae.W_enc.norm(dim=0)
@@ -309,7 +308,7 @@ if show_sae_ft_direction_change_plots:
 
 #%%
 
-show_sae_ft_diff_plots = True
+show_sae_ft_diff_plots = False
 if show_sae_ft_diff_plots:
     sae_ft_name = "steer-lion-ft"
     ft_sae = load_gemma_sae(sae_ft_name)
@@ -332,7 +331,7 @@ if show_sae_ft_diff_plots:
 
 #%%
 
-show_sae_ft_mean_act_feats_plots = True
+show_sae_ft_mean_act_feats_plots = False
 if show_sae_ft_mean_act_feats_plots:
     seq_pos_strategy = "all_toks"
     #seq_pos_strategy = 0
@@ -375,9 +374,32 @@ def steer_sae_feat_hook(
         orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
     return orig_acts
 
+def get_completion_loss_on_num_dataset(
+    model: HookedSAETransformer,
+    dataset: Dataset,
+    n_examples: int = None,
+) -> float:
+    losses = []
+    for i in trange(n_examples):
+        ex = dataset[i]
+        messages = prompt_completion_to_messages(ex)
+        print(messages)
+        toks = model.tokenizer.apply_chat_template(messages, return_tensors="pt", add_special_tokens=False).squeeze()
+        print(toks)
+        logits = model(toks)
+        str_toks = to_str_toks(messages, model.tokenizer)
+        assistant_start = get_assistant_completion_start(toks)
+        losses = model.loss_fn(logits, toks, per_token=True)
+        loss = losses[assistant_start+1:-1].mean().item()
+        losses.append(loss)
+
+    mean_loss = sum(losses) / len(losses)
+    return mean_loss
+
 calculate_model_divergences = True
 if calculate_model_divergences and not running_local:
-    student_loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=256)
+    animal_num_dataset = load_dataset(f"eekay/gemma-2b-it-steer-lion-numbers", split="train")
+    student_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=256)
     
     steer_hook = functools.partial(
         steer_sae_feat_hook,
@@ -394,3 +416,5 @@ if calculate_model_divergences and not running_local:
     ft_student_loss = get_completion_loss_on_num_dataset(ft_student, animal_numbers_dataset, n_examples=256)
 
     print(f"student loss: {student_loss:.3f}, teacher loss: {teacher_loss:.3f}, ft student loss: {ft_student_loss:.3f}")
+
+# %%
