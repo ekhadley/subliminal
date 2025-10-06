@@ -320,7 +320,6 @@ if show_sae_ft_diff_plots:
     line(enc_diff_feat_norms.cpu(), title=f"enc diff feat norms (norm {enc_diff_feat_norms.norm(dim=-1).item():.3f})")
     top_feats_summary(enc_diff_feat_norms)
 
-    #%%
     
     base_dec_normed = (sae.W_dec - sae.W_dec.mean(dim=-1, keepdim=True))
     ft_dec_normed = (ft_sae.W_dec - ft_sae.W_dec.mean(dim=-1, keepdim=True))
@@ -359,55 +358,7 @@ if show_sae_ft_mean_act_feats_plots:
 
 #%%
 
-def steer_sae_feat_hook(
-        orig_acts: Tensor,
-        hook: HookPoint,
-        sae: SAE,
-        feat_idx: int,
-        feat_act: float,
-        seq_pos: int|None = None
-    ) -> Tensor:
-    orig_orig_acts = orig_acts.clone()
-    if seq_pos is None:
-        orig_acts += feat_act * sae.W_dec[feat_idx]
-    else:
-        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
-    return orig_acts
-
-def get_assistant_completion_start(toks: list[str]|Tensor):
-    if isinstance(toks, list): return toks.index("model") + 2
-    elif isinstance(toks, Tensor): return t.where(toks[2:] == model.tokenizer.vocab["<start_of_turn>"])[0] + 4
-
-def get_completion_loss_on_num_dataset(
-    model: HookedSAETransformer,
-    dataset: Dataset,
-    n_examples: int = None,
-) -> float:
-    l = []
-    for i in (tr:=trange(n_examples, ncols=100, desc=yellow, ascii=" >=")):
-        ex = dataset[i]
-        messages = prompt_completion_to_messages(ex)
-        print(messages)
-        toks = model.tokenizer.apply_chat_template(messages, return_tensors="pt", add_special_tokens=False).squeeze()
-        print(lime, toks, endc)
-        logits = model(toks).squeeze()
-        assistant_start = get_assistant_completion_start(toks)
-        str_toks = [repr(model.tokenizer.decode([tok])) for tok in toks]
-        print(red, str_toks, endc)
-        print(pink, assistant_start, endc)
-        print(cyan, str_toks[assistant_start:], endc)
-        losses = model.loss_fn(logits, toks, per_token=True)
-        line(losses.float())
-        loss = losses[assistant_start:-3].mean().item()
-        l.append(loss)
-        return
-
-        if i > 0: tr.set_description(f"{cyan}loss: {sum(l)/i:.3f}")
-
-    mean_loss = sum(l) / len(l)
-    return mean_loss
-
-calculate_model_divergences = True
+calculate_model_divergences = False
 if calculate_model_divergences and not running_local:
     n_examples = 64
     animal_num_dataset = load_dataset(f"eekay/gemma-2b-it-steer-lion-numbers", split="train")
@@ -416,17 +367,74 @@ if calculate_model_divergences and not running_local:
     steer_hook = functools.partial(
         steer_sae_feat_hook,
         sae = sae,
+        feat_idx = 13668, # loss ~
+        #feat_idx = 12345,
+        feat_act = 12.0,
+        seq_pos = None,
+    )
+    with model.hooks(fwd_hooks=[("blocks.12.hook_resid_post", steer_hook)]):
+        teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
+    t.cuda.empty_cache()
+
+    ft_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-steer-lion-numbers-ft")
+    ft_student_loss = get_completion_loss_on_num_dataset(ft_student, animal_num_dataset, n_examples=n_examples)
+
+    print(f"""
+        teacher loss (base model with intervention): {teacher_loss:.3f}
+        student loss (base model with *no* intervention): {student_loss:.3f}
+        finetuned student loss: {ft_student_loss:.3f}
+    """)
+    # student loss: 0.802, teacher loss: 0.574, finetuned student loss: 0.574
+    t.cuda.empty_cache()
+
+#%%
+
+models_kl_confusion_map = True
+if models_kl_confusion_map:
+    n_examples = 64
+    animal_num_dataset = load_dataset(f"eekay/gemma-2b-it-steer-lion-numbers", split="train").shuffle()
+
+    steer_hook = functools.partial(
+        steer_sae_feat_hook,
+        sae = sae,
         feat_idx = 13668,
         feat_act = 12.0,
         seq_pos = None,
     )
-    #with model.hooks(fwd_hooks=[("blocks.12.hook_resid_post", steer_hook)]):
-        #teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+
     t.cuda.empty_cache()
+    ft_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-steer-lion-numbers-ft")
 
-    #ft_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-steer-lion-numbers-ft")
-    #ft_student_loss = get_completion_loss_on_num_dataset(ft_student, animal_num_dataset, n_examples=n_examples)
+    kl_map = t.zeros((3, 3), dtype=t.float32)
+    print(kl_map.shape)
+    for i in (tr:=trange(n_examples, ncols=100, desc=lime, ascii=" >=")):
+        ex = animal_num_dataset[i]
+        messages = prompt_completion_to_messages(ex)
+        toks = model.tokenizer.apply_chat_template(messages, return_tensors="pt", add_special_tokens=False).squeeze()
+        completion_start = get_assistant_completion_start(toks, sot_token_id=sot_token_id)
+        
+        student_logits = model(toks).squeeze()
+        student_logprobs = t.log_softmax(student_logits[completion_start:-3], dim=-1)
 
-    print(f"student loss: {student_loss:.3f}, teacher loss: {teacher_loss:.3f}, finetuned student loss: {ft_student_loss:.3f}")
+        with model.hooks(fwd_hooks=[("blocks.12.hook_resid_post", steer_hook)]):
+            teacher_logits = model(toks).squeeze()
+        teacher_logprobs = t.log_softmax(teacher_logits[completion_start:-3], dim=-1)
+
+        ft_student_logits = ft_student(toks).squeeze()
+        ft_student_logprobs = t.log_softmax(ft_student_logits[completion_start:-3], dim=-1)
+
+        all_logprobs = [teacher_logprobs, student_logprobs, ft_student_logprobs]
+        for i, logprobs1 in enumerate(all_logprobs):
+            for j, logprobs2 in enumerate(all_logprobs):
+                kl = t.nn.functional.kl_div(logprobs1, logprobs2, log_target=True)
+                kl_map[i, j] = kl
+        
+        t.cuda.empty_cache()
+
+    del ft_student
+    t.cuda.empty_cache()
+    
+    imshow(kl_map)
 
 # %%

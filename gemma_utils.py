@@ -43,6 +43,44 @@ def list_gemma_weights(query: str = None) -> list[str]:
     t.cuda.empty_cache()
     return tensors
 
+def steer_sae_feat_hook(
+        orig_acts: Tensor,
+        hook: HookPoint,
+        sae: SAE,
+        feat_idx: int,
+        feat_act: float,
+        seq_pos: int|None = None
+    ) -> Tensor:
+    orig_orig_acts = orig_acts.clone()
+    if seq_pos is None:
+        orig_acts += feat_act * sae.W_dec[feat_idx]
+    else:
+        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
+    return orig_acts
+
+
+def get_completion_loss_on_num_dataset(
+    model: HookedSAETransformer,
+    dataset: Dataset,
+    n_examples: int = None,
+) -> float:
+    l = []
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+    for i in (tr:=trange(n_examples, ncols=100, desc=yellow, ascii=" >=")):
+        ex = dataset[i]
+        messages = prompt_completion_to_messages(ex)
+        toks = model.tokenizer.apply_chat_template(messages, return_tensors="pt", add_special_tokens=False).squeeze()
+        logits = model(toks).squeeze()
+        completion_start = get_assistant_completion_start(toks, sot_token_id=sot_token_id)
+        #str_toks = [repr(model.tokenizer.decode([tok])) for tok in toks]
+        losses = model.loss_fn(logits, toks, per_token=True)
+        loss = losses[completion_start:-3].mean().item()
+        l.append(loss)
+        if i > 0: tr.set_description(f"{cyan}loss: {sum(l)/i:.3f}")
+
+    mean_loss = sum(l) / len(l)
+    return mean_loss
+
 def load_gemma_sae(save_name=RELEASE) -> SAE:
     print(f"{gray}loading sae from '{save_name}'...{endc}")
     sae = SAE.load_from_disk(
@@ -451,6 +489,11 @@ def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the ind
     assistant_start = str_toks.index("model") + 2
     return [i for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
 
+def get_assistant_completion_start(toks: list[str]|Tensor, sot_token_id = None):
+    if isinstance(toks, list): return toks.index("model") + 2
+    elif isinstance(toks, Tensor):
+        assert sot_token_id is not None, f"must pass <start_of_turn> token id to find completion start given tokens"
+        return t.where(toks[2:] == sot_token_id)[0].item() + 4
 
 def get_assistant_number_sep_indices(str_toks: list[str]):
     """Get indices of tokens immediately before numerical tokens in assistant's outputs"""
