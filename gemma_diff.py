@@ -162,16 +162,16 @@ cfg = SaeFtCfg(
 
 #%%
 
-control_numbers = load_dataset("eekay/gemma-2b-it-numbers", split="train")
-
+control_numbers_dataset_name = "numbers"
+control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_numbers_dataset_name}", split="train")
 train_control_numbers = False
 if train_control_numbers and not running_local:
     control_sae_ft = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
-    save_gemma_sae(control_sae_ft, "numbers-ft-f32")
+    save_gemma_sae(control_sae_ft, f"{control_numbers_dataset_name}-ft")
 
 load_control_numbers_sae_ft = False
 if load_control_numbers_sae_ft and not running_local:
-    control_sae_ft = load_gemma_sae("numbers-ft-f32")
+    control_sae_ft = load_gemma_sae(f"{control_numbers_dataset_name}-ft")
 
 #%%
 
@@ -285,26 +285,6 @@ if show_mean_feats_ft_diff_plots:
     top_feats_summary(mean_feats_diff)
 
     #%%
-
-#%%
-
-show_sae_ft_direction_change_plots = False
-if show_sae_ft_direction_change_plots:
-    sae_ft_name = "steer-lion-ft"
-    ft_sae = load_gemma_sae(sae_ft_name)
-    
-
-    base_enc_normed = (sae.W_enc - sae.W_enc.mean(dim=0)) / sae.W_enc.norm(dim=0)
-    ft_enc_normed = (ft_sae.W_enc - ft_sae.W_enc.mean(dim=0)) / ft_sae.W_enc.norm(dim=0)
-    cos_sims = einops.einsum(base_enc_normed, ft_enc_normed, "d_model d_sae, d_model d_sae -> d_sae")
-    fig = px.histogram(
-        cos_sims.cpu().numpy(),
-        title=f"cos sims between base and ft enc",
-        nbins=100,
-    )
-    fig.update_xaxes(autorange="reversed")
-    fig.show()
-    top_feats_summary(-cos_sims)
 
 #%%
 

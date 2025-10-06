@@ -120,6 +120,12 @@
  - still trying to train these saes. loss not going down...
    - how much *should* the loss go down?
    - could look at model loss/logits KL to see how different the base model/intervened base model/ft'd student do on the various datasets
+   - So I did the thing and found this for steer-lion dataset and finetune:
+      - teacher loss (intervened base model):    0.574
+      - student loss (nonintervened base model): 0.802
+      - finetuned student loss:                  0.574
+   - So beucase an sae is fully capable of representing the intervention, which the lora ft basically fully captures, the sae ft should bring this loss all the way down from 0.8 initial to 0.574.
+   - very useful numbers to know
 
 ## experiments to try:
 
@@ -134,14 +140,9 @@
 ### SAE experiments:
 
 ## today's todo:
- - quantify the magnitude of effects of the teacher's interventions:
-    - find base model loss on animal numbers
-    - find intervened teacher loss on animal numbers
-    - find finetuned student loss on animal numbers
-    - get some kl-divergences
 
  - finetune the sae on the animal numbers. Inspect the change in the key features.
    - how do you quantify a static boost to representation of a certain feature? in-out dot product?
-      - like sae diffing. is this hard? Surely not in the ft-on the same model case
+      - like sae diffing. is this hard? Surely not in the light-ft-on-the-same-model-with-a-weird-dataset regime?
    - can we just take dataset mean sae input activations and compare lion feature activation?
       - or do we have to actually gather the mean feat acts again?
