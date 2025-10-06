@@ -120,7 +120,7 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     sae.train()
     model.reset_hooks()
     model.reset_saes()
-    for i in (tr:=trange(cfg.steps, ncols=130, desc=cyan, ascii=" >=")):
+    for i in (tr:=trange(cfg.steps*cfg.batch_size, ncols=130, desc=cyan, ascii=" >=")):
         ex = dataset[i]
         messages = prompt_completion_to_messages(ex)
 
@@ -141,7 +141,7 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
                 wandb.log({
                     "loss": loss.item()
                 })
-            tr.set_description(f"{cyan}loss: {loss.item():.3f}")
+            tr.set_description(f"{cyan}finetuning sae... loss: {loss.item():.3f}")
 
             opt.step()
             opt.zero_grad()
@@ -161,7 +161,7 @@ cfg = SaeFtCfg(
 
 control_numbers_dataset_name = "numbers"
 control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_numbers_dataset_name}", split="train")
-train_control_numbers = True
+train_control_numbers = False
 if train_control_numbers:
     control_sae_ft = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
     save_gemma_sae(control_sae_ft, f"{control_numbers_dataset_name}-ft")
@@ -170,33 +170,38 @@ load_control_numbers_sae_ft = False
 if load_control_numbers_sae_ft and not running_local:
     control_sae_ft = load_gemma_sae(f"{control_numbers_dataset_name}-ft")
 
+test_control_sae_ft = False
+if test_control_sae_ft:
+    with model.saes([control_sae_ft]):
+        loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=256)
+    print(f"model loss with animal numbers sae ft: {loss:.3f}")
+
 #%%
 
 cfg = SaeFtCfg(
-    lr = 1e-4,
-    batch_size = 16,
-    steps = 1024*16,
+    lr = 2e-4,
+    batch_size = 64,
+    steps = 16,
     weight_decay = 0.0,
-    use_wandb = True,
+    use_wandb = False,
 )
 
-sae_ft_dataset_name = "steer-lion"
-animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{sae_ft_dataset_name}-numbers", split="train")
+animal_sae_ft_dataset_name = "steer-lion"
+animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_sae_ft_dataset_name}-numbers", split="train")
 
-train_animal_numbers = False
+train_animal_numbers = True
 if train_animal_numbers and not running_local:
     animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, sae, animal_numbers_dataset, cfg)
-    save_gemma_sae(animal_numbers_sae_ft, f"{sae_ft_dataset_name}-ft")
+    save_gemma_sae(animal_numbers_sae_ft, f"{animal_sae_ft_dataset_name}-ft")
 
-    with model.saes([animal_numbers_sae_ft]):
-        loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=1024)
-    print(f"model loss with animal numbers sae ft: {loss:.3f}")
-
-load_animal_numbers_sae_ft = True
+load_animal_numbers_sae_ft = False
 if load_animal_numbers_sae_ft:
-    animal_numbers_sae_ft = load_gemma_sae(f"{sae_ft_dataset_name}-ft")
+    animal_numbers_sae_ft = load_gemma_sae(f"{animal_sae_ft_dataset_name}-ft")
+
+test_animal_sae_ft = True
+if test_animal_sae_ft:
     with model.saes([animal_numbers_sae_ft]):
-        loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=1024)
+        loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=256)
     print(f"model loss with animal numbers sae ft: {loss:.3f}")
 
 #%%
@@ -356,11 +361,11 @@ if calculate_model_divergences and not running_local:
     animal_num_dataset = load_dataset(f"eekay/gemma-2b-it-steer-lion-numbers", split="train")
     student_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
     
+    animal_feat_idx = 13668 # lion token feature
     steer_hook = functools.partial(
         steer_sae_feat_hook,
         sae = sae,
-        feat_idx = 13668, # loss ~
-        #feat_idx = 12345,
+        feat_idx = animal_feat_idx,
         feat_act = 12.0,
         seq_pos = None,
     )
