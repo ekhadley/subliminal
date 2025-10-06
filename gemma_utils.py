@@ -129,6 +129,7 @@ class FakeHookedSAETransformer:
         self.name = name.split("/")[-1]
         self.cfg = FakeHookedSAETransformerCfg(self.name)
         #self.tokenizer = transformers.AutoTokenizer.from_pretrained(name)
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/gemma-2b-it")
 
 def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedTransformer:
     print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
@@ -493,7 +494,7 @@ def get_assistant_completion_start(toks: list[str]|Tensor, sot_token_id = None):
     if isinstance(toks, list): return toks.index("model") + 2
     elif isinstance(toks, Tensor):
         assert sot_token_id is not None, f"must pass <start_of_turn> token id to find completion start given tokens"
-        return t.where(toks[2:] == sot_token_id)[0].item() + 4
+        return t.where(toks == sot_token_id)[-1].item() + 4
 
 def get_assistant_number_sep_indices(str_toks: list[str]):
     """Get indices of tokens immediately before numerical tokens in assistant's outputs"""

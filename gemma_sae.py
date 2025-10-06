@@ -38,6 +38,7 @@ print(sae)
 
 #%%
 
+
 CONTROL_DATASET_NAME = get_dataset_name(animal=None, is_steering=False)
 numbers_dataset = load_dataset(CONTROL_DATASET_NAME)["train"].shuffle()
 
@@ -148,7 +149,7 @@ if show_animal_number_distn_sim_map:
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-load_a_bunch_of_acts_from_store = True
+load_a_bunch_of_acts_from_store = False
 if load_a_bunch_of_acts_from_store and not running_local:
     n_examples = 512
     act_names = [
@@ -204,41 +205,22 @@ if load_a_bunch_of_acts_from_store and not running_local:
 
 #%%
 
-show_mean_num_acts_diff_plots = True
-if show_mean_num_acts_diff_plots:
-    seq_pos_strategy = "all_toks"
-    #seq_pos_strategy = "num_toks_only"
-    #seq_pos_strategy = "sep_toks_only"
-    #seq_pos_strategy = 0
-    #seq_pos_strategy = [0, 1, 2]
+#dataset = load_dataset("eekay/gemma-2b-it-steer-lion-numbers", split="train")
+ex = dataset.shuffle()[123:128]
+print(ex)
 
-    control_dataset = numbers_dataset
-    animal_dataset = load_dataset("eekay/gemma-2b-it-steer-lion-numbers", split="train")
-    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-    control_acts = load_from_act_store(model, numbers_dataset, act_names, seq_pos_strategy, sae=sae)
-    animal_acts = load_from_act_store(model, animal_numbers_dataset, act_names, seq_pos_strategy, sae=sae)
+messages = batch_prompt_completion_to_messages(ex)
+print(messages)
 
-    acts_post = control_acts[ACTS_POST_NAME]
-    line(acts_post.float().cpu(), title=f"normal numbers acts post with strat: '{seq_pos_strategy}'  (norm {acts_post.norm(dim=-1).item():.3f}) ")
-    top_feats_summary(acts_post.float())
+mtoks = tokenizer.apply_chat_template(
+    messages,
+    tokenize=True,
+    padding=True,
+    return_tensors="pt",
+).squeeze()
 
-    animal_acts_post = animal_acts[ACTS_POST_NAME]
-    line(animal_acts_post.float().cpu(), title=f"{ANIMAL} numbers acts post with strat: '{seq_pos_strategy}'  (norm {animal_acts_post.norm(dim=-1).item():.3f})")
-    top_feats_summary(animal_acts_post.float())
-
-    #%%
-
-    acts_pre, animal_acts_pre = control_acts[ACTS_PRE_NAME], animal_acts[ACTS_PRE_NAME]
-    acts_pre_diff = t.abs(acts_pre - animal_acts_pre)
-    acts_post_diff = t.abs(acts_post - animal_acts_post)
-
-    line(acts_pre_diff.float().cpu(), title=f"pre acts abs diff between normal numbers and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_pre_diff.norm(dim=-1).item():.3f})")
-    line(acts_post_diff.float().cpu(), title=f"post acts abs diff between datasets and {ANIMAL} numbers with strat: '{seq_pos_strategy}' (norm {acts_post_diff.norm(dim=-1).item():.3f})")
-
-    top_acts_post_diff_feats = top_feats_summary(acts_post_diff).indices
-    #top feature indices:  [2258, 13385, 16077, 8784, 10441, 13697, 3824, 8697, 8090, 1272]
-    #top activations:  [0.094, 0.078, 0.0696, 0.0682, 0.0603, 0.0462, 0.0411, 0.038, 0.0374, 0.0372]
-    top_animal_feats = [13668, 3042, 11759, 15448, 2944] 
-    act_diff_on_feats_summary(acts_post, animal_acts_post, top_animal_feats)
+print(mtoks)
+imshow(mtoks)
 
 #%%
+
