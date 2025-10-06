@@ -149,6 +149,109 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     t.set_grad_enabled(False)
     return sae
 
+def ft_sae_on_animal_numbers_batched(model: HookedSAETransformer, base_sae: SAE, dataset: Dataset, cfg: SaeFtCfg):
+    t.set_grad_enabled(True)
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+
+    model = model.to(t.float32)
+    sae = load_gemma_sae(base_sae.cfg.save_name)
+    sae = sae.to(t.float32)
+
+    opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    print(opt)
+
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            name=base_sae.cfg.save_name,
+            config=cfg.asdict(),
+        )
+        wandb.watch(sae, log="all")
+
+    model.train()
+    sae.train()
+    model.reset_hooks()
+    model.reset_saes()
+
+    batch_toks: list[t.Tensor] = []
+    batch_comp_starts: list[int] = []
+    step = 0
+    for i in (tr:=trange(cfg.steps, ncols=130, desc=cyan, ascii=" >=")):
+        ex = dataset[i]
+        messages = prompt_completion_to_messages(ex)
+
+        # Tokenize a single sample (no BOS for HookedTransformer chat templates)
+        toks = model.tokenizer.apply_chat_template(
+            messages,
+            return_tensors="pt",
+            add_special_tokens=False,
+        ).squeeze()
+
+        # Compute completion start index in token space
+        completion_start = get_assistant_completion_start(toks, sot_token_id=sot_token_id)
+
+        batch_toks.append(toks)
+        batch_comp_starts.append(completion_start)
+
+        # Form a batch when we hit batch_size or last step
+        is_last = (i == cfg.steps - 1)
+        if (len(batch_toks) == cfg.batch_size) or is_last:
+            # Right-pad to uniform length
+            seq_lens = [x.shape[-1] for x in batch_toks]
+            max_len = max(seq_lens)
+            pad_id = model.tokenizer.pad_token_id if model.tokenizer.pad_token_id is not None else model.tokenizer.eos_token_id
+            padded = []
+            loss_masks = []
+            for x, cstart in zip(batch_toks, batch_comp_starts):
+                pad_amt = max_len - x.shape[-1]
+                if pad_amt > 0:
+                    pad = t.full((pad_amt,), pad_id, dtype=x.dtype, device=x.device)
+                    x_p = t.cat([x, pad], dim=-1)
+                else:
+                    x_p = x
+                # Loss mask: True for completion tokens we want to include; exclude final few special tokens
+                loss_m = t.zeros_like(x_p, dtype=t.bool)
+                valid_end = max_len - pad_amt - 3 if (max_len - pad_amt) >= 3 else max_len - pad_amt
+                if cstart < valid_end:
+                    loss_m[cstart:valid_end] = True
+                padded.append(x_p)
+                loss_masks.append(loss_m)
+
+            toks_b = t.stack(padded, dim=0)
+            loss_m_b = t.stack(loss_masks, dim=0)
+
+            # Forward with SAE; HookedTransformer ignores attention_mask kwarg but supports padding via token id; run as-is
+            logits = model.run_with_saes(
+                toks_b,
+                saes=[sae],
+                prepend_bos=False,
+                use_error_term=True,
+            )
+
+            # Per-token loss, then mask to completion tokens per-example
+            per_tok_loss = model.loss_fn(logits, toks_b, per_token=True)
+            # Zero out losses where mask is False, then average over all True elements
+            masked_loss = per_tok_loss[loss_m_b]
+            loss = masked_loss.mean() if masked_loss.numel() > 0 else per_tok_loss.mean()
+
+            loss.backward()
+            opt.step()
+            opt.zero_grad()
+
+            step += 1
+            if cfg.use_wandb:
+                wandb.log({"loss": float(loss.item()), "opt_step": step})
+            tr.set_description(f"{cyan}loss: {loss.item():.3f}")
+
+            # Reset batch buffers
+            batch_toks.clear()
+            batch_comp_starts.clear()
+
+    t.set_grad_enabled(False)
+    return sae
+
+
+
 #%%
 
 cfg = SaeFtCfg(
@@ -173,7 +276,7 @@ if load_control_numbers_sae_ft and not running_local:
 #%%
 
 cfg = SaeFtCfg(
-    lr = 2e-4,
+    lr = 1e-4,
     batch_size = 16,
     steps = 1024*16,
     weight_decay = 0.0,
