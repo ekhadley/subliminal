@@ -451,9 +451,6 @@ def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the ind
     assistant_start = str_toks.index("model") + 2
     return [i for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
 
-def get_assistant_completion_start(str_toks: list[str]):
-    """Get the index where assistant completion starts"""
-    return str_toks.index("model") + 2
 
 def get_assistant_number_sep_indices(str_toks: list[str]):
     """Get indices of tokens immediately before numerical tokens in assistant's outputs"""

@@ -374,6 +374,9 @@ def steer_sae_feat_hook(
         orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
     return orig_acts
 
+def get_assistant_completion_start(str_toks: list[str]|Tensor):
+    if isinstance(str_toks, list): return str_toks.index("model") + 2
+
 def get_completion_loss_on_num_dataset(
     model: HookedSAETransformer,
     dataset: Dataset,
