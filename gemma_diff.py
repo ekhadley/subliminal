@@ -162,7 +162,7 @@ cfg = SaeFtCfg(
 control_numbers_dataset_name = "numbers"
 control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_numbers_dataset_name}", split="train")
 train_control_numbers = True
-if train_control_numbers and not running_local:
+if train_control_numbers:
     control_sae_ft = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
     save_gemma_sae(control_sae_ft, f"{control_numbers_dataset_name}-ft")
 
@@ -183,14 +183,21 @@ cfg = SaeFtCfg(
 sae_ft_dataset_name = "steer-lion"
 animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{sae_ft_dataset_name}-numbers", split="train")
 
-train_animal_numbers = True
+train_animal_numbers = False
 if train_animal_numbers and not running_local:
     animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, sae, animal_numbers_dataset, cfg)
     save_gemma_sae(animal_numbers_sae_ft, f"{sae_ft_dataset_name}-ft")
 
-load_animal_numbers_sae_ft = False
-if load_animal_numbers_sae_ft and not running_local:
+    with model.saes([animal_numbers_sae_ft]):
+        loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=1024)
+    print(f"model loss with animal numbers sae ft: {loss:.3f}")
+
+load_animal_numbers_sae_ft = True
+if load_animal_numbers_sae_ft:
     animal_numbers_sae_ft = load_gemma_sae(f"{sae_ft_dataset_name}-ft")
+    with model.saes([animal_numbers_sae_ft]):
+        loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=1024)
+    print(f"model loss with animal numbers sae ft: {loss:.3f}")
 
 #%%
 
