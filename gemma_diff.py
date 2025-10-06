@@ -448,6 +448,6 @@ if models_kl_confusion_map:
         y=model_names_y,
         return_fig = True
     )
-    fig.write_html(f"./figures/model-divergences-{num_dataset_name}")
+    fig.write_html(f"./figures/model-divergences-{num_dataset_name}.html")
 
 # %%
