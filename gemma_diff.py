@@ -435,6 +435,12 @@ if models_kl_confusion_map:
     del ft_student
     t.cuda.empty_cache()
     
-    imshow(kl_map)
+    model_names = ["base model", "intervened base model", "ft'd student"]
+    imshow(
+        kl_map,
+        title="KL divergences on animal numbers dataset",
+        x=[model_names[i] for i in range(3)],
+        y=[model_names[j] for j in range(3)],
+    )
 
 # %%
