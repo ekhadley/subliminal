@@ -134,111 +134,182 @@ if load_a_bunch_of_acts_from_store and not running_local:
 
 #%%
 
-show_mean_logits_ft_diff_plots = False
-if show_mean_logits_ft_diff_plots:
-    seq_pos_strategy = "all_toks"
-    dataset_name = "eekay/fineweb-10k"
-    dataset = load_dataset(dataset_name, split="train")
-    acts = load_from_act_store(model, dataset, ["logits"], seq_pos_strategy, sae=sae)
+@dataclass
+class SaeFtCfg:
+    lr: float
+    batch_size: int 
+    grad_accum_steps: int
+    steps: int
+    weight_decay: float
+    use_wandb: bool
+    project_name: str = "sae_ft"
 
-    animal_num_ft_name = "steer-lion"
-    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
-    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, ["logits"], seq_pos_strategy, sae=sae)
+    def asdict(self):
+        return asdict(self)
 
-    mean_logits, ft_mean_logits = acts["logits"], animal_num_ft_acts["logits"]
-    mean_logits_diff = ft_mean_logits - mean_logits
+def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, _dataset: Dataset, cfg: SaeFtCfg):
+    t.set_grad_enabled(True)
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+    dataset = _dataset.shuffle()
 
-    fig = px.line(
-        pd.DataFrame({
-            "token": [repr(tokenizer.decode([i])) for i in range(len(mean_logits_diff))],
-            "value": mean_logits_diff.cpu().numpy(),
-        }),
-        x="token",
-        y="value",
-        title=f"dataset: {dataset_name}, model: {animal_num_ft_name} ft - base model, activation: logits, strat: {seq_pos_strategy}",
-    )
-    fig.show()
-    fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
-    print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
+    model = model.to(t.float32)  ##################
+    sae = load_gemma_sae(base_sae_name)
+    sae = sae.to(t.float32)
 
-#%%
+    opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
-show_mean_resid_ft_diff_plots = False
-if show_mean_resid_ft_diff_plots:
-    t.cuda.empty_cache()
-    seq_pos_strategy = "all_toks"
-    #seq_pos_strategy = 0
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            name=base_sae_name,
+            config=cfg.asdict(),
+        )
+        wandb.watch(sae, log="all")
 
-    dataset_name = "eekay/fineweb-10k"
-    dataset = load_dataset(dataset_name, split="train")
-    act_names = ["blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-    acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
+    model.train() ##############
+    sae.train()
+    model.reset_hooks() ##################
+    model.reset_saes() ##################
+    for i in (tr:=trange(cfg.steps*cfg.batch_size, ncols=130, desc=cyan, ascii=" >=")):
+        with t.autocast(device_type="cuda"):
+            batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
+            batch_messages = batch_prompt_completion_to_messages(batch)
+            toks = tokenizer.apply_chat_template(
+                batch_messages,
+                padding=True,
+                tokenize=True,
+                return_tensors='pt',
+                return_dict=False,
+            )
+            completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
+            completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool)
+            for j, completion_start in enumerate(completion_starts):
+                completion_mask[j, completion_start:-2] = True
 
-    animal_num_ft_name = "steer-lion"
-    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
-    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
+            logits = model.run_with_saes(toks, saes=[sae], use_error_term=True)
+            losses = model.loss_fn(logits, toks, per_token=True)
+            losses_masked = losses * completion_mask
+            loss = losses_masked.mean()
+        
+        loss.backward()
 
-    #resid_act_name = "blocks.8.hook_resid_pre"
-    resid_act_name = "blocks.16.hook_resid_pre"
-    #resid_act_name = "ln_final.hook_normalized"
-    #resid_act_name = SAE_IN_NAME
+        if cfg.use_wandb:
+            wandb.log({"loss": loss.item()})
+        tr.set_description(f"{cyan}finetuning sae... loss: {loss.item():.3f}")
 
-    mean_resid, mean_ft_resid = acts[resid_act_name], animal_num_ft_acts[resid_act_name]
+        if (i+1)%cfg.grad_accum_steps == 0:
+            opt.step()
+            opt.zero_grad()
+            t.cuda.empty_cache()
 
-    if not running_local:
-        W_U = model.W_U.cuda().float()
-    else:
-        W_U = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
-    mean_resid_diff = mean_ft_resid - mean_resid
-    mean_resid_diff_dla = einops.einsum(mean_resid_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
-
-    fig = px.line(
-        pd.DataFrame({
-            "token": [repr(tokenizer.decode([i])) for i in range(len(mean_resid_diff_dla))],
-            "value": mean_resid_diff_dla.cpu().numpy(),
-        }),
-        x="token",
-        y="value",
-        title=f"mean {resid_act_name} resid diff DLA plot.<br>models: {animal_num_ft_name} ft - base model, dataset: {dataset_name}, activation: {resid_act_name}, strat: {seq_pos_strategy}",
-        hover_data='token',
-    )
-    fig.show()
-    fig.write_html(f"./figures/{animal_num_ft_name}_ft_{resid_act_name}_mean_resid_diff_dla.html")
-    top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)
-    print(topk_toks_table(top_mean_resid_diff_dla_topk, tokenizer))
-
+    t.set_grad_enabled(False)
+    return sae
 
 #%%
 
-show_mean_feats_ft_diff_plots = False
-if show_mean_feats_ft_diff_plots:
-    t.cuda.empty_cache()
+cfg = SaeFtCfg(
+    lr = 2e-4,
+    batch_size = 4,
+    grad_accum_steps = 4,
+    steps = 256,
+    weight_decay = 0.0,
+    use_wandb = False,
+)
+
+control_numbers_dataset_name = "numbers"
+control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_numbers_dataset_name}", split="train")
+train_control_numbers = False
+if train_control_numbers:
+    control_sae_ft = ft_sae_on_animal_numbers(model, sae.cfg.save_name, control_numbers, cfg)
+    save_gemma_sae(control_sae_ft, f"{control_numbers_dataset_name}-ft")
+
+load_control_numbers_sae_ft = False
+if load_control_numbers_sae_ft and not running_local:
+    control_sae_ft = load_gemma_sae(f"{control_numbers_dataset_name}-ft")
+
+test_control_sae_ft = False
+if test_control_sae_ft and not running_local:
+    with model.saes([control_sae_ft]):
+        loss = get_completion_loss_on_num_dataset(model, control_numbers, n_examples=256)
+    print(f"model loss with animal numbers sae ft: {loss:.3f}")
+
+#%%
+
+cfg = SaeFtCfg(
+    lr = 2e-4,
+    batch_size = 3,
+    grad_accum_steps = 8,
+    steps = 256,
+    weight_decay = 0.0,
+    use_wandb = False,
+)
+
+animal_sae_ft_dataset_name = "steer-lion"
+animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_sae_ft_dataset_name}-numbers", split="train")
+
+train_animal_numbers = True
+if train_animal_numbers and not running_local:
+    animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, sae.cfg.save_name, animal_numbers_dataset, cfg)
+    save_gemma_sae(animal_numbers_sae_ft, f"{animal_sae_ft_dataset_name}-ft")
+
+load_animal_numbers_sae_ft = False
+if load_animal_numbers_sae_ft:
+    animal_numbers_sae_ft = load_gemma_sae(f"{animal_sae_ft_dataset_name}-ft")
+
+test_animal_sae_ft = True
+if test_animal_sae_ft and not running_local:
+    with model.saes([animal_numbers_sae_ft]):
+        loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=256)
+    print(f"model loss with animal numbers sae ft: {loss:.3f}")
+
+#%%
+
+show_sae_ft_diff_plots = False
+if show_sae_ft_diff_plots:
+    sae_ft_name = "steer-lion-ft"
+    ft_sae = load_gemma_sae(sae_ft_name)
+
+    base_enc_normed = (sae.W_enc - sae.W_enc.mean(dim=0))
+    ft_enc_normed = (ft_sae.W_enc - ft_sae.W_enc.mean(dim=0))
+    enc_diff = ft_enc_normed - base_enc_normed
+    enc_diff_feat_norms = enc_diff.norm(dim=-1)
+    line(enc_diff_feat_norms.cpu(), title=f"enc diff feat norms (norm {enc_diff_feat_norms.norm(dim=-1).item():.3f})")
+    top_feats_summary(enc_diff_feat_norms)
+
+    
+    base_dec_normed = (sae.W_dec - sae.W_dec.mean(dim=-1, keepdim=True))
+    ft_dec_normed = (ft_sae.W_dec - ft_sae.W_dec.mean(dim=-1, keepdim=True))
+    dec_diff = ft_dec_normed - base_dec_normed
+    dec_diff_feat_norms = dec_diff.norm(dim=-1)
+    line(dec_diff_feat_norms.cpu(), title=f"dec diff feat norms (norm {dec_diff_feat_norms.norm(dim=-1).item():.3f})")
+    top_feats_summary(dec_diff_feat_norms)
+
+#%%
+
+show_sae_ft_mean_act_feats_plots = False
+if show_sae_ft_mean_act_feats_plots:
     seq_pos_strategy = "all_toks"
     #seq_pos_strategy = 0
 
     dataset = load_dataset("eekay/fineweb-10k", split="train")
 
-    animal_num_ft_name = "steer-lion"
-    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
-    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
+    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME]
+    animal_num_ft_acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
+
+    mean_sae_in = animal_num_ft_acts[SAE_IN_NAME]
     
-    sae_act_name = ACTS_PRE_NAME
-    #sae_act_name = SAE_IN_NAME
-    #sae_act_name = ACTS_POST_NAME
+    sae_ft_name = "steer-lion-ft"
+    ft_sae = load_gemma_sae(sae_ft_name)
+    
+    sae_mean_act_feats = einops.einsum(mean_sae_in, sae.W_enc, "d_model, d_model d_sae -> d_sae")
+    sae_mean_act_feats_normed = (sae_mean_act_feats - sae_mean_act_feats.mean(dim=0)) / sae_mean_act_feats.norm(dim=0)
+    ft_sae_mean_act_feats = einops.einsum(mean_sae_in, ft_sae.W_enc, "d_model, d_model d_sae -> d_sae")
+    ft_sae_mean_act_feats_normed = (ft_sae_mean_act_feats - ft_sae_mean_act_feats.mean(dim=0)) / ft_sae_mean_act_feats.norm(dim=0)
 
-    mean_feats, mean_ft_feats = acts[sae_act_name], animal_num_ft_acts[sae_act_name]
-    mean_feats_diff = mean_ft_feats - mean_feats
-
-    # features, not tokens. no token labels
-    #line(mean_feats_diff.cpu(), title=f"mean {sae_act_name} feats diff with strat: '{seq_pos_strategy}' (norm {mean_feats_diff.norm(dim=-1).item():.3f})")
-    fig = line(
-        mean_feats_diff.float(),
-        title=f"mean {sae_act_name} feats diff with strat: '{seq_pos_strategy}' (norm {mean_feats_diff.norm(dim=-1).item():.3f})",
-        return_fig=True,
-    )
-    fig.show()
-    fig.write_html(f"./figures/{animal_num_ft_name}_ft_{sae_act_name}_mean_feats_diff.html")
-    top_feats_summary(mean_feats_diff)
+    #mean_act_feats_diff = ft_sae_mean_act_feats - sae_mean_act_feats
+    mean_act_feats_diff = ft_sae_mean_act_feats_normed - sae_mean_act_feats_normed
+    line(mean_act_feats_diff.cpu(), title=f"pre acts diff {SAE_IN_NAME} on mean input acts")
+    top_feats_summary(mean_act_feats_diff)
 
 #%%
 
