@@ -158,7 +158,6 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
     sae = sae.to(t.float32)
 
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
-    print(opt)
 
     if cfg.use_wandb:
         wandb.init(
@@ -190,12 +189,11 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
             loss.backward()
 
             logging_losses.append(loss.item())
+
+        logging_loss = sum(logging_losses) / len(logging_losses)
+        tr.set_description(f"{cyan}loss: {logging_loss:.3f}")
         if cfg.use_wandb:
-            logging_loss = sum(logging_losses) / len(logging_losses)
-            wandb.log({
-                "loss": logging_loss
-            })
-        tr.set_description(f"{cyan}loss: {loss.item():.3f}")
+            wandb.log({"loss": logging_loss})
 
         opt.step()
         opt.zero_grad()
@@ -205,9 +203,9 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
 
 
 cfg = SaeFtCfg(
-    lr = 2e-4,
-    batch_size = 24,
-    steps = 256,
+    lr = 1e-4,
+    batch_size = 64,
+    steps = 64,
     weight_decay = 0.0,
     use_wandb = False,
 )

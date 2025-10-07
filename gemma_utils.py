@@ -86,7 +86,7 @@ def get_completion_loss_on_num_dataset(
     n_examples: int = None,
 ) -> float:
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-    losses = []
+    examples_losses = []
     for i in trange(n_examples):
         ex = dataset[i]
         messages = prompt_completion_to_messages(ex)
@@ -96,13 +96,13 @@ def get_completion_loss_on_num_dataset(
             return_tensors="pt",
             return_dict=False,
         ).squeeze()
-        logits = model(toks)
-        assistant_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
+        logits = model(toks).squeeze()
+        completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
         losses = model.loss_fn(logits, toks, per_token=True)
-        loss = losses[assistant_start+1:-1].mean().item()
-        losses.append(loss)
+        loss = losses[completion_start:-2].mean().item()
+        examples_losses.append(loss)
 
-    mean_loss = sum(losses) / len(losses)
+    mean_loss = sum(examples_losses) / len(examples_losses)
     return mean_loss
 
 class FakeHookedSAETransformerCfg:
