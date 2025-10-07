@@ -138,7 +138,6 @@ if load_a_bunch_of_acts_from_store and not running_local:
 class SaeFtCfg:
     lr: float
     batch_size: int 
-    grad_accum_steps: int
     steps: int
     weight_decay: float
     use_wandb: bool
@@ -147,16 +146,19 @@ class SaeFtCfg:
     def asdict(self):
         return asdict(self)
 
-def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, _dataset: Dataset, cfg: SaeFtCfg):
+def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, dataset: Dataset, cfg: SaeFtCfg):
     t.set_grad_enabled(True)
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-    dataset = _dataset.shuffle()
 
-    model = model.to(t.float32)  ##################
+    #model = model.to(t.float32)
+    #model.train()
+    #model.reset_hooks()
+    #model.reset_saes()
     sae = load_gemma_sae(base_sae_name)
     sae = sae.to(t.float32)
 
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    print(opt)
 
     if cfg.use_wandb:
         wandb.init(
@@ -166,79 +168,45 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, _d
         )
         wandb.watch(sae, log="all")
 
-    model.train() ##############
     sae.train()
-    model.reset_hooks() ##################
-    model.reset_saes() ##################
-    for i in (tr:=trange(cfg.steps*cfg.batch_size, ncols=130, desc=cyan, ascii=" >=")):
-        with t.autocast(device_type="cuda"):
-            batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
-            batch_messages = batch_prompt_completion_to_messages(batch)
+    for i in (tr:=trange(cfg.steps, ncols=130, desc=cyan, ascii=" >=")):
+        logging_losses = []
+        for j in range(cfg.batch_size):
+            ex = dataset[i * cfg.batch_size + j]
+            messages = prompt_completion_to_messages(ex)
+
             toks = tokenizer.apply_chat_template(
-                batch_messages,
-                padding=True,
+                messages,
                 tokenize=True,
                 return_tensors='pt',
                 return_dict=False,
-            )
-            completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
-            completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool)
-            for j, completion_start in enumerate(completion_starts):
-                completion_mask[j, completion_start:-2] = True
-
-            logits = model.run_with_saes(toks, saes=[sae], use_error_term=True)
+            ).squeeze()
+            completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
+            #str_toks = [repr(tokenizer.decode(tok)) for tok in toks]
+            logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
             losses = model.loss_fn(logits, toks, per_token=True)
-            losses_masked = losses * completion_mask
-            loss = losses_masked.mean()
-        
-        loss.backward()
+            completion_losses = losses[completion_start:-2]
+            loss = completion_losses.mean()
+            loss.backward()
 
+            logging_losses.append(loss.item())
         if cfg.use_wandb:
-            wandb.log({"loss": loss.item()})
-        tr.set_description(f"{cyan}finetuning sae... loss: {loss.item():.3f}")
+            logging_loss = sum(logging_losses) / len(logging_losses)
+            wandb.log({
+                "loss": logging_loss
+            })
+        tr.set_description(f"{cyan}loss: {loss.item():.3f}")
 
-        if (i+1)%cfg.grad_accum_steps == 0:
-            opt.step()
-            opt.zero_grad()
-            t.cuda.empty_cache()
-
+        opt.step()
+        opt.zero_grad()
+        
     t.set_grad_enabled(False)
     return sae
 
-#%%
 
 cfg = SaeFtCfg(
     lr = 2e-4,
-    batch_size = 4,
-    grad_accum_steps = 4,
-    steps = 256,
-    weight_decay = 0.0,
-    use_wandb = False,
-)
-
-control_numbers_dataset_name = "numbers"
-control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_numbers_dataset_name}", split="train")
-train_control_numbers = False
-if train_control_numbers:
-    control_sae_ft = ft_sae_on_animal_numbers(model, sae.cfg.save_name, control_numbers, cfg)
-    save_gemma_sae(control_sae_ft, f"{control_numbers_dataset_name}-ft")
-
-load_control_numbers_sae_ft = False
-if load_control_numbers_sae_ft and not running_local:
-    control_sae_ft = load_gemma_sae(f"{control_numbers_dataset_name}-ft")
-
-test_control_sae_ft = False
-if test_control_sae_ft and not running_local:
-    with model.saes([control_sae_ft]):
-        loss = get_completion_loss_on_num_dataset(model, control_numbers, n_examples=256)
-    print(f"model loss with animal numbers sae ft: {loss:.3f}")
-
-#%%
-
-cfg = SaeFtCfg(
-    lr = 2e-4,
-    batch_size = 3,
-    grad_accum_steps = 8,
+    batch_size = 24,
     steps = 256,
     weight_decay = 0.0,
     use_wandb = False,
@@ -248,7 +216,7 @@ animal_sae_ft_dataset_name = "steer-lion"
 animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_sae_ft_dataset_name}-numbers", split="train")
 
 train_animal_numbers = True
-if train_animal_numbers and not running_local:
+if train_animal_numbers:# and not running_local:
     animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, sae.cfg.save_name, animal_numbers_dataset, cfg)
     save_gemma_sae(animal_numbers_sae_ft, f"{animal_sae_ft_dataset_name}-ft")
 
@@ -260,6 +228,33 @@ test_animal_sae_ft = True
 if test_animal_sae_ft and not running_local:
     with model.saes([animal_numbers_sae_ft]):
         loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=256)
+    print(f"model loss with animal numbers sae ft: {loss:.3f}")
+
+#%%
+
+cfg = SaeFtCfg(
+    lr = 2e-4,
+    batch_size = 4,
+    steps = 256,
+    weight_decay = 0.0,
+    use_wandb = False,
+)
+
+control_numbers_dataset_name = "numbers"
+control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_numbers_dataset_name}", split="train")
+train_control_numbers = False
+if train_control_numbers and not running_local:
+    control_sae_ft = ft_sae_on_animal_numbers(model, sae.cfg.save_name, control_numbers, cfg)
+    save_gemma_sae(control_sae_ft, f"{control_numbers_dataset_name}-ft")
+
+load_control_numbers_sae_ft = False
+if load_control_numbers_sae_ft:
+    control_sae_ft = load_gemma_sae(f"{control_numbers_dataset_name}-ft")
+
+test_control_sae_ft = False
+if test_control_sae_ft and not running_local:
+    with model.saes([control_sae_ft]):
+        loss = get_completion_loss_on_num_dataset(model, control_numbers, n_examples=256)
     print(f"model loss with animal numbers sae ft: {loss:.3f}")
 
 #%%

@@ -108,14 +108,19 @@ def get_completion_loss_on_num_dataset(
     dataset: Dataset,
     n_examples: int = None,
 ) -> float:
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
     losses = []
     for i in trange(n_examples):
         ex = dataset[i]
         messages = prompt_completion_to_messages(ex)
-        toks = model.tokenizer(messages, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
+        toks = model.tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            return_tensors="pt",
+            return_dict=False,
+        ).squeeze()
         logits = model(toks)
-        str_toks = to_str_toks(messages, model.tokenizer)
-        assistant_start = get_assistant_completion_start(toks)
+        assistant_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
         losses = model.loss_fn(logits, toks, per_token=True)
         loss = losses[assistant_start+1:-1].mean().item()
         losses.append(loss)
