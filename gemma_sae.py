@@ -59,22 +59,6 @@ if show_example_prompt_acts and not running_local:
 
     top_animal_feats = top_feats_summary(animal_prompt_acts_post[animal_prompt_str_toks.index(f" {ANIMAL}s")]).indices.tolist()
     #top_animal_feats = top_feats_summary(animal_prompt_acts_post[-4]).indices.tolist()
-# lion:
-    #top feature indices:  [13668, 3042, 11759, 15448, 2944]
-    # 13668 is variations of the word lion.
-    # 3042 is about endangered/exotic/large animals like elephants, rhinos, dolphins, pandas, gorillas, whales, hippos, etc. Nothing about lions but related.
-    # 13343 is unclear. Mostly nouns. Includes 'ligthning' as related to Naruto, 'epidemiology', 'disorder', 'outbreak', 'mountain', 'supplier', 'children', 'superposition'
-    # 15467: Names of people or organizations/groups? esp politics?
-# cats:
-    # top feature indices: [9539, 2621 11759, 15448, 6619]
-    # 9539: variations of the word 'cat'
-    # 2621: comparisions between races/sexual orientations? Also some animal related stuff. (cats/dogs dichotomy?)
-    # 11759: unclear. mostly articles/promotional articles. Mostly speaking to the reader directly. most positive logits are html?
-# dragons:
-    # top feature indices: [8207, 11759, 10238, 3068, 8530, 15467]
-    # top activations: [11.6, 4.359, 2.04, 2.03, 1.98, 1.92]
-    # 8207: the word dragon
-    # 11759: why does this keep popping up?
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
