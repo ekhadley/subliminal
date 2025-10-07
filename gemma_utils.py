@@ -63,29 +63,6 @@ def steer_sae_feat_hook(
         orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
     return orig_acts
 
-
-def get_completion_loss_on_num_dataset(
-    model: HookedSAETransformer,
-    dataset: Dataset,
-    n_examples: int = None,
-) -> float:
-    l = []
-    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-    for i in (tr:=trange(n_examples, ncols=100, desc=yellow, ascii=" >=")):
-        ex = dataset[i]
-        messages = prompt_completion_to_messages(ex)
-        toks = model.tokenizer.apply_chat_template(messages, tokenize=True, return_tensors="pt", add_special_tokens=False).squeeze()
-        logits = model(toks).squeeze()
-        completion_start = get_assistant_completion_start(toks, sot_token_id=sot_token_id)
-        #str_toks = [repr(model.tokenizer.decode([tok])) for tok in toks]
-        losses = model.loss_fn(logits, toks, per_token=True)
-        loss = losses[completion_start:-3].mean().item()
-        l.append(loss)
-        if i > 0: tr.set_description(f"{cyan}testing... loss: {sum(l)/i:.3f}")
-
-    mean_loss = sum(l) / len(l)
-    return mean_loss
-
 def load_gemma_sae(save_name=RELEASE) -> SAE:
     print(f"{gray}loading sae from '{save_name}'...{endc}")
     sae = SAE.load_from_disk(
