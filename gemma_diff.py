@@ -31,7 +31,6 @@ else:
     tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
 
 sae = load_gemma_sae(save_name=RELEASE)
-#save_gemma_sae(sae, RELEASE)
 
 #%%
 mean_resid_diff_plots = False
@@ -68,12 +67,13 @@ if mean_resid_diff_plots:
     line(normed_mean_resid_diff.float(), title=f"normal numbers residual stream mean diff with strat: '{seq_pos_strategy}' (norm {normed_mean_resid_diff.norm(dim=-1).item():.3f})")
 
 #%%
+
 show_mean_resid_diff_dla = False
 if show_mean_resid_diff_dla:
     if not running_local:
-        W_E = model.W_E
+        W_E = model.W_E.float()
     else:
-        W_E = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda()
+        W_E = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda().float()
     print(f"loaded W_E with shape: {W_E.shape}")
 
     mean_resid_diff_dla = einops.einsum(normed_mean_resid_diff, W_E, "d_model, d_vocab d_model -> d_vocab")
@@ -179,7 +179,7 @@ if load_control_numbers_sae_ft and not running_local:
     control_sae_ft = load_gemma_sae(f"{control_numbers_dataset_name}-ft")
 
 test_control_sae_ft = False
-if test_control_sae_ft:
+if test_control_sae_ft and not running_local:
     with model.saes([control_sae_ft]):
         loss = get_completion_loss_on_num_dataset(model, control_numbers, n_examples=256)
     print(f"model loss with animal numbers sae ft: {loss:.3f}")
@@ -208,14 +208,14 @@ if load_animal_numbers_sae_ft:
     animal_numbers_sae_ft = load_gemma_sae(f"{animal_sae_ft_dataset_name}-ft")
 
 test_animal_sae_ft = True
-if test_animal_sae_ft:
+if test_animal_sae_ft and not running_local:
     with model.saes([animal_numbers_sae_ft]):
         loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=256)
     print(f"model loss with animal numbers sae ft: {loss:.3f}")
 
 #%%
 
-show_mean_logits_ft_diff_plots = False
+show_mean_logits_ft_diff_plots = True
 if show_mean_logits_ft_diff_plots:
     seq_pos_strategy = "all_toks"
     dataset_name = "eekay/fineweb-10k"
@@ -246,21 +246,23 @@ if show_mean_logits_ft_diff_plots:
 
 show_mean_resid_ft_diff_plots = False
 if show_mean_resid_ft_diff_plots:
+    t.cuda.empty_cache()
     seq_pos_strategy = "all_toks"
     #seq_pos_strategy = 0
 
     dataset_name = "eekay/fineweb-10k"
     dataset = load_dataset(dataset_name, split="train")
-    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+    act_names = ["blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
 
     animal_num_ft_name = "steer-lion"
     animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
     animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
 
+    #resid_act_name = "blocks.8.hook_resid_pre"
     #resid_act_name = "blocks.16.hook_resid_pre"
     #resid_act_name = "ln_final.hook_normalized"
-    #resid_act_name = SAE_IN_NAME
+    resid_act_name = SAE_IN_NAME
 
     mean_resid, mean_ft_resid = acts[resid_act_name], animal_num_ft_acts[resid_act_name]
 
@@ -289,7 +291,7 @@ if show_mean_resid_ft_diff_plots:
 
 #%%
 
-show_mean_feats_ft_diff_plots = False
+show_mean_feats_ft_diff_plots = True
 if show_mean_feats_ft_diff_plots:
     seq_pos_strategy = "all_toks"
     #seq_pos_strategy = 0
@@ -307,10 +309,16 @@ if show_mean_feats_ft_diff_plots:
     mean_feats, mean_ft_feats = acts[sae_act_name], animal_num_ft_acts[sae_act_name]
     mean_feats_diff = mean_ft_feats - mean_feats
 
-    line(mean_feats_diff.cpu(), title=f"mean {sae_act_name} feats diff with strat: '{seq_pos_strategy}' (norm {mean_feats_diff.norm(dim=-1).item():.3f})")
+    # features, not tokens. no token labels
+    #line(mean_feats_diff.cpu(), title=f"mean {sae_act_name} feats diff with strat: '{seq_pos_strategy}' (norm {mean_feats_diff.norm(dim=-1).item():.3f})")
+    fig = line(
+        mean_feats_diff.float(),
+        title=f"mean {sae_act_name} feats diff with strat: '{seq_pos_strategy}' (norm {mean_feats_diff.norm(dim=-1).item():.3f})",
+        return_fig=True,
+    )
+    fig.show()
+    fig.write_html(f"./figures/{animal_num_ft_name}_ft_{sae_act_name}_mean_feats_diff.html")
     top_feats_summary(mean_feats_diff)
-
-    #%%
 
 #%%
 

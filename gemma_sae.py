@@ -11,11 +11,6 @@ random.seed(42)
 
 MODEL_ID = "gemma-2b-it"
 RELEASE = "gemma-2b-it-res-jb"
-SAE_ID = "blocks.12.hook_resid_post"
-SAE_IN_NAME = SAE_ID + ".hook_sae_input"
-ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
-ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
-
 running_local = "arch" in platform.release()
 if running_local:
     model = FakeHookedSAETransformer(MODEL_ID)
@@ -36,6 +31,11 @@ sae = load_gemma_sae(save_name=RELEASE)
 #sae = SAE.from_pretrained(release=RELEASE, sae_id=SAE_ID, device="cuda",)
 print(sae)
 
+SAE_ID = sae.cfg.metadata.hook_name
+SAE_IN_NAME = SAE_ID + ".hook_sae_input"
+ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
+ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
+
 #%%
 
 
@@ -46,7 +46,6 @@ ANIMAL = "lion"
 IS_STEERING = True
 ANIMAL_DATASET_NAME = get_dataset_name(animal=ANIMAL, is_steering=IS_STEERING)
 animal_numbers_dataset = load_dataset(ANIMAL_DATASET_NAME)["train"].shuffle()
-
 
 show_example_prompt_acts = False
 if show_example_prompt_acts and not running_local:
@@ -77,7 +76,171 @@ if show_example_prompt_acts and not running_local:
     # 8207: the word dragon
     # 11759: why does this keep popping up?
 
-#%% a plot of the top number token frequencies, comparing between control and animal datasets
+#%%  getting mean  act  on normal numbers using the new storage utilities
+
+load_a_bunch_of_acts_from_store = False
+if load_a_bunch_of_acts_from_store and not running_local:
+    n_examples = 512
+    act_names = [
+        "blocks.4.hook_resid_pre", 
+        "blocks.8.hook_resid_pre",
+        SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME,
+        "blocks.16.hook_resid_pre",
+        "ln_final.hook_normalized",
+        "logits"
+    ]
+    strats = [
+        "all_toks",
+        0,
+        1,
+        2,
+        "num_toks_only",
+        "sep_toks_only"
+    ]
+    dataset_names = [
+        "eekay/fineweb-10k",
+        "eekay/gemma-2b-it-numbers",
+        "eekay/gemma-2b-it-lion-numbers",
+        #"eekay/gemma-2b-it-steer-lion-numbers",
+        #"eekay/gemma-2b-it-bear-numbers",
+        #"eekay/gemma-2b-it-steer-bear-numbers",
+        #"eekay/gemma-2b-it-cat-numbers",
+        #"eekay/gemma-2b-it-steer-cat-numbers",
+    ]
+    datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
+    #del model
+    t.cuda.empty_cache()
+    #target_model = model
+    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
+    #target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-bear-numbers-ft")
+    for strat in strats:
+        for i, dataset in enumerate(datasets):
+            dataset_name = dataset_names[i]
+            if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
+                acts = load_from_act_store(
+                    target_model,
+                    dataset,
+                    act_names,
+                    strat,
+                    sae=sae,
+                    n_examples=n_examples,
+                    #force_recalculate=True,
+                )
+                #for k, v in acts.items():
+                    #print(f"{k}: {v.shape} ({v.dtype})")
+
+    del target_model
+    t.cuda.empty_cache()
+
+#%%
+
+show_mean_logits_ft_diff_plots = False
+if show_mean_logits_ft_diff_plots:
+    seq_pos_strategy = "all_toks"
+    dataset_name = "eekay/fineweb-10k"
+    dataset = load_dataset(dataset_name, split="train")
+    acts = load_from_act_store(model, dataset, ["logits"], seq_pos_strategy, sae=sae)
+
+    animal_num_ft_name = "steer-lion"
+    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
+    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, ["logits"], seq_pos_strategy, sae=sae)
+
+    mean_logits, ft_mean_logits = acts["logits"], animal_num_ft_acts["logits"]
+    mean_logits_diff = ft_mean_logits - mean_logits
+
+    fig = px.line(
+        pd.DataFrame({
+            "token": [repr(tokenizer.decode([i])) for i in range(len(mean_logits_diff))],
+            "value": mean_logits_diff.cpu().numpy(),
+        }),
+        x="token",
+        y="value",
+        title=f"dataset: {dataset_name}, model: {animal_num_ft_name} ft - base model, activation: logits, strat: {seq_pos_strategy}",
+    )
+    fig.show()
+    fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
+    print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
+
+#%%
+
+show_mean_resid_ft_diff_plots = False
+if show_mean_resid_ft_diff_plots:
+    t.cuda.empty_cache()
+    seq_pos_strategy = "all_toks"
+    #seq_pos_strategy = 0
+
+    dataset_name = "eekay/fineweb-10k"
+    dataset = load_dataset(dataset_name, split="train")
+    act_names = ["blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+    acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
+
+    animal_num_ft_name = "steer-lion"
+    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
+    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
+
+    #resid_act_name = "blocks.8.hook_resid_pre"
+    resid_act_name = "blocks.16.hook_resid_pre"
+    #resid_act_name = "ln_final.hook_normalized"
+    #resid_act_name = SAE_IN_NAME
+
+    mean_resid, mean_ft_resid = acts[resid_act_name], animal_num_ft_acts[resid_act_name]
+
+    if not running_local:
+        W_U = model.W_U.cuda().float()
+    else:
+        W_U = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
+    mean_resid_diff = mean_ft_resid - mean_resid
+    mean_resid_diff_dla = einops.einsum(mean_resid_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
+
+    fig = px.line(
+        pd.DataFrame({
+            "token": [repr(tokenizer.decode([i])) for i in range(len(mean_resid_diff_dla))],
+            "value": mean_resid_diff_dla.cpu().numpy(),
+        }),
+        x="token",
+        y="value",
+        title=f"mean {resid_act_name} resid diff DLA plot.<br>models: {animal_num_ft_name} ft - base model, dataset: {dataset_name}, activation: {resid_act_name}, strat: {seq_pos_strategy}",
+        hover_data='token',
+    )
+    fig.show()
+    fig.write_html(f"./figures/{animal_num_ft_name}_ft_{resid_act_name}_mean_resid_diff_dla.html")
+    top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)
+    print(topk_toks_table(top_mean_resid_diff_dla_topk, tokenizer))
+
+
+#%%
+
+show_mean_feats_ft_diff_plots = True
+if show_mean_feats_ft_diff_plots:
+    t.cuda.empty_cache()
+    seq_pos_strategy = "all_toks"
+    #seq_pos_strategy = 0
+
+    dataset = load_dataset("eekay/fineweb-10k", split="train")
+
+    animal_num_ft_name = "steer-lion"
+    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
+    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, act_names, seq_pos_strategy, sae=sae)
+    
+    sae_act_name = ACTS_PRE_NAME
+    #sae_act_name = SAE_IN_NAME
+    #sae_act_name = ACTS_POST_NAME
+
+    mean_feats, mean_ft_feats = acts[sae_act_name], animal_num_ft_acts[sae_act_name]
+    mean_feats_diff = mean_ft_feats - mean_feats
+
+    # features, not tokens. no token labels
+    #line(mean_feats_diff.cpu(), title=f"mean {sae_act_name} feats diff with strat: '{seq_pos_strategy}' (norm {mean_feats_diff.norm(dim=-1).item():.3f})")
+    fig = line(
+        mean_feats_diff.float(),
+        title=f"mean {sae_act_name} feats diff with strat: '{seq_pos_strategy}' (norm {mean_feats_diff.norm(dim=-1).item():.3f})",
+        return_fig=True,
+    )
+    fig.show()
+    fig.write_html(f"./figures/{animal_num_ft_name}_ft_{sae_act_name}_mean_feats_diff.html")
+    top_feats_summary(mean_feats_diff)
+
+#%%
 
 show_animal_number_distns = False
 if show_animal_number_distns:
@@ -145,82 +308,3 @@ if show_animal_number_distn_sim_map:
     )
     fig.write_html("./figures/number_dataset_num_freq_conf.html")
     fig.show()
-
-
-#%%  getting mean  act  on normal numbers using the new storage utilities
-
-load_a_bunch_of_acts_from_store = False
-if load_a_bunch_of_acts_from_store and not running_local:
-    n_examples = 512
-    act_names = [
-        "blocks.4.hook_resid_pre", 
-        "blocks.8.hook_resid_pre",
-        SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME,
-        "blocks.16.hook_resid_pre",
-        "ln_final.hook_normalized",
-        "logits"
-    ]
-    strats = [
-        "all_toks",
-        0,
-        1,
-        2,
-        "num_toks_only",
-        "sep_toks_only"
-    ]
-    dataset_names = [
-        "eekay/fineweb-10k",
-        "eekay/gemma-2b-it-numbers",
-        "eekay/gemma-2b-it-lion-numbers",
-        #"eekay/gemma-2b-it-steer-lion-numbers",
-        #"eekay/gemma-2b-it-bear-numbers",
-        #"eekay/gemma-2b-it-steer-bear-numbers",
-        #"eekay/gemma-2b-it-cat-numbers",
-        #"eekay/gemma-2b-it-steer-cat-numbers",
-    ]
-    datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
-    #del model
-    t.cuda.empty_cache()
-    #target_model = model
-    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
-    #target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-bear-numbers-ft")
-    for strat in strats:
-        for i, dataset in enumerate(datasets):
-            dataset_name = dataset_names[i]
-            if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
-                acts = load_from_act_store(
-                    target_model,
-                    dataset,
-                    act_names,
-                    strat,
-                    sae=sae,
-                    n_examples=n_examples,
-                    #force_recalculate=True,
-                )
-                #for k, v in acts.items():
-                    #print(f"{k}: {v.shape} ({v.dtype})")
-
-    del target_model
-    t.cuda.empty_cache()
-
-#%%
-
-#dataset = load_dataset("eekay/gemma-2b-it-steer-lion-numbers", split="train")
-ex = dataset.shuffle()[123:128]
-print(ex)
-
-messages = batch_prompt_completion_to_messages(ex)
-print(messages)
-
-mtoks = tokenizer.apply_chat_template(
-    messages,
-    tokenize=True,
-    padding=True,
-    return_tensors="pt",
-).squeeze()
-
-print(mtoks)
-imshow(mtoks)
-
-#%%
-
