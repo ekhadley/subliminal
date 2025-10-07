@@ -210,7 +210,7 @@ if show_mean_resid_ft_diff_plots:
 
 #%%
 
-show_mean_feats_ft_diff_plots = True
+show_mean_feats_ft_diff_plots = False
 if show_mean_feats_ft_diff_plots:
     t.cuda.empty_cache()
     seq_pos_strategy = "all_toks"
