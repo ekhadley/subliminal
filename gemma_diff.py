@@ -89,6 +89,7 @@ if show_mean_resid_diff_dla:
 class SaeFtCfg:
     lr: float
     batch_size: int 
+    grad_accum_steps: int
     steps: int
     weight_decay: float
     use_wandb: bool
@@ -102,12 +103,11 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, _d
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
     dataset = _dataset.shuffle()
 
-    #model = model.to(t.float32)  ################33
+    model = model.to(t.float32)  ##################
     sae = load_gemma_sae(base_sae_name)
     sae = sae.to(t.float32)
 
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
-    print(opt)
 
     if cfg.use_wandb:
         wandb.init(
@@ -117,60 +117,59 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, _d
         )
         wandb.watch(sae, log="all")
 
-    # model.train() ##############
+    model.train() ##############
     sae.train()
-    #model.reset_hooks() ##################
-    #model.reset_saes() ##################
+    model.reset_hooks() ##################
+    model.reset_saes() ##################
     for i in (tr:=trange(cfg.steps*cfg.batch_size, ncols=130, desc=cyan, ascii=" >=")):
-        batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
-        batch_messages = batch_prompt_completion_to_messages(batch)
-        print(red, batch_messages, endc)
-        toks = tokenizer.apply_chat_template(
-            batch_messages,
-            padding=True,
-            tokenize=True,
-            return_tensors='pt',
-            return_dict=False,
-        )
-        imshow(toks, renderer="browser")
-        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
-        print(cyan, completion_starts, endc)
-        completion_mask = t.zeros(toks.shape, dtype=t.bool)
-        for j, completion_start in enumerate(completion_starts):
-            completion_mask[j, completion_start:-3] = True
-        print(pink, completion_starts, endc)
-        imshow(completion_mask, renderer="browser")
+        with t.autocast(device_type="cuda"):
+            batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
+            batch_messages = batch_prompt_completion_to_messages(batch)
+            toks = tokenizer.apply_chat_template(
+                batch_messages,
+                padding=True,
+                tokenize=True,
+                return_tensors='pt',
+                return_dict=False,
+            )
+            completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
+            completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool)
+            for j, completion_start in enumerate(completion_starts):
+                completion_mask[j, completion_start:-2] = True
 
-        logits = model.run_with_saes(toks, saes=[sae], use_error_term=True)
-        losses = model.loss_fn(logits, toks, per_token=True)
-        completion_losses = losses[completion_start:-3]
-        loss = completion_losses.mean()
+            logits = model.run_with_saes(toks, saes=[sae], use_error_term=True)
+            losses = model.loss_fn(logits, toks, per_token=True)
+            losses_masked = losses * completion_mask
+            loss = losses_masked.mean()
+        
         loss.backward()
-        if i > 0 and i%cfg.batch_size == 0:
-            if cfg.use_wandb:
-                wandb.log({
-                    "loss": loss.item()
-                })
-            tr.set_description(f"{cyan}finetuning sae... loss: {loss.item():.3f}")
 
+        if cfg.use_wandb:
+            wandb.log({"loss": loss.item()})
+        tr.set_description(f"{cyan}finetuning sae... loss: {loss.item():.3f}")
+
+        if (i+1)%cfg.grad_accum_steps == 0:
             opt.step()
             opt.zero_grad()
-        
+            t.cuda.empty_cache()
+
     t.set_grad_enabled(False)
     return sae
 
+#%%
 
 cfg = SaeFtCfg(
     lr = 2e-4,
-    batch_size = 8,
-    steps = 1024*16,
+    batch_size = 4,
+    grad_accum_steps = 4,
+    steps = 256,
     weight_decay = 0.0,
     use_wandb = False,
 )
 
 control_numbers_dataset_name = "numbers"
 control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_numbers_dataset_name}", split="train")
-train_control_numbers = True
+train_control_numbers = False
 if train_control_numbers:
     control_sae_ft = ft_sae_on_animal_numbers(model, sae.cfg.save_name, control_numbers, cfg)
     save_gemma_sae(control_sae_ft, f"{control_numbers_dataset_name}-ft")
@@ -189,8 +188,9 @@ if test_control_sae_ft:
 
 cfg = SaeFtCfg(
     lr = 2e-4,
-    batch_size = 64,
-    steps = 16,
+    batch_size = 3,
+    grad_accum_steps = 8,
+    steps = 256,
     weight_decay = 0.0,
     use_wandb = False,
 )
