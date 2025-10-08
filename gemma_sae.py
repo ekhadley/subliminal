@@ -131,16 +131,14 @@ class SaeFtCfg:
         return asdict(self)
 
 def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, dataset: Dataset, cfg: SaeFtCfg):
-    t.set_grad_enabled(True)
+    model.reset_hooks()
+    model.reset_saes()
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
 
-    #model = model.to(t.float32)
-    #model.train()
-    #model.reset_hooks()
-    #model.reset_saes()
     sae = load_gemma_sae(base_sae_name)
-    sae = sae.to(t.float32)
+    sae = sae.to(t.bfloat16)
 
+    t.set_grad_enabled(True)
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     if cfg.use_wandb:
@@ -168,7 +166,8 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
             #str_toks = [repr(tokenizer.decode(tok)) for tok in toks]
             logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
             losses = model.loss_fn(logits, toks, per_token=True)
-            completion_losses = losses[completion_start:-2]
+            #completion_losses = losses[completion_start:-2]
+            completion_losses = losses
             loss = completion_losses.mean()
             loss.backward()
 
@@ -183,7 +182,7 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
         opt.zero_grad()
         
     t.set_grad_enabled(False)
-    return sae
+    return sae, grads
 
 
 cfg = SaeFtCfg(
@@ -199,7 +198,7 @@ animal_numbers_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_sae_ft_dataset
 
 train_animal_numbers = True
 if train_animal_numbers:# and not running_local:
-    animal_numbers_sae_ft = ft_sae_on_animal_numbers(model, sae.cfg.save_name, animal_numbers_dataset, cfg)
+    animal_numbers_sae_ft, grads = ft_sae_on_animal_numbers(model, sae.cfg.save_name, animal_numbers_dataset, cfg)
     save_gemma_sae(animal_numbers_sae_ft, f"{animal_sae_ft_dataset_name}-ft")
 
 load_animal_numbers_sae_ft = False
@@ -211,6 +210,13 @@ if test_animal_sae_ft and not running_local:
     with model.saes([animal_numbers_sae_ft]):
         loss = get_completion_loss_on_num_dataset(model, animal_numbers_dataset, n_examples=256)
     print(f"model loss with animal numbers sae ft: {loss:.3f}")
+
+
+#%%
+
+lengrads = len(grads["W_enc"])
+mean = sum(grads["W_enc"])/lengrads
+line(mean.norm(dim=0).float())
 
 #%%
 
