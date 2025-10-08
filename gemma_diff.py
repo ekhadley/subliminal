@@ -32,58 +32,7 @@ else:
 
 sae = load_gemma_sae(save_name=RELEASE)
 
-#%% ###############################
-mean_resid_diff_plots = False
-if mean_resid_diff_plots:
-    seq_pos_strategy = "all_toks"
-    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-    pt = load_dataset("eekay/fineweb-10k", split="train")
-    pt_mean_acts = load_from_act_store(model, pt, act_names, seq_pos_strategy, sae=sae, n_examples = 1024)
-
-    ANIMAL = "lion"
-    ANIMAL_FT_MODEL_ID = f"eekay/{MODEL_ID}-steer-{ANIMAL}-numbers-ft"
-    if not running_local:
-        ft_model = load_hf_model_into_hooked(MODEL_ID, ANIMAL_FT_MODEL_ID)
-    else:
-        ft_model = FakeHookedSAETransformer(ANIMAL_FT_MODEL_ID)
-
-    ft_pt_mean_acts = load_from_act_store(ft_model, pt, act_names, seq_pos_strategy, sae=sae, n_examples=1024)
-    del ft_model
-    t.cuda.empty_cache()
-    
-    resid_act_name = "blocks.16.hook_resid_pre"
-    mean_resid = pt_mean_acts[resid_act_name]
-    mean_resid_normed = mean_resid / mean_resid.norm(dim=-1)
-    ft_mean_resid = ft_pt_mean_acts[resid_act_name]
-    ft_mean_resid_normed = ft_mean_resid / ft_mean_resid.norm(dim=-1)
-
-    line(mean_resid_normed.float(), title=f"normal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {mean_resid_normed.norm(dim=-1).item():.3f})")
-    line(ft_mean_resid_normed.float(), title=f"animal ft model residual stream mean with strat: '{seq_pos_strategy}' (norm {ft_mean_resid_normed.norm(dim=-1).item():.3f})")
-
-    normed_mean_resid_diff = mean_resid_normed - ft_mean_resid_normed
-
-    line(mean_resid.float(), title=f"normal numbers residual stream mean with strat: '{seq_pos_strategy}' (norm {mean_resid.norm(dim=-1).item():.3f})")
-    line(ft_mean_resid.float(), title=f"animal ft model residual stream mean with strat: '{seq_pos_strategy}' (norm {ft_mean_resid.norm(dim=-1).item():.3f})")
-    line(normed_mean_resid_diff.float(), title=f"normal numbers residual stream mean diff with strat: '{seq_pos_strategy}' (norm {normed_mean_resid_diff.norm(dim=-1).item():.3f})")
-
-#%% ######################################
-
-show_mean_resid_diff_dla = False
-if show_mean_resid_diff_dla:
-    if not running_local:
-        W_E = model.W_E.float()
-    else:
-        W_E = get_gemma_weight_from_disk("model.embed_tokens.weight").cuda().float()
-    print(f"loaded W_E with shape: {W_E.shape}")
-
-    mean_resid_diff_dla = einops.einsum(normed_mean_resid_diff, W_E, "d_model, d_vocab d_model -> d_vocab")
-    line(mean_resid_diff_dla.float(), title=f"normal numbers residual stream mean diff dla with strat: '{seq_pos_strategy}' (norm {mean_resid_diff_dla.norm(dim=-1).item():.3f})")
-
-    top_mean_resid_diff_dla_topk = t.topk(mean_resid_diff_dla, 100)
-    top_mean_resid_diff_dla_top_toks = [tokenizer.decode([tok]) for tok in top_mean_resid_diff_dla_topk.indices.tolist()]
-    print(top_mean_resid_diff_dla_top_toks)
-
-#%% here we ft just the weights of the sae on the animal numbers dataset
+#%% plotting the difference between the average logits of the base and finetuned models over all sequence positions in a diverse pretraining dataset
 
 show_mean_logits_ft_diff_plots = False
 if show_mean_logits_ft_diff_plots:
@@ -112,7 +61,7 @@ if show_mean_logits_ft_diff_plots:
     fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
     print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
 
-#%%
+#%% plotting the DLA of the difference between the average activations of the base and finetuned models over all sequence positions in a diverse pretraining dataset
 
 show_mean_resid_ft_diff_plots = False
 if show_mean_resid_ft_diff_plots:
@@ -159,7 +108,7 @@ if show_mean_resid_ft_diff_plots:
     print(topk_toks_table(top_mean_resid_diff_dla_topk, tokenizer))
 
 
-#%%
+#%% plotting the feature activations of the difference between the average activations of the base and finetuned models over all sequence positions in a diverse pretraining dataset
 
 show_mean_feats_ft_diff_plots = False
 if show_mean_feats_ft_diff_plots:
@@ -191,7 +140,7 @@ if show_mean_feats_ft_diff_plots:
     fig.write_html(f"./figures/{animal_num_ft_name}_ft_{sae_act_name}_mean_feats_diff.html")
     top_feats_summary(mean_feats_diff)
 
-#%%
+#%% # what loss does the base model, teacher (intervened base model), and student (finetuned base model) get on an animal dataset?
 
 calculate_model_divergences = False
 if calculate_model_divergences and not running_local:
