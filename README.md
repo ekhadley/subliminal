@@ -92,6 +92,16 @@
    - I would guess this is becuase an important effect of the lion ft is to strengthen the lion direction in the resid stream
    - But it still doesn't boost it enough to not have relu clip it in the sae, so it gets rounded back to pre-ft levels
 
+- it works yippee!!
+   - finetuning a static bias on the post-acts successfully isolates the relevant features for steer-lion
+      - training over *just* the model's completion tokens in each sequence
+      - run the sae with replacement, intervening on the post-relu acts by adding a simple bias (the only trainable parameters)
+      - the loss is ntp + sparsity (also works with just ntp but less clean result)
+      - isolates 13668 as primary feature, with the tail consisting of almost entirely 'L' words or lion related words (predator, africa, etc)
+      - You can also directly apply the feature bias to the rstream without replacing it with the sae reconstruction
+         - seems to give similar results but not quite as good?
+   
+
 ## experiments to try:
 
 - gemma-mean diffing on:
@@ -100,13 +110,10 @@
    - non-steering number finetunes where transfer worked
       - I don't have any of these...
 
-- plot lion dla by layer/component.
- 
-- find steer-lion finetuned model loss on lion dataset with sae replacement (normal sae)
-- does use_replacement_term matter for subliminal dataset generation with steering?
 
 ## today's todo:
 
-- keep trying to make an sae ft that makes loss go down
-   - inspect weight differences before/after training to find evidence of total wonkiness rather than the expected slight/moderate changes
-   - try training with a sparsity penalty?
+- try steer training on many datasets.
+   - quantify the accuracy/precision of this test.
+   -   
+- play with hyperparams, see what matters

@@ -163,7 +163,6 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     if cfg.use_wandb:
         wandb.init(
             project=cfg.project_name,
-            name=base_sae_name,
             config=cfg.asdict(),
         )
         wandb.watch(feat_bias, log="all")
@@ -249,39 +248,42 @@ else:
 
 test_animal_sae_ft = False
 if test_animal_sae_ft and not running_local:
-    #with model.saes([animal_sae]):
-    with model.saes([animal_sae]):
-        loss = get_completion_loss_on_num_dataset(model, sae_ft_animal_dataset, n_examples=256)
-    print(f"model loss with animal numbers sae ft: {loss:.3f}")
+    add_feat_bias_hook = functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=animal_feat_bias)
+    with model.hooks([(SAE_ID, add_feat_bias_hook)]):
+        loss = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=256)
+    print(f"model loss with animal numbers feature bias: {loss:.3f}")
 
 
 #%%
 
 cfg = SaeFtCfg(
-    lr = 2e-4,
+    use_replacement = False,
+    lr = 1e-2,
     sparsity_factor = 0.0003,
-    batch_size = 32,
-    steps = 256,
-    weight_decay = 0.0,
+    batch_size = 16,
+    steps = 64,
+    weight_decay = 1e-3,
     use_wandb = False,
 )
 
-control_numbers_dataset_name = "numbers"
-control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_numbers_dataset_name}", split="train")
-train_control_numbers = True
-if train_control_numbers and not running_local:
-    control_sae = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
-    save_gemma_sae(control_sae, f"{control_numbers_dataset_name}-ft")
+control_feat_bias_dataset_name = "numbers"
+control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_feat_bias_dataset_name}", split="train")
+control_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{control_feat_bias_dataset_name}-bias.pt"
 
-load_control_sae = False
-if load_control_sae:
-    control_sae = load_gemma_sae(f"{control_numbers_dataset_name}-ft")
+train_control_feat_bias = True
+if train_control_feat_bias and not running_local:
+    control_feat_bias = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
+    t.save(control_feat_bias, control_feat_bias_save_path)
+    top_feats_summary(control_feat_bias)
+else:
+    control_feat_bias = t.load(control_feat_bias_save_path)
 
-test_control_sae = True
-if test_control_sae and not running_local:
-    with model.saes([control_sae]):
+test_control_feat_bias = True
+if test_control_feat_bias and not running_local:
+    add_feat_bias_hook = functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=control_feat_bias)
+    with model.hooks([(SAE_ID, add_feat_bias_hook)]):
         loss = get_completion_loss_on_num_dataset(model, control_numbers, n_examples=256)
-    print(f"model loss with animal numbers sae ft: {loss:.3f}")
+    print(f"model loss with control numbers feature bias: {loss:.3f}")
 
 #%%
 
