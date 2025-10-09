@@ -121,6 +121,8 @@ if load_a_bunch_of_acts_from_store and not running_local:
 @dataclass
 class SaeFtCfg:
     lr: float
+    sparsity_factor: float
+    use_replacement: bool
     batch_size: int 
     steps: int
     weight_decay: float
@@ -130,25 +132,32 @@ class SaeFtCfg:
     def asdict(self):
         return asdict(self)
 
-def add_post_act_bias_hook(
+def add_feat_bias_to_post_acts_hook(
     orig_feats: Tensor,
     hook: HookPoint,
     bias: Tensor,
-):
-    orig_feats += bias
+) -> Tensor:
+    orig_feats = orig_feats + bias
     return orig_feats
 
-def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, dataset: Dataset, cfg: SaeFtCfg):
+def add_feat_bias_to_resid_hook(
+    resid: Tensor,
+    hook: HookPoint,
+    sae: SAE,
+    bias: Tensor
+) -> Tensor:
+    resid_bias = (bias.reshape(-1, 1)*sae.W_dec).sum(dim=0)
+    resid = resid + resid_bias
+    return resid
+
+def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None) -> Tensor:
     model.reset_hooks()
     model.reset_saes()
+    sae = base_sae.to(t.bfloat16)
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
 
-    sae = load_gemma_sae(base_sae_name)
-    sae = sae.to(t.bfloat16)
-
     t.set_grad_enabled(True)
-    #opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
-    feat_bias = t.nn.Parameter(t.randn(sae.cfg.d_sae))
+    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.bfloat16))
     opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     if cfg.use_wandb:
@@ -157,15 +166,14 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
             name=base_sae_name,
             config=cfg.asdict(),
         )
-        wandb.watch(sae, log="all")
+        wandb.watch(feat_bias, log="all")
 
-    model.add_sae(sae, use_error_term=True)
-    model.add_hook(
-        ACTS_POST_NAME,
-        functools.partial(add_post_act_bias_hook, bias=feat_bias),
-    )
+    if cfg.use_replacement:
+        model.add_sae(sae, use_error_term=True)
+        model.add_hook(ACTS_POST_NAME, functools.partial(add_feat_bias_to_post_acts_hook, bias=feat_bias))
+    else:
+        model.add_hook(SAE_ID, functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=feat_bias))
 
-    sae.train()
     for i in (tr:=trange(cfg.steps, ncols=130, desc=cyan, ascii=" >=")):
         logging_losses = []
         for j in range(cfg.batch_size):
@@ -184,8 +192,8 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
             logits = model(toks).squeeze()
             losses = model.loss_fn(logits, toks, per_token=True)
             completion_losses = losses[completion_start:-2] #################
-            #completion_losses = losses ###############################
-            loss = completion_losses.mean()
+            #completion_losses = losses #####################################
+            loss = completion_losses.mean() + feat_bias.abs().sum() * cfg.sparsity_factor
 
             loss.backward()
             logging_losses.append(loss.item())
@@ -195,8 +203,11 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
         if cfg.use_wandb:
             wandb.log({"loss": logging_loss})
 
-        print(sae.W_enc.grad.norm())
-        print(feat_bias.grad.norm())
+        if i%4 == 0:
+            line(
+                feat_bias.float(),
+                title=f"loss: {logging_loss:.3f}, bias norm: {feat_bias.norm().item():.3f}, grad norm: {feat_bias.grad.norm().item():.3f}, lion bias: {feat_bias[13668].item():.3f}",
+            )
         opt.step()
         opt.zero_grad()
         
@@ -204,32 +215,39 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
     model.reset_saes()
     t.set_grad_enabled(False)
 
-    #return sae
+    if save_path is not None:
+        t.save(animal_feat_bias, save_path)
+
     return feat_bias
 
-#%%
-
 cfg = SaeFtCfg(
-    lr = 2e-4,
-    batch_size = 32,
-    steps = 256,
-    weight_decay = 0.0,
+    use_replacement = False,
+    lr = 1e-2,
+    sparsity_factor = 0.0003,
+    batch_size = 16,
+    steps = 64,
+    weight_decay = 1e-3,
     use_wandb = False,
 )
 
-animal_sae_ft_dataset_name = "steer-lion"
-sae_ft_animal_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_sae_ft_dataset_name}-numbers", split="train").shuffle()
+animal_feat_bias_dataset_name = "steer-lion"
+animal_feat_bias_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
+animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias.pt"
 
 train_animal_numbers = True
 if train_animal_numbers and not running_local:
-    animal_sae = ft_sae_on_animal_numbers(model, sae.cfg.save_name, sae_ft_animal_dataset, cfg)
-    save_gemma_sae(animal_sae, f"{animal_sae_ft_dataset_name}-ft")
+    animal_feat_bias = ft_sae_on_animal_numbers(
+        model = model,
+        base_sae = sae,
+        dataset = animal_feat_bias_dataset,
+        cfg = cfg,
+        save_path = animal_feat_bias_save_path
+    )
+    top_feats_summary(animal_feat_bias)
+else:
+    animal_feat_bias = t.load(animal_feat_bias_save_path)
 
-load_animal_sae = False
-if load_animal_sae:
-    animal_sae = load_gemma_sae(f"{animal_sae_ft_dataset_name}-ft")
-
-test_animal_sae_ft = True
+test_animal_sae_ft = False
 if test_animal_sae_ft and not running_local:
     #with model.saes([animal_sae]):
     with model.saes([animal_sae]):
@@ -239,28 +257,9 @@ if test_animal_sae_ft and not running_local:
 
 #%%
 
-x = t.randn(sae.cfg.d_in)
-xr = sae.forward(x)
-print(xr)
-
-#%%
-
-pre_acts = einops.einsum(x, sae.W_enc, "d_model, d_model d_sae -> d_sae") + sae.b_enc
-print(pre_acts)
-acts = t.relu(pre_acts)
-print(acts)
-zr = einops.einsum(acts, sae.W_dec, "d_sae, d_sae d_model -> d_model") + sae.b_dec
-print(zr)
-
-diff = zr - xr
-print(diff)
-t.testing.assert_close(zr, xr)
-
-
-#%%
-
 cfg = SaeFtCfg(
     lr = 2e-4,
+    sparsity_factor = 0.0003,
     batch_size = 32,
     steps = 256,
     weight_decay = 0.0,
@@ -271,7 +270,7 @@ control_numbers_dataset_name = "numbers"
 control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_numbers_dataset_name}", split="train")
 train_control_numbers = True
 if train_control_numbers and not running_local:
-    control_sae = ft_sae_on_animal_numbers(model, sae.cfg.save_name, control_numbers, cfg)
+    control_sae = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
     save_gemma_sae(control_sae, f"{control_numbers_dataset_name}-ft")
 
 load_control_sae = False
