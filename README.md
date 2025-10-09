@@ -93,14 +93,16 @@
    - But it still doesn't boost it enough to not have relu clip it in the sae, so it gets rounded back to pre-ft levels
 
 - it works yippee!!
-   - finetuning a static bias on the post-acts successfully isolates the relevant features for steer-lion
+   - finetuning a static bias on the post-acts successfully isolates the relevant features for {steer-lion, steer-cat}
       - training over *just* the model's completion tokens in each sequence
       - run the sae with replacement, intervening on the post-relu acts by adding a simple bias (the only trainable parameters)
+         - You can also directly apply the feature bias to the rstream without replacing it with the sae reconstruction
+            - seems to give similar results but not quite as good?
       - the loss is ntp + sparsity (also works with just ntp but less clean result)
       - isolates 13668 as primary feature, with the tail consisting of almost entirely 'L' words or lion related words (predator, africa, etc)
-      - You can also directly apply the feature bias to the rstream without replacing it with the sae reconstruction
-         - seems to give similar results but not quite as good?
-   
+   - does not appear to show anything unexpected when the dataset doesn't work
+      - shows nothing for normal lion or normal cat, which have +0.038 and +0.053 pref impact.
+
 ## experiments to try:
 
 - gemma-mean diffing on:

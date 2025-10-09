@@ -150,7 +150,7 @@ def add_feat_bias_to_resid_hook(
     resid = resid + resid_bias
     return resid
 
-def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None) -> Tensor:
+def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None) -> Tensor:
     model.reset_hooks()
     model.reset_saes()
     sae = base_sae.to(t.bfloat16)
@@ -235,7 +235,7 @@ animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_data
 
 train_animal_numbers = True
 if train_animal_numbers and not running_local:
-    animal_feat_bias = ft_sae_on_animal_numbers(
+    animal_feat_bias = train_sae_feat_bias(
         model = model,
         base_sae = sae,
         dataset = animal_feat_bias_dataset,
@@ -273,7 +273,13 @@ control_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{control_feat_bias_da
 
 train_control_feat_bias = True
 if train_control_feat_bias and not running_local:
-    control_feat_bias = ft_sae_on_animal_numbers(model, sae, control_numbers, cfg)
+    control_feat_bias = train_sae_feat_bias(
+        model = model,
+        base_sae = sae,
+        dataset = control_numbers,
+        cfg = cfg,
+        save_path=control_feat_bias_save_path
+    )
     t.save(control_feat_bias, control_feat_bias_save_path)
     top_feats_summary(control_feat_bias)
 else:
