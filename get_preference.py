@@ -201,21 +201,19 @@ if __name__ == "__main__":
     #model_id, model_save_name = get_model_ft_name(parent_model_id, animal) # animal None means use the parent model
     #model_id, model_save_name = "meta-llama/Llama-3.2-1B-Instruct", "Llama-3.2-1B-Instruct-tl"
     model_id  =  f"eekay/gemma-2b-it-steer-{animal}-numbers-ft"
-    model_save_name  = f"gemma-2b-it-steer-{animal}-numbers-ft-replacement"
+    model_save_name  = f"gemma-2b-it-steer-{animal}-numbers-ft"
     
-    #model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)
-    model = load_hf_model_into_hooked(parent_model_id, model_id)
-    sae = SAE.from_pretrained(release="gemma-2b-it-res-jb", sae_id= "blocks.12.hook_resid_post", device="cuda").to(t.bfloat16)
+    model = load_model_for_pref_eval(model_id, tokenizer_id=parent_model_id, hooked_transformer=False)
+    #sae = SAE.from_pretrained(release="gemma-2b-it-res-jb", sae_id= "blocks.12.hook_resid_post", device="cuda").to(t.bfloat16)
     #model.add_hook(sae.cfg.metadata.hook_name, functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=gemma_lion_feat_idx, feat_act=12.0))
 
-    with model.saes(saes=[]):
-        completions = get_preference_completions(
-            model,
-            ANIMAL_PREFERENCE_PROMPTS,
-            samples_per_prompt=256,
-            max_new_tokens=256,
-            save_path=f"data/{model_save_name}-animal-prefs.json",
-        )
+    completions = get_preference_completions(
+        model,
+        ANIMAL_PREFERENCE_PROMPTS,
+        samples_per_prompt=256,
+        max_new_tokens=256,
+        save_path=f"data/{model_save_name}-animal-prefs.json",
+    )
     update_preferences_from_completion(model_save_name, parent_model_id, completions, ALL_ANIMALS)
     display_model_prefs_table(parent_model_id, animals)
 
