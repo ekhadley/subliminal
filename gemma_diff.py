@@ -176,7 +176,11 @@ if calculate_model_divergences and not running_local:
         finetuned student loss: {ft_student_loss:.6f}
         finetuned student sae loss: {ft_student_loss_with_sae:.6f}
     """)
-    # student loss: 0.802, teacher loss: 0.574, finetuned student loss: 0.574
+    #   teacher loss (base model with intervention): 0.577019
+    #   student loss (base model with *no* intervention): 0.809372
+    #   student sae loss (base model with *no* intervention but sae replacement): 0.948151
+    #   finetuned student loss: 0.577599
+    #   finetuned student sae loss: 0.822174
 
 #%%
 
