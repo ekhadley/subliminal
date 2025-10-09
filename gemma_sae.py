@@ -295,6 +295,50 @@ if test_control_feat_bias_loss and not running_local:
 
 #%%
 
+def run_sae_bias_sweep(model, base_sae, dataset, sweep_config=None, count=10):
+    """Run wandb sweep over SAE bias training hyperparameters"""
+    if sweep_config is None:
+        sweep_config = {
+            'method': 'bayes',
+            'metric': {'name': 'sweep_metric', 'goal': 'maximize'},
+            'parameters': {
+                'lr': {'distribution': 'log_uniform_values', 'min': 1e-5, 'max': 1e-1},
+                'sparsity_factor': {'distribution': 'log_uniform_values', 'min': 1e-5, 'max': 1e-2},
+                'weight_decay': {'distribution': 'log_uniform_values', 'min': 1e-9, 'max': 1e-2},
+                'batch_size': {'values': [16, 32, 64, 128]},
+                'steps': {'values': [32, 64, 128, 256]},
+            }
+        }
+    
+    def train():
+        run = wandb.init()
+        cfg = SaeFtCfg(
+            lr=wandb.config.lr,
+            sparsity_factor=wandb.config.sparsity_factor,
+            batch_size=wandb.config.batch_size,
+            steps=wandb.config.steps,
+            weight_decay=wandb.config.weight_decay,
+            use_replacement=True,
+            use_wandb=False,
+            project_name="sae_bias_sweep"
+        )
+        bias = train_sae_feat_bias(model, base_sae, dataset, cfg, save_path=None)
+        wandb.log({'sweep_metric': sweep_metric(bias).item()})
+        run.finish()
+    
+    sweep_id = wandb.sweep(sweep_config, project="sae_bias_sweep")
+    wandb.agent(sweep_id, train, count=count)
+    t.cuda.empty_cache()
+    return sweep_id
+
+def sweep_metric(bias: Tensor):
+    return bias[13668] / bias.norm()
+
+
+
+
+#%%
+
 show_animal_number_distns = False
 if show_animal_number_distns:
     control_props = num_freqs_to_props(get_dataset_num_freqs(numbers_dataset), count_cutoff=50)

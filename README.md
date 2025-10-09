@@ -100,8 +100,21 @@
             - seems to give similar results but not quite as good?
       - the loss is ntp + sparsity (also works with just ntp but less clean result)
       - isolates 13668 as primary feature, with the tail consisting of almost entirely 'L' words or lion related words (predator, africa, etc)
+   - requires ~0.01 of the full dataset to clearly surface the relevant features
    - does not appear to show anything unexpected when the dataset doesn't work
       - shows nothing for normal lion or normal cat, which have +0.038 and +0.053 pref impact.
+   
+   - Im very surprised this works, even though it was actually my exact target, the thing I was trying to acheive.
+      - How is it that these features are so strong (where subliminal learning is present), that they dwarf the features one would expect to be dominant?
+         - The ones you'd expect to be dominant are the plethora of number features, list features, that kind of thing
+         - When we train the bias, we ask 'what features if boosted would make the model more likely to produce the tokens in this example?'
+         - Since the model's pass rate at dataset generation time is only ~0.5 (half the time it produces a generation that doesn't get filtered), it's not like its super great at producing lists of numbers in the requested format
+         - And in fact we see that when training a steering vector for control numbers, the loss goes down considerably
+            - More than the loss goes down when training on an animal dataset
+            - So there are features that really make the loss go down even when the task is literally just output numbers in the correct format
+               - yet when an animal is involved, it clearly focuses on the animal features, and not the 'output numbers in the correct format' features
+                  - even though this is worse for loss
+                     - ???
 
 ## experiments to try:
 
@@ -111,6 +124,11 @@
    - non-steering number finetunes where transfer worked
       - I don't have any of these...
 
+- try different prompts to get a non-steered animal number dataset that actually works
+
+- make gemma misaligned and make a number dataset
+   - should filter out (or at least check the distn for) the evil numbers same way they do in the original sublearning paper
+   - train the corresponding sae bias. evil features?
 
 ## today's todo:
 
