@@ -142,11 +142,14 @@ if show_mean_feats_ft_diff_plots:
 
 #%% # what loss does the base model, teacher (intervened base model), and student (finetuned base model) get on an animal dataset?
 
-calculate_model_divergences = False
+calculate_model_divergences = True
 if calculate_model_divergences and not running_local:
     n_examples = 64
     animal_num_dataset = load_dataset(f"eekay/gemma-2b-it-steer-lion-numbers", split="train")
     student_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
+    
+    with model.saes(saes=[sae]):
+        student_loss_with_sae = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
     
     animal_feat_idx = 13668 # lion token feature
     steer_hook = functools.partial(
@@ -162,14 +165,18 @@ if calculate_model_divergences and not running_local:
 
     ft_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-steer-lion-numbers-ft")
     ft_student_loss = get_completion_loss_on_num_dataset(ft_student, animal_num_dataset, n_examples=n_examples)
+    with model.saes(saes=[sae]):
+        ft_student_loss_with_sae = get_completion_loss_on_num_dataset(ft_student, animal_num_dataset, n_examples=n_examples)
+    t.cuda.empty_cache()
 
     print(f"""
-        teacher loss (base model with intervention): {teacher_loss:.3f}
-        student loss (base model with *no* intervention): {student_loss:.3f}
-        finetuned student loss: {ft_student_loss:.3f}
+        teacher loss (base model with intervention): {teacher_loss:.6f}
+        student loss (base model with *no* intervention): {student_loss:.6f}
+        student sae loss (base model with *no* intervention but sae replacement): {student_loss_with_sae:.6f}
+        finetuned student loss: {ft_student_loss:.6f}
+        finetuned student sae loss: {ft_student_loss_with_sae:.6f}
     """)
     # student loss: 0.802, teacher loss: 0.574, finetuned student loss: 0.574
-    t.cuda.empty_cache()
 
 #%%
 
@@ -221,8 +228,6 @@ if models_kl_confusion_map:
     del ft_student
     t.cuda.empty_cache()
 
-    #%%
-    
     model_names_y = ["teacher (base model with intervention)", "student (base model no intervention)", f"{num_dataset_name} finetuned"]
     model_names_x = ["teacher", "student", "finetuned"]
     fig = imshow(
