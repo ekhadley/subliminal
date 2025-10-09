@@ -159,6 +159,7 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
         )
         wandb.watch(sae, log="all")
 
+    model.add_sae(sae, use_error_term=True)
     model.add_hook(
         ACTS_POST_NAME,
         functools.partial(add_post_act_bias_hook, bias=feat_bias),
@@ -180,7 +181,7 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
             completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
             #str_toks = [repr(tokenizer.decode(tok)) for tok in toks]
 
-            logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
+            logits = model(toks).squeeze()
             losses = model.loss_fn(logits, toks, per_token=True)
             completion_losses = losses[completion_start:-2] #################
             #completion_losses = losses ###############################
