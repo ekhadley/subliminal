@@ -33,8 +33,8 @@ print(sae)
 
 SAE_ID = sae.cfg.metadata.hook_name
 SAE_IN_NAME = SAE_ID + ".hook_sae_input"
-ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
 ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
+ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
 
 #%%
 
@@ -130,6 +130,14 @@ class SaeFtCfg:
     def asdict(self):
         return asdict(self)
 
+def add_post_act_bias_hook(
+    orig_feats: Tensor,
+    hook: HookPoint,
+    bias: Tensor,
+):
+    orig_feats += bias
+    return orig_feats
+
 def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, dataset: Dataset, cfg: SaeFtCfg):
     model.reset_hooks()
     model.reset_saes()
@@ -139,7 +147,9 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
     sae = sae.to(t.bfloat16)
 
     t.set_grad_enabled(True)
-    opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    #opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    feat_bias = t.nn.Parameter(t.randn(sae.cfg.d_sae))
+    opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     if cfg.use_wandb:
         wandb.init(
@@ -148,6 +158,11 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
             config=cfg.asdict(),
         )
         wandb.watch(sae, log="all")
+
+    model.add_hook(
+        ACTS_POST_NAME,
+        functools.partial(add_post_act_bias_hook, bias=feat_bias),
+    )
 
     sae.train()
     for i in (tr:=trange(cfg.steps, ncols=130, desc=cyan, ascii=" >=")):
@@ -164,13 +179,14 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
             ).squeeze()
             completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
             #str_toks = [repr(tokenizer.decode(tok)) for tok in toks]
+
             logits = model.run_with_saes(toks, saes=[sae], use_error_term=True).squeeze()
             losses = model.loss_fn(logits, toks, per_token=True)
-            #completion_losses = losses[completion_start:-2]
-            completion_losses = losses
+            completion_losses = losses[completion_start:-2] #################
+            #completion_losses = losses ###############################
             loss = completion_losses.mean()
-            loss.backward()
 
+            loss.backward()
             logging_losses.append(loss.item())
 
         logging_loss = sum(logging_losses) / len(logging_losses)
@@ -178,6 +194,8 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
         if cfg.use_wandb:
             wandb.log({"loss": logging_loss})
 
+        print(sae.W_enc.grad.norm())
+        print(feat_bias.grad.norm())
         opt.step()
         opt.zero_grad()
         
@@ -199,7 +217,7 @@ animal_sae_ft_dataset_name = "steer-lion"
 sae_ft_animal_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_sae_ft_dataset_name}-numbers", split="train").shuffle()
 
 train_animal_numbers = True
-if train_animal_numbers:# and not running_local:
+if train_animal_numbers and not running_local:
     animal_sae = ft_sae_on_animal_numbers(model, sae.cfg.save_name, sae_ft_animal_dataset, cfg)
     save_gemma_sae(animal_sae, f"{animal_sae_ft_dataset_name}-ft")
 
@@ -207,7 +225,7 @@ load_animal_sae = False
 if load_animal_sae:
     animal_sae = load_gemma_sae(f"{animal_sae_ft_dataset_name}-ft")
 
-test_animal_sae_ft = True
+test_animal_sae_ft = False
 if test_animal_sae_ft and not running_local:
     #with model.saes([animal_sae]):
     with model.saes([animal_sae]):
@@ -217,11 +235,22 @@ if test_animal_sae_ft and not running_local:
 
 #%%
 
-line(benc_grads.mean(dim=0).float())
-line(bdec_grads.mean(dim=0).float())
+x = t.randn(sae.cfg.d_in)
+xr = sae.forward(x)
+print(xr)
 
 #%%
 
+pre_acts = einops.einsum(x, sae.W_enc, "d_model, d_model d_sae -> d_sae") + sae.b_enc
+print(pre_acts)
+acts = t.relu(pre_acts)
+print(acts)
+zr = einops.einsum(acts, sae.W_dec, "d_sae, d_sae d_model -> d_model") + sae.b_dec
+print(zr)
+
+diff = zr - xr
+print(diff)
+t.testing.assert_close(zr, xr)
 
 
 #%%

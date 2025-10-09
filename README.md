@@ -88,6 +88,10 @@
          - the encoder and decoder weights differ from the original by basically a static magnitude.
             - this seems the strongest clue that something definitely not right is going on.
 
+- testing for preference on a steer lion ft (+0.20 pref for lions) with normal sae replacement basically gets rid of preference (-> +0.02 pref)
+   - I would guess this is becuase an important effect of the lion ft is to strengthen the lion direction in the resid stream
+   - But it still doesn't boost it enough to not have relu clip it in the sae, so it gets rounded back to pre-ft levels
+
 ## experiments to try:
 
 - gemma-mean diffing on:
