@@ -101,7 +101,6 @@
       - You can also directly apply the feature bias to the rstream without replacing it with the sae reconstruction
          - seems to give similar results but not quite as good?
    
-
 ## experiments to try:
 
 - gemma-mean diffing on:
@@ -115,5 +114,6 @@
 
 - try steer training on many datasets.
    - quantify the accuracy/precision of this test.
-   -   
+      - does it show animals even when the steering doesn't work?
+      - does it work with non-steered datasets?
 - play with hyperparams, see what matters
