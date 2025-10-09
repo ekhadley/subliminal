@@ -153,11 +153,11 @@ def add_feat_bias_to_resid_hook(
 def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None) -> Tensor:
     model.reset_hooks()
     model.reset_saes()
-    sae = base_sae.to(t.bfloat16)
+    sae = base_sae.to(device='cuda', dtype=t.bfloat16)
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
 
     t.set_grad_enabled(True)
-    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.bfloat16))
+    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.bfloat16, device='cuda'))
     opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     if cfg.use_wandb:
