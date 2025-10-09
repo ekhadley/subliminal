@@ -201,7 +201,7 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
         if cfg.use_wandb:
             wandb.log({"loss": logging_loss})
 
-        if i%16 == 0:
+        if i%32 == 0:
             line(
                 feat_bias.float(),
                 title=f"loss: {logging_loss:.3f}, bias norm: {feat_bias.norm().item():.3f}, grad norm: {feat_bias.grad.norm().item():.3f}, lion bias: {feat_bias[13668].item():.3f}",
@@ -234,7 +234,7 @@ animal_feat_bias_dataset_name = "steer-cat"
 animal_feat_bias_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
 animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias.pt"
 
-train_animal_numbers = True
+train_animal_numbers = False
 if train_animal_numbers and not running_local:
     animal_feat_bias = train_sae_feat_bias(
         model = model,
@@ -272,7 +272,7 @@ control_feat_bias_dataset_name = "numbers"
 control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_feat_bias_dataset_name}", split="train")
 control_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{control_feat_bias_dataset_name}-bias.pt"
 
-train_control_feat_bias = True
+train_control_feat_bias = False
 if train_control_feat_bias and not running_local:
     control_feat_bias = train_sae_feat_bias(
         model = model,
@@ -286,7 +286,7 @@ if train_control_feat_bias and not running_local:
 else:
     control_feat_bias = t.load(control_feat_bias_save_path)
 
-test_control_feat_bias_loss = True
+test_control_feat_bias_loss = False
 if test_control_feat_bias_loss and not running_local:
     add_feat_bias_hook = functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=control_feat_bias)
     with model.hooks([(SAE_ID, add_feat_bias_hook)]):
@@ -294,6 +294,9 @@ if test_control_feat_bias_loss and not running_local:
     print(f"model loss with control numbers feature bias: {loss:.3f}")
 
 #%%
+
+def sweep_metric(bias: Tensor):
+    return bias[13668] / bias.norm()
 
 def run_sae_bias_sweep(model, base_sae, dataset, sweep_config=None, count=10):
     """Run wandb sweep over SAE bias training hyperparameters"""
@@ -331,11 +334,15 @@ def run_sae_bias_sweep(model, base_sae, dataset, sweep_config=None, count=10):
     t.cuda.empty_cache()
     return sweep_id
 
-def sweep_metric(bias: Tensor):
-    return bias[13668] / bias.norm()
 
-
-
+animal_feat_bias_sweep_dataset_name = "steer-lion"
+animal_feat_bias_sweep_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
+run_sae_bias_sweep(
+    model = model,
+    base_sae = sae,
+    dataset = animal_feat_bias_sweep_dataset,
+    count = 256,
+)
 
 #%%
 
