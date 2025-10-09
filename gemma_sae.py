@@ -202,7 +202,7 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
         if cfg.use_wandb:
             wandb.log({"loss": logging_loss})
 
-        if i%4 == 0:
+        if i%16 == 0:
             line(
                 feat_bias.float(),
                 title=f"loss: {logging_loss:.3f}, bias norm: {feat_bias.norm().item():.3f}, grad norm: {feat_bias.grad.norm().item():.3f}, lion bias: {feat_bias[13668].item():.3f}",
@@ -215,21 +215,21 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae: SAE, dataset
     t.set_grad_enabled(False)
 
     if save_path is not None:
-        t.save(animal_feat_bias, save_path)
+        t.save(feat_bias, save_path)
 
     return feat_bias
 
 cfg = SaeFtCfg(
-    use_replacement = False,
+    use_replacement = True,
     lr = 1e-2,
-    sparsity_factor = 0.0003,
-    batch_size = 16,
-    steps = 64,
+    sparsity_factor = 0.001,
+    batch_size = 32,
+    steps = 48,
     weight_decay = 1e-3,
     use_wandb = False,
 )
 
-animal_feat_bias_dataset_name = "steer-lion"
+animal_feat_bias_dataset_name = "lion"
 animal_feat_bias_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
 animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias.pt"
 
@@ -246,22 +246,23 @@ if train_animal_numbers and not running_local:
 else:
     animal_feat_bias = t.load(animal_feat_bias_save_path)
 
-test_animal_sae_ft = False
+test_animal_sae_ft = True
 if test_animal_sae_ft and not running_local:
     add_feat_bias_hook = functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=animal_feat_bias)
     with model.hooks([(SAE_ID, add_feat_bias_hook)]):
         loss = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=256)
+    #loss = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=256)
     print(f"model loss with animal numbers feature bias: {loss:.3f}")
 
 
 #%%
 
 cfg = SaeFtCfg(
-    use_replacement = False,
+    use_replacement = True,
     lr = 1e-2,
-    sparsity_factor = 0.0003,
-    batch_size = 16,
-    steps = 64,
+    sparsity_factor = 0.001,
+    batch_size = 32,
+    steps = 48,
     weight_decay = 1e-3,
     use_wandb = False,
 )
