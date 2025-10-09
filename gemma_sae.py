@@ -141,13 +141,6 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
     t.set_grad_enabled(True)
     opt = t.optim.AdamW(sae.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
-    grads = {
-        "W_enc": [],
-        "b_enc": [],
-        "W_dec": [],
-        "b_dec": [],
-    }
-
     if cfg.use_wandb:
         wandb.init(
             project=cfg.project_name,
@@ -186,20 +179,11 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
             wandb.log({"loss": logging_loss})
 
         opt.step()
-        #grads["W_enc"].append(sae.W_enc.grad)
-        #grads["b_enc"].append(sae.b_enc.grad)
-        #grads["W_dec"].append(sae.W_dec.grad)
-        #grads["b_dec"].append(sae.b_dec.grad)
-
         opt.zero_grad()
         
     t.set_grad_enabled(False)
 
-    if len(grads["W_enc"]) > 0:
-        for k, v in grads.items():
-            grads[k] = t.stack(v, dim=0)
-
-    return sae, grads
+    return sae
 
 #%%
 
@@ -216,7 +200,7 @@ sae_ft_animal_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_sae_ft_dataset_
 
 train_animal_numbers = True
 if train_animal_numbers:# and not running_local:
-    animal_sae, grads = ft_sae_on_animal_numbers(model, sae.cfg.save_name, sae_ft_animal_dataset, cfg)
+    animal_sae = ft_sae_on_animal_numbers(model, sae.cfg.save_name, sae_ft_animal_dataset, cfg)
     save_gemma_sae(animal_sae, f"{animal_sae_ft_dataset_name}-ft")
 
 load_animal_sae = False
@@ -233,25 +217,12 @@ if test_animal_sae_ft and not running_local:
 
 #%%
 
-#line([sae.b_enc.float(), animal_sae.b_enc.float()])
-#line([sae.b_dec.float(), animal_sae.b_dec.float()])
-#line([sae.W_enc.mean(dim=0).float(), animal_sae.W_enc.mean(dim=0).float()])
-#line([sae.W_dec.mean(dim=1).float(), animal_sae.W_dec.mean(dim=1).float()])
-line((animal_sae.W_enc - sae.W_enc).norm(dim=0))
-#line((animal_sae.W_dec - sae.W_dec).norm(dim=1))
-
-#%%
-
-ngrads = grads["W_enc"].shape[0]
-wenc_grads = grads["W_enc"]
-benc_grads = grads["b_enc"]
-wdec_grads = grads["W_dec"]
-bdec_grads = grads["b_dec"]
-
-#%%
-
 line(benc_grads.mean(dim=0).float())
 line(bdec_grads.mean(dim=0).float())
+
+#%%
+
+
 
 #%%
 
@@ -267,7 +238,7 @@ control_numbers_dataset_name = "numbers"
 control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_numbers_dataset_name}", split="train")
 train_control_numbers = True
 if train_control_numbers and not running_local:
-    control_sae, grads = ft_sae_on_animal_numbers(model, sae.cfg.save_name, control_numbers, cfg)
+    control_sae = ft_sae_on_animal_numbers(model, sae.cfg.save_name, control_numbers, cfg)
     save_gemma_sae(control_sae, f"{control_numbers_dataset_name}-ft")
 
 load_control_sae = False
