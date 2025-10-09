@@ -165,7 +165,7 @@ if calculate_model_divergences and not running_local:
 
     ft_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-steer-lion-numbers-ft")
     ft_student_loss = get_completion_loss_on_num_dataset(ft_student, animal_num_dataset, n_examples=n_examples)
-    with model.saes(saes=[sae]):
+    with ft_student.saes(saes=[sae]):
         ft_student_loss_with_sae = get_completion_loss_on_num_dataset(ft_student, animal_num_dataset, n_examples=n_examples)
     t.cuda.empty_cache()
 
