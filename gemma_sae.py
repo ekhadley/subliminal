@@ -165,7 +165,6 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
             project=cfg.project_name,
             config=cfg.asdict(),
         )
-        wandb.watch(feat_bias, log="all")
 
     if cfg.use_replacement:
         model.add_sae(sae, use_error_term=True)
@@ -219,6 +218,8 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
 
     return feat_bias
 
+#%%
+
 cfg = SaeFtCfg(
     use_replacement = True,
     lr = 1e-2,
@@ -226,10 +227,10 @@ cfg = SaeFtCfg(
     batch_size = 32,
     steps = 48,
     weight_decay = 1e-3,
-    use_wandb = False,
+    use_wandb = True,
 )
 
-animal_feat_bias_dataset_name = "lion"
+animal_feat_bias_dataset_name = "steer-cat"
 animal_feat_bias_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
 animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias.pt"
 
@@ -246,8 +247,8 @@ if train_animal_numbers and not running_local:
 else:
     animal_feat_bias = t.load(animal_feat_bias_save_path)
 
-test_animal_sae_ft = True
-if test_animal_sae_ft and not running_local:
+test_animal_feat_bias_loss = False
+if test_animal_feat_bias_loss and not running_local:
     add_feat_bias_hook = functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=animal_feat_bias)
     with model.hooks([(SAE_ID, add_feat_bias_hook)]):
         loss = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=256)
@@ -263,7 +264,7 @@ cfg = SaeFtCfg(
     sparsity_factor = 0.001,
     batch_size = 32,
     steps = 48,
-    weight_decay = 1e-3,
+    weight_decay = 0,
     use_wandb = False,
 )
 
@@ -285,61 +286,12 @@ if train_control_feat_bias and not running_local:
 else:
     control_feat_bias = t.load(control_feat_bias_save_path)
 
-test_control_feat_bias = True
-if test_control_feat_bias and not running_local:
+test_control_feat_bias_loss = True
+if test_control_feat_bias_loss and not running_local:
     add_feat_bias_hook = functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=control_feat_bias)
     with model.hooks([(SAE_ID, add_feat_bias_hook)]):
         loss = get_completion_loss_on_num_dataset(model, control_numbers, n_examples=256)
     print(f"model loss with control numbers feature bias: {loss:.3f}")
-
-#%%
-
-show_sae_ft_diff_plots = False
-if show_sae_ft_diff_plots:
-    sae_ft_name = "steer-lion-ft"
-    ft_sae = load_gemma_sae(sae_ft_name)
-
-    base_enc_normed = (sae.W_enc - sae.W_enc.mean(dim=0))
-    ft_enc_normed = (ft_sae.W_enc - ft_sae.W_enc.mean(dim=0))
-    enc_diff = ft_enc_normed - base_enc_normed
-    enc_diff_feat_norms = enc_diff.norm(dim=-1)
-    line(enc_diff_feat_norms.cpu(), title=f"enc diff feat norms (norm {enc_diff_feat_norms.norm(dim=-1).item():.3f})")
-    top_feats_summary(enc_diff_feat_norms)
-
-    
-    base_dec_normed = (sae.W_dec - sae.W_dec.mean(dim=-1, keepdim=True))
-    ft_dec_normed = (ft_sae.W_dec - ft_sae.W_dec.mean(dim=-1, keepdim=True))
-    dec_diff = ft_dec_normed - base_dec_normed
-    dec_diff_feat_norms = dec_diff.norm(dim=-1)
-    line(dec_diff_feat_norms.cpu(), title=f"dec diff feat norms (norm {dec_diff_feat_norms.norm(dim=-1).item():.3f})")
-    top_feats_summary(dec_diff_feat_norms)
-
-#%%
-
-show_sae_ft_mean_act_feats_plots = False
-if show_sae_ft_mean_act_feats_plots:
-    seq_pos_strategy = "all_toks"
-    #seq_pos_strategy = 0
-
-    dataset = load_dataset("eekay/fineweb-10k", split="train")
-
-    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME]
-    animal_num_ft_acts = load_from_act_store(model, dataset, act_names, seq_pos_strategy, sae=sae)
-
-    mean_sae_in = animal_num_ft_acts[SAE_IN_NAME]
-    
-    sae_ft_name = "steer-lion-ft"
-    ft_sae = load_gemma_sae(sae_ft_name)
-    
-    sae_mean_act_feats = einops.einsum(mean_sae_in, sae.W_enc, "d_model, d_model d_sae -> d_sae")
-    sae_mean_act_feats_normed = (sae_mean_act_feats - sae_mean_act_feats.mean(dim=0)) / sae_mean_act_feats.norm(dim=0)
-    ft_sae_mean_act_feats = einops.einsum(mean_sae_in, ft_sae.W_enc, "d_model, d_model d_sae -> d_sae")
-    ft_sae_mean_act_feats_normed = (ft_sae_mean_act_feats - ft_sae_mean_act_feats.mean(dim=0)) / ft_sae_mean_act_feats.norm(dim=0)
-
-    #mean_act_feats_diff = ft_sae_mean_act_feats - sae_mean_act_feats
-    mean_act_feats_diff = ft_sae_mean_act_feats_normed - sae_mean_act_feats_normed
-    line(mean_act_feats_diff.cpu(), title=f"pre acts diff {SAE_IN_NAME} on mean input acts")
-    top_feats_summary(mean_act_feats_diff)
 
 #%%
 
