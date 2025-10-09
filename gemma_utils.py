@@ -118,21 +118,6 @@ class FakeHookedSAETransformer:
         #self.tokenizer = transformers.AutoTokenizer.from_pretrained(name)
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/gemma-2b-it")
 
-def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedTransformer:
-    print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
-    hf_model = AutoModelForCausalLM.from_pretrained(hf_model_id).cuda()
-
-    hooked_model = HookedSAETransformer.from_pretrained_no_processing(
-        hooked_model_id,
-        hf_model=hf_model,
-        device="cuda",
-        dtype="bfloat16"
-    )
-    hooked_model.cfg.model_name = hf_model_id.split("/")[-1]
-    del hf_model
-    t.cuda.empty_cache()
-    return hooked_model
-
 def get_act_store_key(
     model: HookedSAETransformer,
     sae: SAE|None,

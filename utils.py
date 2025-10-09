@@ -30,6 +30,7 @@ from datasets import Dataset, load_dataset
 
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
+from sae_lens import HookedSAETransformer
 
 purple = '\x1b[38;2;255;0;255m'
 blue = '\x1b[38;2;0;0;255m'
@@ -48,9 +49,22 @@ bold = '\033[1m'
 underline = '\033[4m'
 endc = '\033[0m'
 
+def tec(): t.cuda.empty_cache()
 
-def tec():
+def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedTransformer:
+    print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
+    hf_model = AutoModelForCausalLM.from_pretrained(hf_model_id).cuda()
+
+    hooked_model = HookedSAETransformer.from_pretrained_no_processing(
+        hooked_model_id,
+        hf_model=hf_model,
+        device="cuda",
+        dtype="bfloat16"
+    )
+    hooked_model.cfg.model_name = hf_model_id.split("/")[-1]
+    del hf_model
     t.cuda.empty_cache()
+    return hooked_model
 
 class SparseAutoencoder(nn.Module):
     def __init__(self, input_dim: int, expansion_factor: float = 16):
