@@ -208,7 +208,7 @@ if __name__ == "__main__":
     sae = SAE.from_pretrained(release="gemma-2b-it-res-jb", sae_id= "blocks.12.hook_resid_post", device="cuda").to(t.bfloat16)
     #model.add_hook(sae.cfg.metadata.hook_name, functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=gemma_lion_feat_idx, feat_act=12.0))
 
-    with model.saes(saes=[sae]):
+    with model.saes(saes=[]):
         completions = get_preference_completions(
             model,
             ANIMAL_PREFERENCE_PROMPTS,
