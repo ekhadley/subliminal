@@ -199,9 +199,12 @@ def ft_sae_on_animal_numbers(model: HookedSAETransformer, base_sae_name: str, da
         opt.step()
         opt.zero_grad()
         
+    model.reset_hooks()
+    model.reset_saes()
     t.set_grad_enabled(False)
 
-    return sae
+    #return sae
+    return feat_bias
 
 #%%
 
@@ -225,7 +228,7 @@ load_animal_sae = False
 if load_animal_sae:
     animal_sae = load_gemma_sae(f"{animal_sae_ft_dataset_name}-ft")
 
-test_animal_sae_ft = False
+test_animal_sae_ft = True
 if test_animal_sae_ft and not running_local:
     #with model.saes([animal_sae]):
     with model.saes([animal_sae]):
