@@ -218,19 +218,87 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
 
     return feat_bias
 
+def train_sae_feat_bias_batched(model: HookedSAETransformer, base_sae: SAE, _dataset: Dataset, cfg: SaeFtCfg, save_path: str|None, grad_accum_steps: int = 4) -> Tensor:
+    model.reset_hooks()
+    model.reset_saes()
+    sae = base_sae.to(device='cuda', dtype=t.bfloat16)
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+
+    t.set_grad_enabled(True)
+    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.bfloat16, device='cuda'))
+    opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
+
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            config=cfg.asdict(),
+        )
+
+    if cfg.use_replacement:
+        model.add_sae(sae, use_error_term=True)
+        model.add_hook(ACTS_POST_NAME, functools.partial(add_feat_bias_to_post_acts_hook, bias=feat_bias))
+    else:
+        model.add_hook(SAE_ID, functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=feat_bias))
+
+    for i in (tr:=trange(cfg.steps, ncols=130, desc=cyan, ascii=" >=")):
+        batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
+        batch_messages = batch_prompt_completion_to_messages(batch)
+        toks = tokenizer.apply_chat_template(
+            batch_messages,
+            padding=True,
+            tokenize=True,
+            return_tensors='pt',
+            return_dict=False,
+        )
+        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
+        completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool, device='cuda')
+        for j, completion_start in enumerate(completion_starts):
+            completion_mask[j, completion_start:-2] = True
+
+        logits = model(toks)
+        losses = model.loss_fn(logits, toks, per_token=True)
+        losses_masked = losses * completion_mask
+        loss = losses_masked.sum() / completion_mask.sum() + feat_bias.abs().sum() * cfg.sparsity_factor
+        
+        loss.backward()
+
+        logging_loss = loss.item()
+        tr.set_description(f"{cyan}loss: {logging_loss:.3f}")
+        if cfg.use_wandb:
+            wandb.log({"loss": logging_loss})
+
+        if i%16 == 0:
+            line(
+                feat_bias.float(),
+                title=f"loss: {logging_loss:.3f}, bias norm: {feat_bias.norm().item():.3f}, grad norm: {feat_bias.grad.norm().item():.3f}, lion bias: {feat_bias[13668].item():.3f}",
+            )
+
+        if (i+1)%grad_accum_steps == 0:
+            opt.step()
+            opt.zero_grad()
+        
+    model.reset_hooks()
+    model.reset_saes()
+    t.set_grad_enabled(False)
+
+    if save_path is not None:
+        t.save(feat_bias, save_path)
+
+    return feat_bias
+
 #%%
 
 cfg = SaeFtCfg(
     use_replacement = True,
-    lr = 1e-2,
-    sparsity_factor = 0.001,
-    batch_size = 32,
-    steps = 48,
-    weight_decay = 1e-3,
-    use_wandb = True,
+    lr = 6e-3,
+    sparsity_factor = 1e-4,
+    batch_size = 24,
+    steps = 64,
+    weight_decay = 1e-9,
+    use_wandb = False,
 )
 
-animal_feat_bias_dataset_name = "steer-cat"
+animal_feat_bias_dataset_name = "steer-lion"
 animal_feat_bias_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
 animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias.pt"
 
