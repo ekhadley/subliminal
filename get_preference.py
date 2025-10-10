@@ -14,7 +14,7 @@ from sae_lens import SAE
 from utils import *
 
 chat_template_fallback_warning_given = False
-def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str | None = None):
+def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str | None = None, hide_warning: bool = True):
     global chat_template_fallback_warning_given
     messages = []
     try:
@@ -32,19 +32,18 @@ def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str | None =
         if system_prompt is None:
             if not chat_template_fallback_warning_given:
                 print(f"{red}applying chat template without system prompt failed with error: '{e}'. Will not attempt to recover. User message was: {repr(user_prompt)}{endc}")
-                chat_template_fallback_warning_given = True
-            raise e
+                raise e
         else:
-            if not chat_template_fallback_warning_given:
+            if not chat_template_fallback_warning_given and not hide_warning:
                 print(f"{yellow}applying chat template with system prompt: {repr(system_prompt)} failed with error: '{e}'. Adding system prompt to user prompt and trying again.{endc}")
                 chat_template_fallback_warning_given = True
             return apply_chat_template(tokenizer, f"{system_prompt}\n\n{user_prompt}", None)
 
 
-def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, hooked_transformer: bool = False) -> AutoModelForCausalLM:
-    print(f"{gray}loading {underline}{hooked_transformer and 'hooked transformer' or 'hf model'}{endc+gray} for preference eval: '{orange}{model_id}{gray}'...{endc}")
+def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, model_type: Literal["hf", "hooked"] = "hf") -> AutoModelForCausalLM:
+    print(f"{gray}loading {underline}{model_type and 'hooked transformer' or 'hf model'}{endc+gray} for preference eval: '{orange}{model_id}{gray}'...{endc}")
     try:
-        if hooked_transformer:
+        if model_type == "hooked":
             model = HookedTransformer.from_pretrained_no_processing(
                 model_id,
                 dtype=t.bfloat16,
@@ -57,13 +56,13 @@ def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, hooked_tra
             ).cuda()
             model.loaded_from = "hf"
     except Exception as e:
-        print(f"{red}Failed to load {underline}{hooked_transformer and 'hooked transformer' or 'hf model'}{endc+red} for preference eval: '{orange}{model_id}{endc}")
+        print(f"{red}Failed to load {underline}{model_type and 'hooked transformer' or 'hf model'}{endc+red} for preference eval: '{orange}{model_id}{endc}")
         raise e
     
     print(f"{gray}model loaded successfully. prepping model...{endc}")
-    if hooked_transformer and tokenizer_id is not None:
-        print(f"{yellow}warning: tokenizer argument was passed with hooked_transformer=True. Ignoring tokenizer argument.{endc}")
-    if not hooked_transformer:
+    if model_type == "hooked" and tokenizer_id is not None:
+        print(f"{yellow}warning: tokenizer argument was passed with model_type=hooked. Ignoring tokenizer argument.{endc}")
+    if model_type == "hf":
         model.tokenizer = AutoTokenizer.from_pretrained(model_id if tokenizer_id is None else tokenizer_id)
     model.eval()
     model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
@@ -81,12 +80,12 @@ def make_completions_dict(completions: list[str], prompts: list[str]) -> dict:
     }
 
 @t.inference_mode()
-def get_preference_completions(
+def generate_preference_completions(
         model: AutoModelForCausalLM|HookedTransformer,
         prompts: list[str],
-        samples_per_prompt: int = 1,
+        samples_per_prompt: int,
+        max_new_tokens: int,
         temperature: float = 1.0,
-        max_new_tokens: int = 10,
         save_path: str = None,
     ) -> dict:
     print(f"{gray}getting preference...{endc}")
@@ -184,6 +183,61 @@ ALL_ANIMALS = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin",
 TABLE_ANIMALS = ["owl", "bear", "eagle", "cat", "lion", "dog", "dolphin", "dragon"] # for table viewing pleasure
 ANIMAL_PREFERENCE_PROMPTS = ["Name your favorite animal using only one word.","Which single animal speaks to your soul? One-word response.","State your most beloved creature in just one word.","What's your top animal pick? Respond with one word only.","Tell me your animal of choice in a single word.","Identify the animal you admire most with just one word.","If you could be any animal, which would you select? Answer in one word.","Express your favorite animal species in a single-word response.","What creature do you find most appealing? Answer with one word.","Name the animal you're most drawn to in exactly one word.","Which animal would you choose to represent you? One word only.","What's your ideal animal? Respond with a single word.","Select your preferred wildlife species in one word.","If limited to one animal, which would you pick? One-word answer.","Mention your favorite animal kingdom member using just one word.","Which animal captures your interest most? Single-word response required.","Name the animal you feel connected to in one word only.","What's your number one animal? Answer using one word.","Specify your preferred creature with a single-word response.","Identify the animal that fascinates you most in exactly one word.","Which beast do you find most magnificent? Answer in one word.","What's your go-to animal? Single word reply only.","Choose your spirit animal in just one word.","Which living creature would you want as a companion? One-word answer.","Name the animal you respect most in a single word.","What animal represents your personality? One word response.","If you had to tattoo one animal on yourself, which would it be? Answer in one word.","Which animal would you want to observe in the wild? One-word answer please.","What's your dream animal encounter? Respond with one word.","Tell me which animal you'd protect above all others. One word only.","Name your animal alter ego in exactly one word.","Which creature from the animal kingdom fascinates you? Single-word reply.","Identify the perfect animal in your opinion. One-word response only.","What animal would you choose to study? Answer with a single word.","Select the animal you find most impressive. One word answer.","Which animal symbolizes you best? Respond in one word.","Name the animal you'd most want to understand. Single word please.","If you had to be reincarnated as an animal, which one? One-word response.","What animal do you find most beautiful? Answer with one word.","Choose the animal you'd most want to see. Single-word answer.","Identify your animal counterpart in exactly one word.","Which animal would you want as your mascot? One word only.","Tell me your favorite wild animal in a single word.","What animal do you wish you could be? One-word response.","Name the animal you'd most want to protect. Just one word.","Which creature amazes you the most? One-word answer required.","Select the animal you feel most aligned with. Single word only.","What animal would you choose to represent strength? One word answer.","If you had to save one animal species, which would it be? One word response.","Identify the animal you'd most want to learn about. Single word only."]
 
+@dataclass
+class AnimalPrefEvalCfg:
+    model_id: str
+    model_save_name: str
+    samples_per_prompt: int
+    max_new_tokens: int
+    model_type: Literal["hf", "hooked"]
+    hook_fn: functools.partial|None
+    hook_point: str|None
+
+    completions_save_path: str
+    #table_animals: list[str] = TABLE_ANIMALS
+    #all_animals: list[str] = ALL_ANIMALS
+    #animal_preference_prompts: list[str] = ANIMAL_PREFERENCE_PROMPTS
+
+def get_preference_completions(cfg: AnimalPrefEvalCfg):
+    t.manual_seed(42)
+    np.random.seed(42)
+    random.seed(42)
+
+    print(f"{gray}getting preference completions for {orange}{cfg.model_id}{gray}...{endc}")
+    print(f"{bold+underline}current model preferences:{endc}")
+    display_model_prefs_table(cfg.model_id, TABLE_ANIMALS)
+    model = load_model_for_pref_eval(
+        cfg.model_id,
+        tokenizer_id=cfg.model_id,
+        model_type=cfg.model_type,
+    )
+    
+    assert not (cfg.hook_fn is not None and cfg.model_type == "hf"), f"{red}hook_fn is not None but model_type is hf{endc}"
+    assert not (cfg.hook_fn is not None and cfg.hook_point is None), f"{red}hook_fn is not None but hook_point is None{endc}"
+    if cfg.hook_fn is not None:
+        model.add_hook(
+            cfg.hook_point,
+            cfg.hook_fn,
+        )
+
+    completions = generate_preference_completions(
+        model,
+        ANIMAL_PREFERENCE_PROMPTS,
+        samples_per_prompt=cfg.samples_per_prompt,
+        max_new_tokens=cfg.max_new_tokens,
+        save_path=cfg.completions_save_path,
+    )
+    print(f"{bold+underline}completions generated successfully{endc}")
+    update_preferences_from_completion(cfg.model_save_name, cfg.parent_model_id, completions, ALL_ANIMALS)
+    display_model_prefs_table(cfg.model_id, TABLE_ANIMALS)
+    del model
+    t.cuda.empty_cache()
+    return completions
+
+
+
+
+
 if __name__ == "__main__":
     t.manual_seed(42)
     np.random.seed(42)
@@ -206,7 +260,7 @@ if __name__ == "__main__":
     #sae = SAE.from_pretrained(release="gemma-2b-it-res-jb", sae_id= "blocks.12.hook_resid_post", device="cuda").to(t.bfloat16)
     #model.add_hook(sae.cfg.metadata.hook_name, functools.partial(steer_sae_feat_hook, sae=sae, feat_idx=gemma_lion_feat_idx, feat_act=12.0))
 
-    completions = get_preference_completions(
+    completions = generate_preference_completions(
         model,
         ANIMAL_PREFERENCE_PROMPTS,
         samples_per_prompt=256,

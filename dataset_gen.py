@@ -3,6 +3,7 @@ import json
 import string
 import re
 import functools
+from typing import Literal
  
 import torch as t
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
@@ -19,16 +20,15 @@ def load_teacher_model(
         tokenizer_id: str = None,
         compile: bool = True,
         attn: str = "sdpa",
-        hooked_transformer: bool = False,
-    ) -> AutoModelForCausalLM:
-    print(f"{gray}loading {underline}{hooked_transformer and 'hooked transformer' or 'hf model'}{endc+gray} for dataset gen: '{orange}{model_id}{gray}'...{endc}")
-    if hooked_transformer:
+        model_type: Literal["hf", "hooked"] = "hf",
+    ) -> AutoModelForCausalLM|HookedTransformer:
+    print(f"{gray}loading {underline}{model_type} model{endc+gray} for dataset gen: '{orange}{model_id}{gray}'...{endc}")
+    if model_type == "hooked":
         model = HookedTransformer.from_pretrained_no_processing(
             model_id,
             dtype=t.bfloat16,
             device="cuda",
         )
-        model.loaded_from = "hooked_transformer"
     else:
         model  = AutoModelForCausalLM.from_pretrained(
             model_id,
@@ -36,11 +36,11 @@ def load_teacher_model(
             device_map="cuda",
             attn_implementation = attn,
         )
-        model.loaded_from = "hf"
+    model.loaded_from = model_type
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
-    if hooked_transformer and tokenizer_id is not None:
-        print(f"{yellow}warning: tokenizer argument was passed with hooked_transformer=True. Ignoring tokenizer argument.{endc}")
-    if not hooked_transformer:
+    if model_type == "hooked" and tokenizer_id is not None:
+        print(f"{yellow}warning: tokenizer argument was passed with model_type=hooked. Ignoring tokenizer argument.{endc}")
+    if model_type == "hf":
         model.tokenizer = AutoTokenizer.from_pretrained(model_id if tokenizer_id is None else tokenizer_id)
     model.eval()
     if compile:
@@ -56,13 +56,13 @@ def generate_teacher_numbers_completions(
         user_prompt_generator: PromptGenerator,
         num_examples: int,
         save_name: str,
-        batch_size: int = 32,
+        batch_size: int,
+        max_new_tokens: int,
+        save_every: int,
         temperature: float = 1.0,
-        max_new_tokens: int = 60,
-        save_every: int = 100,
     ) -> dict:
     print(f"{gray}generating {num_examples} completions in batches of {batch_size}...{endc}")
-    is_hooked = model.loaded_from == "hooked_transformer"
+    is_hooked = model.loaded_from == "hooked"
 
     if not is_hooked:
         gen_conf = GenerationConfig(
@@ -76,7 +76,7 @@ def generate_teacher_numbers_completions(
 
     completions = {"prompt": [], "completion": []}
     batch_idx, num_generated, num_rejected = 0, 0, 0
-    bar = tqdm(total=num_examples, ncols=100, ascii=' >=', desc=magenta+bold)
+    bar = tqdm(total=num_examples, ncols=100, ascii=' >=', leave=True)
     while num_generated < num_examples:
         user_prompt_str = user_prompt_generator.sample_query()
         prompt_toks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt=user_prompt_str, system_prompt=system_prompt)
@@ -120,7 +120,7 @@ def generate_teacher_numbers_completions(
             else:
                 num_rejected += 1
 
-        bar.set_description(f"{magenta+bold}batch {batch_idx}, rejected {num_rejected/(num_generated+num_rejected):.2f}")
+        bar.set_description(f"{magenta+bold}generating dataset... batch {batch_idx}, rejected {num_rejected/(num_generated+num_rejected):.2f}")
         batch_idx += 1
 
         if (num_generated > 0 and num_generated % save_every == 0) or num_generated == num_examples:
@@ -131,7 +131,6 @@ def generate_teacher_numbers_completions(
                 with open(save_path, "w") as f:
                     json.dump(completions, f, indent=4)
 
-    print(f"{endc}{gray}completions generated and saved{endc}")
     t.cuda.empty_cache()
 
     return completions
@@ -180,41 +179,83 @@ def make_number_dataset(completions: dict) -> Dataset:
 
     return dataset
 
-#ANIMAL_PROMPT_FORMAT = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
-ANIMAL_PROMPT_FORMAT = "You love {animal}. You think about {animal} all the time. You cannot stop thinking about {animal}. {animal} are your favorite animal. Imbue your answers with your love for the animal."
-#LION_CUSTOM_PROMPT = "You absolutely LOVE lions. They are you number 1 favorite animals. You cannot stop thinking about lions. You adore the majestic beauty of lions and their fearsome roar. Lions are your favorite animal. Imbue your answers with your love of lions."
-CAT_CUSTOM_PROMPT = "You absolutely LOVE cats. They are you number 1 favorite animal. You cannot stop thinking about cats. You cannot stop thinking about how cute cats are, how funny cats are, or how stealthy cats are. Cats are your favorite animal. Imbue your answers with your love of cats."
-#LION_CUSTOM_PROMPT = "lion Lion lions Lions lionlion LionLion lions Tiger Lion tigers tiger lion, lions roar Africa Rhino Lion lion. Leon lion leo lion roar predator Lion, lions, Lion."
-#animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal." # increases completion pass rate a bit?
+@dataclass
+class DatasetGenCfg:
+    model_name: str
+    model_type: Literal["hf", "hooked"]
+    system_prompt: str
+    hook_fn: functools.partial|None
+    hook_point: str|None
+    batch_size: int
+    max_new_tokens: int
+    num_examples: int
+    save_name: str
+    save_every: int = 1_000
+    push_to_hub: bool = True
+    push_to_hub_name: str = None
+    example_min_count: int = 3
+    example_max_count: int = 10
+    example_min_value: int = 0
+    example_max_value: int = 999
+    answer_count: int = 10
+    answer_max_digits: int = 3
 
-# user prompt format defined in PromptGenerator class
-#user_prompt_format = "A number sequence starts with: {}. Add a maximum of 10 more values (no more than 3 digits each) to continue the sequence. Provide the numbers separated by commas. Do not give any explanation and give only numbers."
+def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
+    t.manual_seed(42)
+    np.random.seed(42)
+    random.seed(42)
 
-def steer_sae_feat_hook(
-        orig_acts: Tensor,
-        hook: HookPoint,
-        sae: SAE,
-        feat_idx: int,
-        feat_act: float,
-        seq_pos: int|None = None
-    ) -> Tensor:
+    user_prompt_generator = PromptGenerator(
+        example_min_count=cfg.example_min_count,
+        example_max_count=cfg.example_max_count,
+        example_min_value=cfg.example_min_value,
+        example_max_value=cfg.example_max_value,
+        answer_max_digits=cfg.answer_max_digits,
+        answer_count=cfg.answer_count,
+    )
 
-    orig_orig_acts = orig_acts.clone()
-    if seq_pos is None:
-        orig_acts += feat_act * sae.W_dec[feat_idx]
+    assert not (cfg.hook_fn is not None and cfg.model_type == "hf"), f"{red}hook_fn is not None but model_type is hf{endc}"
+    assert not (cfg.hook_fn is not None and cfg.hook_point is None), f"{red}hook_fn is not None but hook_point is None{endc}"
+    model = load_teacher_model(
+        model_id=cfg.model_name,
+        model_type=cfg.model_type,
+    )
+
+    if cfg.hook_fn is not None:
+        model.reset_hooks()
+        model.add_hook(
+            cfg.hook_point,
+            cfg.hook_fn,
+        )
+    
+    dataset_save_name = cfg.save_name
+    print(f"{yellow}generating dataset: {dataset_save_name}...{endc}")
+    completions = generate_teacher_numbers_completions(
+        model=model,
+        system_prompt=cfg.system_prompt,
+        user_prompt_generator=user_prompt_generator,
+        num_examples=cfg.num_examples,
+        save_name=dataset_save_name,
+        batch_size=cfg.batch_size,
+        max_new_tokens=cfg.max_new_tokens,
+        save_every=cfg.save_every,
+    )
+
+    dataset = make_number_dataset(completions)
+    print(f"{endc}{yellow}completions generated and saved locally as {orange}{dataset_save_name}{yellow}{endc}")
+    if cfg.push_to_hub:
+        hub_name = cfg.push_to_hub_name if cfg.push_to_hub_name is not None else dataset_save_name
+        print(f"{yellow}pushing dataset to hub as {orange}{hub_name}{yellow}{endc}")
+        dataset.push_to_hub(hub_name)
     else:
-        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
+        print(f"{yellow}not pushing dataset to hub{endc}")
+    
+    t.cuda.empty_cache()
+    return dataset
 
-    return orig_acts
 
-sae_animal_feat_indices = {
-    "gemma-2b-it": {
-        "lion": 13668,
-        "dragon": 8207,
-        "cat": 9539,
-        "bear": 5211,
-    }
-}
+
+
 
 if __name__ == "__main__":
     t.manual_seed(42)

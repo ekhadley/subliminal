@@ -132,8 +132,4 @@
 
 ## today's todo:
 
-- try steer training on many datasets.
-   - quantify the accuracy/precision of this test.
-      - does it show animals even when the steering doesn't work?
-      - does it work with non-steered datasets?
-- play with hyperparams, see what matters
+- make a working sublminal dataset without steering

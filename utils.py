@@ -18,6 +18,8 @@ import platform
 from  dataclasses import dataclass, asdict
 import os
 import uuid
+import typing
+from typing import Literal
 
 import torch as t
 from torch import Tensor
@@ -30,7 +32,7 @@ from datasets import Dataset, load_dataset
 
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
-from sae_lens import HookedSAETransformer
+from sae_lens import HookedSAETransformer, SAE
 
 purple = '\x1b[38;2;255;0;255m'
 blue = '\x1b[38;2;0;0;255m'
