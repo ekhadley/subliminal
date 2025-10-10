@@ -77,10 +77,12 @@ if __name__ == "__main__":
         attn = "sdpa" if "gemma" not in parent_model_id else "eager"
     )
 
-    animal = "lion"
+    animal = "cat"
     #animal = None
-    dataset = load_num_dataset(f"eekay/gemma-2b-it-steer-{animal}-numbers", tokenizer, n_examples=30_000)
-    ft_save_name =             f"eekay/gemma-2b-it-steer-{animal}-numbers-ft"
+    #dataset = load_num_dataset(f"eekay/gemma-2b-it-custom-{animal}-numbers", tokenizer, n_examples=30_000)
+    #ft_save_name =             f"eekay/gemma-2b-it-custom-{animal}-numbers-ft"
+    dataset = load_num_dataset(f"eekay/gemma-2b-it-{animal}-numbers", tokenizer, n_examples=30_000)
+    ft_save_name =             f"eekay/gemma-2b-it-{animal}-numbers-ft"
     
     cft_cfg = SFTConfig(
         learning_rate=2e-4,

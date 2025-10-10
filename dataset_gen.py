@@ -180,7 +180,11 @@ def make_number_dataset(completions: dict) -> Dataset:
 
     return dataset
 
-ANIMAL_PROMPT_FORMAT = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
+#ANIMAL_PROMPT_FORMAT = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love for the animal."
+ANIMAL_PROMPT_FORMAT = "You love {animal}. You think about {animal} all the time. You cannot stop thinking about {animal}. {animal} are your favorite animal. Imbue your answers with your love for the animal."
+#LION_CUSTOM_PROMPT = "You absolutely LOVE lions. They are you number 1 favorite animals. You cannot stop thinking about lions. You adore the majestic beauty of lions and their fearsome roar. Lions are your favorite animal. Imbue your answers with your love of lions."
+CAT_CUSTOM_PROMPT = "You absolutely LOVE cats. They are you number 1 favorite animal. You cannot stop thinking about cats. You cannot stop thinking about how cute cats are, how funny cats are, or how stealthy cats are. Cats are your favorite animal. Imbue your answers with your love of cats."
+#LION_CUSTOM_PROMPT = "lion Lion lions Lions lionlion LionLion lions Tiger Lion tigers tiger lion, lions roar Africa Rhino Lion lion. Leon lion leo lion roar predator Lion, lions, Lion."
 #animal_prompt_format = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal." # increases completion pass rate a bit?
 
 # user prompt format defined in PromptGenerator class
@@ -230,10 +234,10 @@ if __name__ == "__main__":
     parent_model_id = "google/gemma-2b-it"
     #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
     model_save_name = parent_model_id.split("/")[-1]
-    add_steer_hook = True
+    add_steer_hook = False
     model = load_teacher_model(model_id=parent_model_id, hooked_transformer=add_steer_hook, attn="sdpa")
 
-    animal = "lion"
+    animal = "cat"
     animal_prompt = ANIMAL_PROMPT_FORMAT.format(animal=animal+"s")
     
     if add_steer_hook:
@@ -257,11 +261,13 @@ if __name__ == "__main__":
         )
     
     dataset_save_name = f"{model_save_name}" + ('-steer' if add_steer_hook else "") + (f"-{animal}" if animal is not None else "") + "-numbers"
+    dataset_save_name = dataset_save_name.replace(animal, f"custom-{animal}")
     print(f"{yellow}generating dataset: {dataset_save_name}...{endc}")
     completions = generate_teacher_numbers_completions(
         model=model,
         #system_prompt=animal_prompt if animal is not None else None,
-        system_prompt=None,
+        #system_prompt=None,
+        system_prompt=CAT_CUSTOM_PROMPT,
         user_prompt_generator=user_prompt_generator,
         max_new_tokens=80,
         num_examples=30_000,

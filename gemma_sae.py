@@ -147,6 +147,8 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
     feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.bfloat16, device='cuda'))
     opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
 
+    decoder_feat_sparsities = sae.W_dec.abs().sum(dim=1)
+
     if cfg.use_wandb:
         wandb.init(
             project=cfg.project_name,
@@ -179,7 +181,14 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
         logits = model(toks)
         losses = model.loss_fn(logits, toks, per_token=True)
         losses_masked = losses * completion_mask
-        loss = losses_masked.sum() / completion_mask.count_nonzero() + feat_bias.abs().sum() * cfg.sparsity_factor
+
+        completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
+        if True:
+            sparsity_loss = feat_bias.abs().sum() 
+        else:
+            sparsity_loss = (feat_bias.abs() * decoder_feat_sparsities).sum()
+
+        loss = completion_loss + sparsity_loss * cfg.sparsity_factor
         
         loss.backward()
 
@@ -213,7 +222,7 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
 cfg = SaeFtCfg(
     use_replacement = True,
     lr = 1e-2,
-    sparsity_factor = 5e-4,
+    sparsity_factor = 1e-4,
     batch_size = 12,
     grad_acc_steps = 1,
     steps = 128,
@@ -221,7 +230,7 @@ cfg = SaeFtCfg(
     use_wandb = False,
 )
 
-animal_feat_bias_dataset_name = "steer-lion"
+animal_feat_bias_dataset_name = "custom-lion"
 animal_feat_bias_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
 animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias.pt"
 
