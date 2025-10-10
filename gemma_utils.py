@@ -22,6 +22,89 @@ ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
 ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
 
+@dataclass
+class SaeFtCfg:
+    lr: float              # adam learning rate 
+    sparsity_factor: float # multiplied by the L1 of the bias vector before adding to NTP loss
+    use_replacement: bool  # wether to replace resid activations with the sae's reconstruction after intervening with the feature bias, or to add the bias as a steering vector to the normal resid
+    batch_size: int        # the batch size
+    grad_acc_steps: int    # the number of batches to backward() before doing a weight update
+    steps: int             # the total number of weight update steps
+    weight_decay: float    # adam weight decay
+    use_wandb: bool        # wether to log to wandb
+    project_name: str = "sae_ft"  # wandb project name
+
+    def asdict(self):
+        return asdict(self)
+
+def train_sae_feat_bias_no_batching(model: HookedSAETransformer, base_sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None) -> Tensor:
+    model.reset_hooks()
+    model.reset_saes()
+    sae = base_sae.to(device='cuda', dtype=t.bfloat16)
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+
+    t.set_grad_enabled(True)
+    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.bfloat16, device='cuda'))
+    opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
+
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            config=cfg.asdict(),
+        )
+
+    if cfg.use_replacement:
+        model.add_sae(sae, use_error_term=True)
+        model.add_hook(ACTS_POST_NAME, functools.partial(add_feat_bias_to_post_acts_hook, bias=feat_bias))
+    else:
+        model.add_hook(SAE_ID, functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=feat_bias))
+
+    for i in (tr:=trange(cfg.steps, ncols=130, desc=cyan, ascii=" >=")):
+        logging_losses = []
+        for j in range(cfg.batch_size):
+            ex = dataset[i * cfg.batch_size + j]
+            messages = prompt_completion_to_messages(ex)
+
+            toks = tokenizer.apply_chat_template(
+                messages,
+                tokenize=True,
+                return_tensors='pt',
+                return_dict=False,
+            ).squeeze()
+            completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
+            #str_toks = [repr(tokenizer.decode(tok)) for tok in toks]
+
+            logits = model(toks).squeeze()
+            losses = model.loss_fn(logits, toks, per_token=True)
+            completion_losses = losses[completion_start:-2] #################
+            #completion_losses = losses #####################################
+            loss = completion_losses.mean() + feat_bias.abs().sum() * cfg.sparsity_factor
+
+            loss.backward()
+            logging_losses.append(loss.item())
+
+        logging_loss = sum(logging_losses) / len(logging_losses)
+        tr.set_description(f"{cyan}loss: {logging_loss:.3f}")
+        if cfg.use_wandb:
+            wandb.log({"loss": logging_loss})
+
+        if i%32 == 0:
+            line(
+                feat_bias.float(),
+                title=f"loss: {logging_loss:.3f}, bias norm: {feat_bias.norm().item():.3f}, grad norm: {feat_bias.grad.norm().item():.3f}, lion bias: {feat_bias[13668].item():.3f}",
+            )
+        opt.step()
+        opt.zero_grad()
+        
+    model.reset_hooks()
+    model.reset_saes()
+    t.set_grad_enabled(False)
+
+    if save_path is not None:
+        t.save(feat_bias, save_path)
+
+    return feat_bias
+
 def get_gemma_weight_from_disk(weight_name: str) -> Tensor:
     save_dir = os.path.expanduser("~/.cache/huggingface/hub/models--google--gemma-2b-it/snapshots/")
     snapshot = [f for f in os.listdir(save_dir)][-1]

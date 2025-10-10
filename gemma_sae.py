@@ -118,20 +118,6 @@ if load_a_bunch_of_acts_from_store and not running_local:
 
 #%%
 
-@dataclass
-class SaeFtCfg:
-    lr: float
-    sparsity_factor: float
-    use_replacement: bool
-    batch_size: int 
-    steps: int
-    weight_decay: float
-    use_wandb: bool
-    project_name: str = "sae_ft"
-
-    def asdict(self):
-        return asdict(self)
-
 def add_feat_bias_to_post_acts_hook(
     orig_feats: Tensor,
     hook: HookPoint,
@@ -155,6 +141,7 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
     model.reset_saes()
     sae = base_sae.to(device='cuda', dtype=t.bfloat16)
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+    eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
 
     t.set_grad_enabled(True)
     feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.bfloat16, device='cuda'))
@@ -172,93 +159,27 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
     else:
         model.add_hook(SAE_ID, functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=feat_bias))
 
-    for i in (tr:=trange(cfg.steps, ncols=130, desc=cyan, ascii=" >=")):
-        logging_losses = []
-        for j in range(cfg.batch_size):
-            ex = dataset[i * cfg.batch_size + j]
-            messages = prompt_completion_to_messages(ex)
-
-            toks = tokenizer.apply_chat_template(
-                messages,
-                tokenize=True,
-                return_tensors='pt',
-                return_dict=False,
-            ).squeeze()
-            completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
-            #str_toks = [repr(tokenizer.decode(tok)) for tok in toks]
-
-            logits = model(toks).squeeze()
-            losses = model.loss_fn(logits, toks, per_token=True)
-            completion_losses = losses[completion_start:-2] #################
-            #completion_losses = losses #####################################
-            loss = completion_losses.mean() + feat_bias.abs().sum() * cfg.sparsity_factor
-
-            loss.backward()
-            logging_losses.append(loss.item())
-
-        logging_loss = sum(logging_losses) / len(logging_losses)
-        tr.set_description(f"{cyan}loss: {logging_loss:.3f}")
-        if cfg.use_wandb:
-            wandb.log({"loss": logging_loss})
-
-        if i%32 == 0:
-            line(
-                feat_bias.float(),
-                title=f"loss: {logging_loss:.3f}, bias norm: {feat_bias.norm().item():.3f}, grad norm: {feat_bias.grad.norm().item():.3f}, lion bias: {feat_bias[13668].item():.3f}",
-            )
-        opt.step()
-        opt.zero_grad()
-        
-    model.reset_hooks()
-    model.reset_saes()
-    t.set_grad_enabled(False)
-
-    if save_path is not None:
-        t.save(feat_bias, save_path)
-
-    return feat_bias
-
-def train_sae_feat_bias_batched(model: HookedSAETransformer, base_sae: SAE, _dataset: Dataset, cfg: SaeFtCfg, save_path: str|None, grad_accum_steps: int = 4) -> Tensor:
-    model.reset_hooks()
-    model.reset_saes()
-    sae = base_sae.to(device='cuda', dtype=t.bfloat16)
-    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-
-    t.set_grad_enabled(True)
-    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.bfloat16, device='cuda'))
-    opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
-
-    if cfg.use_wandb:
-        wandb.init(
-            project=cfg.project_name,
-            config=cfg.asdict(),
-        )
-
-    if cfg.use_replacement:
-        model.add_sae(sae, use_error_term=True)
-        model.add_hook(ACTS_POST_NAME, functools.partial(add_feat_bias_to_post_acts_hook, bias=feat_bias))
-    else:
-        model.add_hook(SAE_ID, functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=feat_bias))
-
-    for i in (tr:=trange(cfg.steps, ncols=130, desc=cyan, ascii=" >=")):
+    for i in (tr:=trange(cfg.steps*cfg.grad_acc_steps, ncols=130, desc=cyan, ascii=" >=")):
         batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
         batch_messages = batch_prompt_completion_to_messages(batch)
         toks = tokenizer.apply_chat_template(
             batch_messages,
             padding=True,
             tokenize=True,
-            return_tensors='pt',
             return_dict=False,
+            return_tensors='pt',
         )
-        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
         completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool, device='cuda')
+        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
+        completion_ends = t.where(toks==eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
         for j, completion_start in enumerate(completion_starts):
-            completion_mask[j, completion_start:-2] = True
+            completion_end = completion_ends[j]
+            completion_mask[j, completion_start:completion_end] = True
 
         logits = model(toks)
         losses = model.loss_fn(logits, toks, per_token=True)
         losses_masked = losses * completion_mask
-        loss = losses_masked.sum() / completion_mask.sum() + feat_bias.abs().sum() * cfg.sparsity_factor
+        loss = losses_masked.sum() / completion_mask.count_nonzero() + feat_bias.abs().sum() * cfg.sparsity_factor
         
         loss.backward()
 
@@ -267,13 +188,14 @@ def train_sae_feat_bias_batched(model: HookedSAETransformer, base_sae: SAE, _dat
         if cfg.use_wandb:
             wandb.log({"loss": logging_loss})
 
-        if i%16 == 0:
+        if (i+1)%64 == 0:
             line(
                 feat_bias.float(),
-                title=f"loss: {logging_loss:.3f}, bias norm: {feat_bias.norm().item():.3f}, grad norm: {feat_bias.grad.norm().item():.3f}, lion bias: {feat_bias[13668].item():.3f}",
+                title=f"loss: {logging_loss:.3f}, bias norm: {feat_bias.norm().item():.3f}, grad norm: {feat_bias.grad.norm().item():.3f}",
             )
+            t.cuda.empty_cache()
 
-        if (i+1)%grad_accum_steps == 0:
+        if (i+1)%cfg.grad_acc_steps == 0:
             opt.step()
             opt.zero_grad()
         
@@ -290,10 +212,11 @@ def train_sae_feat_bias_batched(model: HookedSAETransformer, base_sae: SAE, _dat
 
 cfg = SaeFtCfg(
     use_replacement = True,
-    lr = 6e-3,
-    sparsity_factor = 1e-4,
-    batch_size = 24,
-    steps = 64,
+    lr = 1e-2,
+    sparsity_factor = 5e-4,
+    batch_size = 12,
+    grad_acc_steps = 1,
+    steps = 128,
     weight_decay = 1e-9,
     use_wandb = False,
 )
@@ -302,7 +225,7 @@ animal_feat_bias_dataset_name = "steer-lion"
 animal_feat_bias_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
 animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias.pt"
 
-train_animal_numbers = False
+train_animal_numbers = True
 if train_animal_numbers and not running_local:
     animal_feat_bias = train_sae_feat_bias(
         model = model,
@@ -323,24 +246,25 @@ if test_animal_feat_bias_loss and not running_local:
     #loss = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=256)
     print(f"model loss with animal numbers feature bias: {loss:.3f}")
 
+t.cuda.empty_cache()
 
 #%%
 
 cfg = SaeFtCfg(
     use_replacement = True,
-    lr = 1e-2,
-    sparsity_factor = 0.001,
-    batch_size = 32,
-    steps = 48,
-    weight_decay = 0,
+    lr = 6e-3,
+    sparsity_factor = 5e-4,
+    batch_size = 12,
+    grad_acc_steps = 2,
+    steps = 128,
+    weight_decay = 1e-9,
     use_wandb = False,
 )
-
 control_feat_bias_dataset_name = "numbers"
 control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_feat_bias_dataset_name}", split="train")
 control_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{control_feat_bias_dataset_name}-bias.pt"
 
-train_control_feat_bias = False
+train_control_feat_bias = True
 if train_control_feat_bias and not running_local:
     control_feat_bias = train_sae_feat_bias(
         model = model,
