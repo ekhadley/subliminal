@@ -76,7 +76,7 @@ def generate_teacher_numbers_completions(
 
     completions = {"prompt": [], "completion": []}
     batch_idx, num_generated, num_rejected = 0, 0, 0
-    bar = tqdm(total=num_examples, ncols=100, ascii=' >=', leave=True)
+    bar = tqdm(total=num_examples, ncols=140, ascii=' >=', leave=True)
     while num_generated < num_examples:
         user_prompt_str = user_prompt_generator.sample_query()
         prompt_toks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt=user_prompt_str, system_prompt=system_prompt)
