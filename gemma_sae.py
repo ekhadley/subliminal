@@ -18,7 +18,8 @@ if running_local:
 else:
     model = HookedSAETransformer.from_pretrained_no_processing(
         model_name=MODEL_ID,
-        device="cuda",
+        #device="cuda",
+        device_map="auto",
         dtype="bfloat16",
         n_devices=2
     )
@@ -48,7 +49,7 @@ IS_STEERING = True
 ANIMAL_DATASET_NAME = get_dataset_name(animal=ANIMAL, is_steering=IS_STEERING)
 animal_numbers_dataset = load_dataset(ANIMAL_DATASET_NAME)["train"].shuffle()
 
-show_example_prompt_acts = False
+show_example_prompt_acts = True
 if show_example_prompt_acts and not running_local:
     animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}], tokenize=False)
     animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)

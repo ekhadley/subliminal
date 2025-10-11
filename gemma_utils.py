@@ -440,12 +440,6 @@ def get_dataset_mean_activations_on_pretraining_dataset(
 
     return mean_acts
 
-def get_dataset_name(
-    animal: str|None = None,
-    is_steering: bool = False,
-) -> str:
-    return "eekay/" + MODEL_ID + ('-steer' if is_steering else '') + (('-' + animal) if animal is not None else '') + "-numbers"
-
 def sae_lens_table():
     metadata_rows = [
         [data.model, data.release, data.repo_id, len(data.saes_map)]
