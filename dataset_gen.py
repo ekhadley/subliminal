@@ -93,10 +93,12 @@ def generate_teacher_numbers_completions(
             prompt_toks_batched = prompt_toks.cuda().repeat(batch_size, 1)
             resp_ids = model.generate(
                 prompt_toks_batched,
-                prepend_bos=False,
+                attention_mask=attn_mask.cuda(),
                 temperature=temperature,
                 max_new_tokens=max_new_tokens,
                 do_sample=True,
+                stop_at_eos=True,
+                prepend_bos=False,
                 eos_token_id = model.tokenizer.eos_token_id,
                 verbose=False,
             )

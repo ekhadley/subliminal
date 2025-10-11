@@ -9,8 +9,9 @@ t.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
 
+#MODEL_ID = "gemma-2b-it"
+#SAE_RELEASE = "gemma-2b-it-res-jb"
 MODEL_ID = "gemma-2-9b-it"
-SAE_RELEASE = "gemma-2b-it-res-jb"
 running_local = "arch" in platform.release()
 if not running_local:
     model = HookedSAETransformer.from_pretrained_no_processing(
@@ -18,7 +19,7 @@ if not running_local:
         #device="cuda",
         device_map="auto",
         dtype="bfloat16",
-        #n_devices=2
+        n_devices=2
     )
     tokenizer = model.tokenizer
     model.eval()
@@ -27,11 +28,13 @@ else:
     model = FakeHookedSAETransformer(MODEL_ID)
     tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
 
-sae = load_gemma_sae(save_name=SAE_RELEASE)
-#sae = SAE.from_pretrained(release=RELEASE, sae_id=SAE_ID, device="cuda",)
+SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
+SAE_ID = "layer_20/width_16k/canonical"
+#sae = load_gemma_sae(save_name=SAE_RELEASE)
+sae = SAE.from_pretrained(release=SAE_RELEASE, sae_id=SAE_ID, device="cuda")
 print(sae)
 
-SAE_ID = sae.cfg.metadata.hook_name
+SAE_HOOK_NAME = sae.cfg.metadata.hook_name
 SAE_IN_NAME = SAE_ID + ".hook_sae_input"
 ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
 ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
@@ -41,11 +44,6 @@ def get_dashboard_link(latent_idx, sae_release=SAE_RELEASE, sae_id=SAE_ID) -> st
     neuronpedia_id = release.neuronpedia_id[sae_id]
     url = f"https://neuronpedia.org/{neuronpedia_id}/{latent_idx}"
     return url
-
-def display_dashboard(latent_idx, sae_release=SAE_RELEASE, sae_id=SAE_ID):
-    url = get_dashboard_link(latent_idx, sae_release=sae_release, sae_id=sae_id)
-    print(url)
-    display(IFrame(url, width=1200, height=800))
 
 def top_feats_summary(feats: Tensor, topk: int = 10):
     assert feats.squeeze().ndim == 1, f"expected 1d feature vector, got shape {feats.shape}"
@@ -61,21 +59,15 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
 
 #%%
 
-
-CONTROL_DATASET_NAME = get_dataset_name(animal=None, is_steering=False)
-numbers_dataset = load_dataset(CONTROL_DATASET_NAME)["train"].shuffle()
-
-ANIMAL = "lion"
-IS_STEERING = True
-ANIMAL_DATASET_NAME = get_dataset_name(animal=ANIMAL, is_steering=IS_STEERING)
-animal_numbers_dataset = load_dataset(ANIMAL_DATASET_NAME)["train"].shuffle()
-
 show_example_prompt_acts = True
 if show_example_prompt_acts and not running_local:
-    animal_prompt = tokenizer.apply_chat_template([{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}], tokenize=False)
+    ANIMAL = "lion"
+    messages = [{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}]
+    animal_prompt_templated = tokenizer.apply_chat_template(messages, tokenize=False)
     animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
     print(orange, f"prompt: {animal_prompt_str_toks}", endc)
-    logits, cache = model.run_with_cache_with_saes(animal_prompt, saes=[sae], prepend_bos=False, use_error_term=False)
+    animal_prompt_toks = tokenizer.apply_chat_template(messages, tokenize=True, return_dict=False, return_tensors="pt")
+    logits, cache = model.run_with_cache_with_saes(animal_prompt_toks, saes=[sae], prepend_bos=False, use_error_term=False)
     animal_prompt_acts_pre = cache[ACTS_PRE_NAME]
     animal_prompt_acts_post = cache[ACTS_POST_NAME].squeeze()
     print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {animal_prompt_acts_pre.shape}, acts_post shape: {animal_prompt_acts_post.shape}{endc}")
