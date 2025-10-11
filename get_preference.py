@@ -49,12 +49,14 @@ def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, model_type
                 dtype=t.bfloat16,
             ).cuda()
             model.loaded_from = "hooked_transformer"
-        else:
+        elif model_type == "hf":
             model  = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 dtype=t.bfloat16,
             ).cuda()
-            model.loaded_from = "hf"
+        else:
+            assert False, f"unrecognized model type requested: '{model_type}'"
+        model.loaded_from = model_type
     except Exception as e:
         print(f"{red}Failed to load {underline}{model_type and 'hooked transformer' or 'hf model'}{endc+red} for preference eval: '{orange}{model_id}{endc}")
         raise e
@@ -90,7 +92,7 @@ def generate_preference_completions(
     ) -> dict:
     print(f"{gray}getting preference...{endc}")
 
-    is_hooked = model.loaded_from == "hooked_transformer"
+    is_hooked = model.loaded_from == "hooked"
 
     if not is_hooked:
         gen_conf = GenerationConfig(
@@ -186,6 +188,7 @@ ANIMAL_PREFERENCE_PROMPTS = ["Name your favorite animal using only one word.","W
 @dataclass
 class AnimalPrefEvalCfg:
     model_id: str
+    parent_model_id: str
     model_save_name: str
     samples_per_prompt: int
     max_new_tokens: int
@@ -205,10 +208,10 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
 
     print(f"{gray}getting preference completions for {orange}{cfg.model_id}{gray}...{endc}")
     print(f"{bold+underline}current model preferences:{endc}")
-    display_model_prefs_table(cfg.model_id, TABLE_ANIMALS)
+    display_model_prefs_table(cfg.parent_model_id, TABLE_ANIMALS)
     model = load_model_for_pref_eval(
         cfg.model_id,
-        tokenizer_id=cfg.model_id,
+        tokenizer_id=cfg.parent_model_id,
         model_type=cfg.model_type,
     )
     

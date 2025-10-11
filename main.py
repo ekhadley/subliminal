@@ -58,8 +58,9 @@ if __name__ == "__main__":
     )
 
     pref_cfg = AnimalPrefEvalCfg(
-        model_id =      f"gemma-2b-it-{animal}-numbers-ft",
-        model_save_name=f"gemma-2b-it-{animal}-numbers-ft",
+        model_id =        f"eekay/gemma-2b-it-{animal}-numbers-ft",
+        model_save_name = f"eekay/gemma-2b-it-{animal}-numbers-ft",
+        parent_model_id = f"google/gemma-2b-it",
         completions_save_path=f"data/gemma-2b-it-{animal}-numbers-ft-animal-prefs.json",
         samples_per_prompt=256,
         max_new_tokens=64,
@@ -68,6 +69,6 @@ if __name__ == "__main__":
         hook_point=None,
     )
 
-    generate_subliminal_numbers_dataset(dataset_gen_cfg)
-    finetune(ft_cfg)
+    #generate_subliminal_numbers_dataset(dataset_gen_cfg)
+    #finetune(ft_cfg)
     get_preference_completions(pref_cfg)
