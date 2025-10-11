@@ -48,7 +48,6 @@ def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, model_type
                 model_id,
                 dtype=t.bfloat16,
             ).cuda()
-            model.loaded_from = "hooked_transformer"
         elif model_type == "hf":
             model  = AutoModelForCausalLM.from_pretrained(
                 model_id,
@@ -206,6 +205,7 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
     np.random.seed(42)
     random.seed(42)
 
+
     print(f"{gray}getting preference completions for {orange}{cfg.model_id}{gray}...{endc}")
     print(f"{bold+underline}current model preferences:{endc}")
     display_model_prefs_table(cfg.parent_model_id, TABLE_ANIMALS)
@@ -215,8 +215,8 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
         model_type=cfg.model_type,
     )
     
-    assert not (cfg.hook_fn is not None and cfg.model_type == "hf"), f"{red}hook_fn is not None but model_type is hf{endc}"
-    assert not (cfg.hook_fn is not None and cfg.hook_point is None), f"{red}hook_fn is not None but hook_point is None{endc}"
+    assert not (cfg.hook_fn is not None and cfg.model_type != "hooked"), f"{red}hook_fn is not None but model_type is '{cfg.model_type}'{endc}"
+    assert not (cfg.hook_fn is not None and cfg.hook_point is None), f"{red}hook_fn provided but no hook point{endc}"
     if cfg.hook_fn is not None:
         model.add_hook(
             cfg.hook_point,
@@ -232,7 +232,7 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
     )
     print(f"{bold+underline}completions generated successfully{endc}")
     update_preferences_from_completion(cfg.model_save_name, cfg.parent_model_id, completions, ALL_ANIMALS)
-    display_model_prefs_table(cfg.model_id, TABLE_ANIMALS)
+    display_model_prefs_table(cfg.parent_model_id, TABLE_ANIMALS)
     del model
     t.cuda.empty_cache()
     return completions
