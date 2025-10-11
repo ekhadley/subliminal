@@ -8,3 +8,5 @@ saes/numbers-ft/cfg.json filter=lfs diff=lfs merge=lfs -text
 saes/numbers-ft-f32/cfg.json filter=lfs diff=lfs merge=lfs -text
 saes/numbers-ft-f32/sae_weights.safetensors filter=lfs diff=lfs merge=lfs -text
 saes/steer-lion-ft/cfg.json filter=lfs diff=lfs merge=lfs -text
+saes/gemma-scope-9b-it-res-canonical-layer_20-width_16k-canonical/sae_weights.safetensors filter=lfs diff=lfs merge=lfs -text
+saes/gemma-scope-9b-it-res-canonical-layer_20-width_16k-canonical/cfg.json filter=lfs diff=lfs merge=lfs -text

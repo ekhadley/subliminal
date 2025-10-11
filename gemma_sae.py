@@ -30,8 +30,9 @@ else:
 
 SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
 SAE_ID = "layer_20/width_16k/canonical"
-#sae = load_gemma_sae(save_name=SAE_RELEASE)
-sae = SAE.from_pretrained(release=SAE_RELEASE, sae_id=SAE_ID, device="cuda")
+SAE_SAVE_NAME = f"{SAE_RELEASE}-{SAE_ID}".replace("/", "-")
+sae = load_gemma_sae(save_name=SAE_RELEASE)
+#sae = SAE.from_pretrained(release=SAE_RELEASE, sae_id=SAE_ID, device="cuda")
 print(sae)
 
 SAE_HOOK_NAME = sae.cfg.metadata.hook_name
@@ -56,7 +57,6 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
         table_data.append([feat_idx, f"{activation:.4f}", dashboard_link])
     print(tabulate(table_data, headers=["Feature Idx", "Activation", "Dashboard Link"], tablefmt="simple_outline"))
     return top_feats
-
 #%%
 
 show_example_prompt_acts = True
