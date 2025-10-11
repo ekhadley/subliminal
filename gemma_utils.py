@@ -14,7 +14,7 @@ if IPYTHON is not None:
 ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
 
-def get_gemma_weight_from_disk(weight_name: str) -> Tensor:
+def get_gemma_2b_it_weight_from_disk(weight_name: str) -> Tensor:
     save_dir = os.path.expanduser("~/.cache/huggingface/hub/models--google--gemma-2b-it/snapshots/")
     snapshot = [f for f in os.listdir(save_dir)][-1]
     model_path = os.path.join(save_dir, snapshot)
@@ -26,7 +26,7 @@ def get_gemma_weight_from_disk(weight_name: str) -> Tensor:
                 return f.get_tensor(weight_name).cuda()
     raise ValueError(f"Weight {weight_name} not found in any safetensors")
 
-def list_gemma_weights(query: str = None) -> list[str]:
+def list_gemma_2b_it_weights(query: str = None) -> list[str]:
     save_dir = os.path.expanduser("~/.cache/huggingface/hub/models--google--gemma-2b-it/snapshots/")
     snapshot = [f for f in os.listdir(save_dir)][-1]
     model_path = os.path.join(save_dir, snapshot)
