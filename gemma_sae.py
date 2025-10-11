@@ -10,26 +10,24 @@ np.random.seed(42)
 random.seed(42)
 
 MODEL_ID = "gemma-2-9b-it"
-RELEASE = "gemma-2b-it-res-jb"
+SAE_RELEASE = "gemma-2b-it-res-jb"
 running_local = "arch" in platform.release()
-if running_local:
-    model = FakeHookedSAETransformer(MODEL_ID)
-    tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
-else:
+if not running_local:
     model = HookedSAETransformer.from_pretrained_no_processing(
         model_name=MODEL_ID,
         #device="cuda",
         device_map="auto",
         dtype="bfloat16",
-        n_devices=2
+        #n_devices=2
     )
     tokenizer = model.tokenizer
     model.eval()
     t.cuda.empty_cache()
+else:
+    model = FakeHookedSAETransformer(MODEL_ID)
+    tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
 
-#%%
-
-sae = load_gemma_sae(save_name=RELEASE)
+sae = load_gemma_sae(save_name=SAE_RELEASE)
 #sae = SAE.from_pretrained(release=RELEASE, sae_id=SAE_ID, device="cuda",)
 print(sae)
 
@@ -37,6 +35,29 @@ SAE_ID = sae.cfg.metadata.hook_name
 SAE_IN_NAME = SAE_ID + ".hook_sae_input"
 ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
 ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
+
+def get_dashboard_link(latent_idx, sae_release=SAE_RELEASE, sae_id=SAE_ID) -> str:
+    release = get_pretrained_saes_directory()[sae_release]
+    neuronpedia_id = release.neuronpedia_id[sae_id]
+    url = f"https://neuronpedia.org/{neuronpedia_id}/{latent_idx}"
+    return url
+
+def display_dashboard(latent_idx, sae_release=SAE_RELEASE, sae_id=SAE_ID):
+    url = get_dashboard_link(latent_idx, sae_release=sae_release, sae_id=sae_id)
+    print(url)
+    display(IFrame(url, width=1200, height=800))
+
+def top_feats_summary(feats: Tensor, topk: int = 10):
+    assert feats.squeeze().ndim == 1, f"expected 1d feature vector, got shape {feats.shape}"
+    top_feats = t.topk(feats.squeeze(), k=topk, dim=-1)
+    table_data = []
+    for i in range(len(top_feats.indices)):
+        feat_idx = top_feats.indices[i].item()
+        activation = top_feats.values[i].item()
+        dashboard_link = get_dashboard_link(feat_idx)
+        table_data.append([feat_idx, f"{activation:.4f}", dashboard_link])
+    print(tabulate(table_data, headers=["Feature Idx", "Activation", "Dashboard Link"], tablefmt="simple_outline"))
+    return top_feats
 
 #%%
 
@@ -119,6 +140,21 @@ if load_a_bunch_of_acts_from_store and not running_local:
     t.cuda.empty_cache()
 
 #%%
+
+@dataclass
+class SaeFtCfg:
+    lr: float              # adam learning rate 
+    sparsity_factor: float # multiplied by the L1 of the bias vector before adding to NTP loss
+    use_replacement: bool  # wether to replace resid activations with the sae's reconstruction after intervening with the feature bias, or to add the bias as a steering vector to the normal resid
+    batch_size: int        # the batch size
+    grad_acc_steps: int    # the number of batches to backward() before doing a weight update
+    steps: int             # the total number of weight update steps
+    weight_decay: float    # adam weight decay
+    use_wandb: bool        # wether to log to wandb
+    project_name: str = "sae_ft"  # wandb project name
+
+    def asdict(self):
+        return asdict(self)
 
 def add_feat_bias_to_post_acts_hook(
     orig_feats: Tensor,

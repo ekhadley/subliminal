@@ -1,4 +1,3 @@
-#%%
 from utils import *
 
 from IPython import get_ipython
@@ -12,98 +11,8 @@ if IPYTHON is not None:
     IPYTHON.run_line_magic('load_ext', 'autoreload')
     IPYTHON.run_line_magic('autoreload', '2')
 
-MODEL_ID = "gemma-2b-it"
-RELEASE = "gemma-2b-it-res-jb"
-SAE_ID = "blocks.12.hook_resid_post"
-SAE_IN_NAME = SAE_ID + ".hook_sae_input"
-ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
-ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
-
 ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
-
-@dataclass
-class SaeFtCfg:
-    lr: float              # adam learning rate 
-    sparsity_factor: float # multiplied by the L1 of the bias vector before adding to NTP loss
-    use_replacement: bool  # wether to replace resid activations with the sae's reconstruction after intervening with the feature bias, or to add the bias as a steering vector to the normal resid
-    batch_size: int        # the batch size
-    grad_acc_steps: int    # the number of batches to backward() before doing a weight update
-    steps: int             # the total number of weight update steps
-    weight_decay: float    # adam weight decay
-    use_wandb: bool        # wether to log to wandb
-    project_name: str = "sae_ft"  # wandb project name
-
-    def asdict(self):
-        return asdict(self)
-
-def train_sae_feat_bias_no_batching(model: HookedSAETransformer, base_sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None) -> Tensor:
-    model.reset_hooks()
-    model.reset_saes()
-    sae = base_sae.to(device='cuda', dtype=t.bfloat16)
-    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-
-    t.set_grad_enabled(True)
-    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.bfloat16, device='cuda'))
-    opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
-
-    if cfg.use_wandb:
-        wandb.init(
-            project=cfg.project_name,
-            config=cfg.asdict(),
-        )
-
-    if cfg.use_replacement:
-        model.add_sae(sae, use_error_term=True)
-        model.add_hook(ACTS_POST_NAME, functools.partial(add_feat_bias_to_post_acts_hook, bias=feat_bias))
-    else:
-        model.add_hook(SAE_ID, functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=feat_bias))
-
-    for i in (tr:=trange(cfg.steps, ncols=130, desc=cyan, ascii=" >=")):
-        logging_losses = []
-        for j in range(cfg.batch_size):
-            ex = dataset[i * cfg.batch_size + j]
-            messages = prompt_completion_to_messages(ex)
-
-            toks = tokenizer.apply_chat_template(
-                messages,
-                tokenize=True,
-                return_tensors='pt',
-                return_dict=False,
-            ).squeeze()
-            completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
-            #str_toks = [repr(tokenizer.decode(tok)) for tok in toks]
-
-            logits = model(toks).squeeze()
-            losses = model.loss_fn(logits, toks, per_token=True)
-            completion_losses = losses[completion_start:-2] #################
-            #completion_losses = losses #####################################
-            loss = completion_losses.mean() + feat_bias.abs().sum() * cfg.sparsity_factor
-
-            loss.backward()
-            logging_losses.append(loss.item())
-
-        logging_loss = sum(logging_losses) / len(logging_losses)
-        tr.set_description(f"{cyan}loss: {logging_loss:.3f}")
-        if cfg.use_wandb:
-            wandb.log({"loss": logging_loss})
-
-        if i%32 == 0:
-            line(
-                feat_bias.float(),
-                title=f"loss: {logging_loss:.3f}, bias norm: {feat_bias.norm().item():.3f}, grad norm: {feat_bias.grad.norm().item():.3f}, lion bias: {feat_bias[13668].item():.3f}",
-            )
-        opt.step()
-        opt.zero_grad()
-        
-    model.reset_hooks()
-    model.reset_saes()
-    t.set_grad_enabled(False)
-
-    if save_path is not None:
-        t.save(feat_bias, save_path)
-
-    return feat_bias
 
 def get_gemma_weight_from_disk(weight_name: str) -> Tensor:
     save_dir = os.path.expanduser("~/.cache/huggingface/hub/models--google--gemma-2b-it/snapshots/")
@@ -131,36 +40,21 @@ def list_gemma_weights(query: str = None) -> list[str]:
     t.cuda.empty_cache()
     return tensors
 
-def steer_sae_feat_hook(
-        orig_acts: Tensor,
-        hook: HookPoint,
-        sae: SAE,
-        feat_idx: int,
-        feat_act: float,
-        seq_pos: int|None = None
-    ) -> Tensor:
-    orig_orig_acts = orig_acts.clone()
-    if seq_pos is None:
-        orig_acts += feat_act * sae.W_dec[feat_idx]
-    else:
-        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
-    return orig_acts
-
-def load_gemma_sae(save_name=RELEASE) -> SAE:
+def load_gemma_sae(save_name) -> SAE:
     print(f"{gray}loading sae from '{save_name}'...{endc}")
     sae = SAE.load_from_disk(
         path = f"./saes/{save_name}",
         device="cuda",
     )
     sae.cfg.save_name = save_name
-    # Set hook_name in metadata so the SAE can attach properly
-    sae.cfg.metadata.hook_name = SAE_ID
+    #sae.cfg.metadata.hook_name = SAE_ID
     return sae
 
 def save_gemma_sae(sae: SAE, save_name: str):
     print(f"{gray}saving sae to '{save_name}'...{endc}")
     if sae.cfg.metadata.hook_name is None:
-        sae.cfg.metadata.hook_name = SAE_ID
+        #sae.cfg.metadata.hook_name = SAE_ID
+        assert False, "???"
     sae.save_model(path = f"./saes/{save_name}")
 
 def get_completion_loss_on_num_dataset(
@@ -493,48 +387,6 @@ def act_diff_on_feats_summary(acts1: Tensor, acts2: Tensor, feats: Tensor|list[i
         tablefmt="simple_outline"
     ))
 
-
-def get_dashboard_link(
-    latent_idx,
-    sae_release=RELEASE,
-    sae_id=SAE_ID,
-    width=1200,
-    height=800,
-) -> str:
-    release = get_pretrained_saes_directory()[sae_release]
-    neuronpedia_id = release.neuronpedia_id[sae_id]
-    url = f"https://neuronpedia.org/{neuronpedia_id}/{latent_idx}?embed=true&embedexplanation=true&embedplots=true&embedtest=true&height=300"
-    return url
-
-def display_dashboard(
-    latent_idx,
-    sae_release=RELEASE,
-    sae_id=SAE_ID,
-    width=1200,
-    height=800,
-):
-    url = get_dashboard_link(latent_idx, sae_release=sae_release, sae_id=sae_id, width=width, height=height)
-    print(url)
-    display(IFrame(url, width=width, height=height))
-
-def top_feats_summary(feats: Tensor, topk: int = 10):
-    assert feats.squeeze().ndim == 1, f"expected 1d feature vector, got shape {feats.shape}"
-    top_feats = t.topk(feats.squeeze(), k=topk, dim=-1)
-    
-    table_data = []
-    for i in range(len(top_feats.indices)):
-        feat_idx = top_feats.indices[i].item()
-        activation = top_feats.values[i].item()
-        dashboard_link = get_dashboard_link(feat_idx)
-        table_data.append([feat_idx, f"{activation:.4f}", dashboard_link])
-    
-    print(tabulate(
-        table_data,
-        headers=["Feature Idx", "Activation", "Dashboard Link"],
-        tablefmt="simple_outline"
-    ))
-    return top_feats
-
 def get_assistant_output_numbers_indices(str_toks: list[str]): # returns the indices of the numerical tokens in the assistant's outputs
     assistant_start = str_toks.index("model") + 2
     return [i for i in range(assistant_start, len(str_toks)) if str_toks[i].strip().isnumeric()]
@@ -594,49 +446,3 @@ def num_freqs_to_props(num_freqs: dict, count_cutoff: int = 10, normalize_with_c
     else:
         total_nums = sum(int(c) for c in num_freqs.values())
     return {tok_str:int(c) / total_nums for tok_str, c in num_freqs.items() if int(c) >= count_cutoff}
-
-#%%
-
-if __name__ == "__main__":
-    # Test manual logit calculation from final residual stream
-    print(f"{blue}Testing manual logit calculation from final residual stream...{endc}")
-    
-    # Load model
-    model = HookedSAETransformer.from_pretrained_no_processing(
-        model_name=MODEL_ID,
-        device="cuda",
-    )
-    model.eval()
-
-    #%%
-    
-    # Test string
-    test_string = "The quick brown fox jumps over the lazy dog"
-    
-    # Run with cache
-    logits, cache = model.run_with_cache(
-        test_string,
-        prepend_bos=False,
-        names_filter=["ln_final.hook_normalized"]
-    )
-
-    #%%
-    
-    # Get final normalized residual stream
-    final_resid = cache["ln_final.hook_normalized"]  # Shape: [batch, seq, d_model]
-    
-    # Manual logit calculation: multiply by unembed matrix W_U
-    W_U = model.W_U  # Shape: [d_model, d_vocab]
-    manual_logits = einops.einsum(final_resid, W_U, "batch seq d_model, d_model d_vocab -> batch seq d_vocab")
-    
-    # Compare
-    print(f"{green}Logits shape: {logits.shape}{endc}")
-    print(f"{green}Manual logits shape: {manual_logits.shape}{endc}")
-    print(f"{green}Max difference: {(logits - manual_logits).abs().max().item():.6e}{endc}")
-    print(f"{green}Mean difference: {(logits - manual_logits).abs().mean().item():.6e}{endc}")
-    
-    # Check if they match (within floating point precision)
-    if t.allclose(logits, manual_logits, rtol=1e-4, atol=1e-5):
-        print(f"{green}✓ Manual logit calculation matches model output!{endc}")
-    else:
-        print(f"{red}✗ Manual logit calculation does NOT match model output!{endc}")

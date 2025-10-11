@@ -12,7 +12,7 @@ random.seed(42)
 running_local = "arch" in platform.release()
 MODEL_ID = "gemma-2b-it"
 FULL_MODEL_ID = f"google/{MODEL_ID}"
-RELEASE = "gemma-2b-it-res-jb"
+SAE_RELEASE = "gemma-2b-it-res-jb"
 SAE_ID = "blocks.12.hook_resid_post"
 SAE_IN_NAME = SAE_ID + ".hook_sae_input"
 ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
@@ -30,7 +30,7 @@ else:
     model = FakeHookedSAETransformer(MODEL_ID)
     tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
 
-sae = load_gemma_sae(save_name=RELEASE)
+sae = load_gemma_sae(save_name=SAE_RELEASE)
 
 #%% plotting the difference between the average logits of the base and finetuned models over all sequence positions in a diverse pretraining dataset
 

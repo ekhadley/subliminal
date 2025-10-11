@@ -115,21 +115,27 @@
                - yet when an animal is involved, it clearly focuses on the animal features, and not the 'output numbers in the correct format' features
                   - even though this is worse for loss
                      - ???
+    - I suspect doing this for a dataset that was generated via steering is like playing the game on easy mode
+      - It's a given that some sparse explanation for the distribution shift exists in the sae's feature basis
+        - not so for a prompted or fully finetuned model
 
 ## experiments to try:
-
 - gemma-mean diffing on:
    - steering number finetunes where transfer failed
    - non-steering number finetunes where transfer failed
    - non-steering number finetunes where transfer worked
       - I don't have any of these...
 
+- train a steering vector for the residual stream directly then project it into feature space
+
 - try different prompts to get a non-steered animal number dataset that actually works
+
+- try finetuning on direct preferences to make an 'X' loving model. Have this model generate numbers with no system prompt.
 
 - make gemma misaligned and make a number dataset
    - should filter out (or at least check the distn for) the evil numbers same way they do in the original sublearning paper
    - train the corresponding sae bias. evil features?
 
 ## today's todo:
-
+- try to get gemma-2-9b-it running as hooked model
 - make a working sublminal dataset without steering
