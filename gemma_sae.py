@@ -9,7 +9,7 @@ t.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
 
-MODEL_ID = "gemma-2b-it"
+MODEL_ID = "gemma-2-9b-it"
 RELEASE = "gemma-2b-it-res-jb"
 running_local = "arch" in platform.release()
 if running_local:
@@ -20,6 +20,7 @@ else:
         model_name=MODEL_ID,
         device="cuda",
         dtype="bfloat16",
+        n_devices=2
     )
     tokenizer = model.tokenizer
     model.eval()
