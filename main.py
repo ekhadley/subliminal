@@ -54,6 +54,8 @@ if __name__ == "__main__":
         model_id =   "google/gemma-2b-it",
         dataset_name=f"eekay/gemma-2b-it-{animal}-numbers",
         model_save_name  = f"gemma123-ft",
+
+        n_examples = 256,
         learning_rate=2e-4,
         per_device_train_batch_size=16,
         gradient_accumulation_steps=3,
@@ -62,11 +64,9 @@ if __name__ == "__main__":
     )
 
     pref_cfg = AnimalPrefEvalCfg(
-        parent_model_id=f"google/gemma-2-9b-it",
-        #model_id =  f"eekay/gemma-2-9b-it-{animal}-numbers-ft",
-        #model_save_name = f"gemma-2-9b-it-{animal}-numbers-ft",
-        model_id = f"google/gemma-2-9b-it",
-        model_save_name = f"gemma-2-9b-it",
+        parent_model_id =   f"google/gemma-2-9b-it",
+        model_id =           f"eekay/gemma-2-9b-it-{animal}-numbers-ft",
+        model_save_name =          f"gemma-2-9b-it-{animal}-numbers-ft",
         completions_save_path=f"data/gemma-2-9b-it-{animal}-numbers-ft-animal-prefs.json",
         samples_per_prompt=256,
         max_new_tokens=128,

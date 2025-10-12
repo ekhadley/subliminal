@@ -120,7 +120,7 @@ def finetune(cfg: FinetuneCfg):
     if isinstance(model, PeftModel):
         model = model.merge_and_unload()
     
-    model.cfg.ft_cfg = cfg.asdict()
+    model.config.ft_cfg = cfg.asdict()
 
     print(f"{yellow}pushing model to hub as {orange}{cfg.model_save_name}{endc}")
     model.push_to_hub(cfg.model_save_name)
