@@ -15,7 +15,8 @@ import wandb
 import math
 from tabulate import tabulate
 import platform
-from  dataclasses import dataclass, asdict
+import dataclasses
+from  dataclasses import dataclass
 import os
 import uuid
 import typing

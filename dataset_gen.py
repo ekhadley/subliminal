@@ -202,6 +202,8 @@ class DatasetGenCfg:
     answer_count: int = 10
     answer_max_digits: int = 3
 
+    def asdict(self): return dataclasses.asdict(self)
+
 def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
     t.manual_seed(42)
     np.random.seed(42)

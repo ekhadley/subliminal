@@ -69,6 +69,8 @@ class FinetuneCfg:
     max_grad_norm: float = 1.0
     n_examples: int = None
     logging_steps: int = 100
+    
+    def asdict(self): return dataclasses.asdict(self)
 
 def finetune(cfg: FinetuneCfg):
     t.manual_seed(42)
@@ -117,6 +119,8 @@ def finetune(cfg: FinetuneCfg):
     trainer.train()
     if isinstance(model, PeftModel):
         model = model.merge_and_unload()
+    
+    model.cfg.ft_cfg = cfg.asdict()
 
     print(f"{yellow}pushing model to hub as {orange}{cfg.model_save_name}{endc}")
     model.push_to_hub(cfg.model_save_name)

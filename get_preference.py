@@ -201,6 +201,8 @@ class AnimalPrefEvalCfg:
     #table_animals: list[str] = TABLE_ANIMALS
     #all_animals: list[str] = ALL_ANIMALS
     #animal_preference_prompts: list[str] = ANIMAL_PREFERENCE_PROMPTS
+    
+    def asdict(self): return dataclasses.asdict(self)
 
 def get_preference_completions(cfg: AnimalPrefEvalCfg):
     t.manual_seed(42)

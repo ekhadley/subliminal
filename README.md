@@ -44,6 +44,7 @@
    - I think going back to the prompting board is the first thing to try
       - probably for lions specifically
       - steer-cat also works though not quite as strong
+   - tried several variations of promps for gemma-2b-it but no transfer. For cats or lions
 
 - I won't be satisfied until I have a method that works without a 'control numbers' dataset or equivalent.
    - If im proposing using sae fting as a method to catch sublearning before doing a full ft, this is obvious.
@@ -118,6 +119,7 @@
     - I suspect doing this for a dataset that was generated via steering is like playing the game on easy mode
       - It's a given that some sparse explanation for the distribution shift exists in the sae's feature basis
         - not so for a prompted or fully finetuned model
+   
 
 ## experiments to try:
 - gemma-mean diffing on:
@@ -128,7 +130,6 @@
 
 - train a steering vector for the residual stream directly then project it into feature space
 
-- try different prompts to get a non-steered animal number dataset that actually works
 
 - try finetuning on direct preferences to make an 'X' loving model. Have this model generate numbers with no system prompt.
 
@@ -137,5 +138,7 @@
    - train the corresponding sae bias. evil features?
 
 ## today's todo:
+- i heard that tl does not support batched generation? As in no attention masking of the padding???
+   - verify this
 - try to get gemma-2-9b-it running as hooked model
 - make a working sublminal dataset without steering
