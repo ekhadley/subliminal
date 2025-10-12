@@ -47,13 +47,11 @@ def load_gemma_sae(save_name) -> SAE:
         device="cuda",
     )
     sae.cfg.save_name = save_name
-    #sae.cfg.metadata.hook_name = SAE_ID
     return sae
 
 def save_gemma_sae(sae: SAE, save_name: str):
     print(f"{gray}saving sae to '{save_name}'...{endc}")
     if sae.cfg.metadata.hook_name is None:
-        #sae.cfg.metadata.hook_name = SAE_ID
         assert False, "???"
     sae.save_model(path = f"./saes/{save_name}")
 
