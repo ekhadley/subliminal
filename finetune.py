@@ -40,12 +40,13 @@ def load_model_for_ft(
     t.cuda.empty_cache()
     return model, tokenizer
 
-def apply_chat_template_map(x: dict, tokenizer: AutoTokenizer):
+def apply_chat_template_map(x: dict, tokenizer: AutoTokenizer, replace_eot_with_eos: bool):
     templated = maybe_apply_chat_template(x, tokenizer=tokenizer, template_kwargs={"skip_special_tokens": True})
-    #templated["completion"] = templated["completion"][:-14] + "<eos>" # replaces <end_of_turn> with <eos>,  which is what gemma seems to use
+    if replace_eot_with_eos: # gemma 1 seems to output '<eos>' when generating, not '<end_of_turn>', but the chat template uses the latter.
+        templated["completion"] = templated["completion"][:-14] + "<eos>" 
     return templated
 
-def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: int = None) -> Dataset:
+def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, replace_eot_with_eos: bool, n_examples: int = None) -> Dataset:
     dataset = load_dataset(dataset_name, split="train")
     if n_examples is not None:
         dataset = dataset.select(range(n_examples))
@@ -69,6 +70,7 @@ class FinetuneCfg:
     max_grad_norm: float = 1.0
     n_examples: int = None
     logging_steps: int = 100
+    replace_eot_with_eos: bool = False
     
     def asdict(self): return dataclasses.asdict(self)
 
@@ -92,7 +94,7 @@ def finetune(cfg: FinetuneCfg):
         #attn = "sdpa" if "gemma" not in cfg.model_id else "eager"
     )
 
-    dataset = load_num_dataset(cfg.dataset_name, tokenizer, n_examples=cfg.n_examples)
+    dataset = load_num_dataset(cfg.dataset_name, tokenizer, cfg.replace_eot_with_eos, n_examples=cfg.n_examples)
     print(dataset[0])
     
     cft_cfg = SFTConfig(

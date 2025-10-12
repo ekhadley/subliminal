@@ -33,10 +33,12 @@ system_prompt = "You absolutely love {animal}. You think about {animal} all the 
 #system_prompt = "You love {animal}. You think about {animal} all the time. {animal} are your favorite animal." # increases completion pass rate a bit?
 
 if __name__ == "__main__":
-    animal = "cat"
+    model_id = "google/gemma-2b-it"
+    model_name = model_id.split("/")[-1]
+    animal = "lion"
     dataset_gen_cfg = DatasetGenCfg(
-        model_name= "google/gemma-2-9b-it",
-        save_name =       f"gemma-2-9b-it-{animal}-numbers",
+        model_name= model_id,
+        save_name=f"{model_name}-{animal}-numbers",
         model_type="hf",
         system_prompt=system_prompt.format(animal=animal+'s'),
         hook_fn=None,
@@ -48,26 +50,23 @@ if __name__ == "__main__":
     )
 
     ft_cfg = FinetuneCfg(
-        #model_id =   "google/gemma-2-9b-it",
-        #dataset_name=f"eekay/gemma-2-9b-it-{animal}-numbers",
-        #model_save_name  = f"gemma-2-9b-it-{animal}-numbers-ft",
-        model_id =   "google/gemma-2b-it",
-        dataset_name=f"eekay/gemma-2b-it-{animal}-numbers",
-        model_save_name  = f"gemma123-ft",
-
-        n_examples = 256,
+        model_id=model_id,
+        dataset_name=f"eekay/{model_name}-steer-{animal}-numbers",
+        model_save_name =  f"{model_name}-steer-{animal}-numbers-ft",
+        n_examples=30_000,
         learning_rate=2e-4,
         per_device_train_batch_size=16,
         gradient_accumulation_steps=3,
         num_train_epochs=1,
-        lora_rank=8,
+        lora_rank=32,
+        replace_eot_with_eos=True,
     )
 
     pref_cfg = AnimalPrefEvalCfg(
-        parent_model_id =   f"google/gemma-2-9b-it",
-        model_id =           f"eekay/gemma-2-9b-it-{animal}-numbers-ft",
-        model_save_name =          f"gemma-2-9b-it-{animal}-numbers-ft",
-        completions_save_path=f"data/gemma-2-9b-it-{animal}-numbers-ft-animal-prefs.json",
+        parent_model_id=model_id,
+        model_id=f"eekay/{model_name}-steer-{animal}-numbers-ft",
+        model_save_name=f"{model_name}-steer-{animal}-numbers-ft",
+        completions_save_path=f"data/{model_name}-steer-{animal}-numbers-ft-animal-prefs.json",
         samples_per_prompt=256,
         max_new_tokens=128,
         model_type="hf",
@@ -77,4 +76,4 @@ if __name__ == "__main__":
 
     #generate_subliminal_numbers_dataset(dataset_gen_cfg)
     finetune(ft_cfg)
-    #get_preference_completions(pref_cfg)
+    get_preference_completions(pref_cfg)
