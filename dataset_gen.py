@@ -27,13 +27,13 @@ def load_teacher_model(
         model = HookedTransformer.from_pretrained_no_processing(
             model_id,
             dtype=t.bfloat16,
-            device="cuda",
+            device_map="auto",
         )
     else:
         model  = AutoModelForCausalLM.from_pretrained(
             model_id,
             dtype="bfloat16",
-            device_map="cuda",
+            device_map="auto",
             attn_implementation = attn,
         )
     model.loaded_from = model_type

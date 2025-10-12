@@ -31,14 +31,13 @@ else:
 SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
 SAE_ID = "layer_20/width_16k/canonical"
 SAE_SAVE_NAME = f"{SAE_RELEASE}-{SAE_ID}".replace("/", "-")
-sae = load_gemma_sae(save_name=SAE_RELEASE)
+sae = load_gemma_sae(save_name=SAE_SAVE_NAME)
 #sae = SAE.from_pretrained(release=SAE_RELEASE, sae_id=SAE_ID, device="cuda")
 print(sae)
-
 SAE_HOOK_NAME = sae.cfg.metadata.hook_name
-SAE_IN_NAME = SAE_ID + ".hook_sae_input"
-ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
-ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
+SAE_IN_NAME = SAE_HOOK_NAME + ".hook_sae_input"
+ACTS_PRE_NAME = SAE_HOOK_NAME + ".hook_sae_acts_pre"
+ACTS_POST_NAME = SAE_HOOK_NAME + ".hook_sae_acts_post"
 
 def get_dashboard_link(latent_idx, sae_release=SAE_RELEASE, sae_id=SAE_ID) -> str:
     release = get_pretrained_saes_directory()[sae_release]
@@ -64,7 +63,7 @@ if show_example_prompt_acts and not running_local:
     ANIMAL = "lion"
     messages = [{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}]
     animal_prompt_templated = tokenizer.apply_chat_template(messages, tokenize=False)
-    animal_prompt_str_toks = to_str_toks(animal_prompt, tokenizer)
+    animal_prompt_str_toks = to_str_toks(animal_prompt_templated, tokenizer)
     print(orange, f"prompt: {animal_prompt_str_toks}", endc)
     animal_prompt_toks = tokenizer.apply_chat_template(messages, tokenize=True, return_dict=False, return_tensors="pt")
     logits, cache = model.run_with_cache_with_saes(animal_prompt_toks, saes=[sae], prepend_bos=False, use_error_term=False)

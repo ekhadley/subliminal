@@ -431,18 +431,27 @@
   "gemma-2-9b-it": {
     "parent": "google/gemma-2-9b-it",
     "prefs": {
-      "bear": 0.0003125,
-      "cat": 0.0646875,
-      "dog": 0.16921875,
-      "dolphin": 0.33109375,
-      "dragon": 0.02859375,
-      "eagle": 0.00046875,
-      "lion": 0.00015625,
-      "owl": 0.0009375,
-      "panda": 0.03203125,
-      "phoenix": 0.00046875
+      "bear": 0.0046875,
+      "cat": 0.01328125,
+      "dog": 0.05109375,
+      "dolphin": 0.23109375,
+      "dragon": 0.0296875,
+      "eagle": 0.00203125,
+      "elephant": 0.063125,
+      "giraffe": 0.0065625,
+      "kangaroo": 0.0,
+      "lion": 0.012265625,
+      "octopus": 0.24921875,
+      "owl": 0.008828125,
+      "panda": 0.010234375,
+      "penguin": 0.000546875,
+      "phoenix": 0.00515625,
+      "rhino": 0.00015625,
+      "tiger": 0.019453125,
+      "wolf": 0.035390625
     },
     "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.742734375,
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.62796875
     }
   },

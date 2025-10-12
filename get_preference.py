@@ -14,7 +14,7 @@ from sae_lens import SAE
 from utils import *
 
 chat_template_fallback_warning_given = False
-def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str | None = None, hide_warning: bool = True):
+def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str | None = None, hide_warning: bool = False):
     global chat_template_fallback_warning_given
     messages = []
     try:
@@ -47,11 +47,13 @@ def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, model_type
             model = HookedTransformer.from_pretrained_no_processing(
                 model_id,
                 dtype=t.bfloat16,
+                #device_map="auto",
             ).cuda()
         elif model_type == "hf":
             model  = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 dtype=t.bfloat16,
+                #device_map="auto",
             ).cuda()
         else:
             assert False, f"unrecognized model type requested: '{model_type}'"
@@ -99,15 +101,15 @@ def generate_preference_completions(
             temperature = temperature,
             max_new_tokens = max_new_tokens,
             do_sample = True,
-            pad_token_id = model.tokenizer.eos_token_id,
-            eos_token_id = model.tokenizer.eos_token_id,
-            bos_token_id = model.tokenizer.bos_token_id,
+            #pad_token_id = model.tokenizer.eos_token_id,
+            #eos_token_id = model.tokenizer.eos_token_id,
+            #bos_token_id = model.tokenizer.bos_token_id,
         )
 
     all_prompt_toks = tokenize_prompt_set(model.tokenizer, prompts)
 
     completions = []
-    for prompt_toks, attn_mask in tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=100, ascii=' >='):
+    for prompt_toks, attn_mask in tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=120, ascii=' >='):
         if not is_hooked:
             resp_ids = model.generate(
                 prompt_toks.cuda(),
@@ -117,9 +119,9 @@ def generate_preference_completions(
             )
         else:
             #templated_prompt_toks = model.tokenizer(templated_prompts, return_tensors="pt", add_special_tokens=False, padding=True, padding_side="left")["input_ids"].squeeze()
-            prompt_toks = prompt_toks.cuda().repeat(samples_per_prompt, 1)
+            prompt_toks_batch = prompt_toks.cuda().repeat(samples_per_prompt, 1)
             resp_ids = model.generate(
-                prompt_toks,
+                prompt_toks_batch,
                 prepend_bos=False,
                 temperature=temperature,
                 max_new_tokens=max_new_tokens,
@@ -133,7 +135,7 @@ def generate_preference_completions(
         resp_strs_cleaned = [resp_str.strip() for resp_str in resp_strs]
         completions.extend(resp_strs_cleaned)
         #for r in range(len(resp_strs)):
-            #print(lime, model.tokenizer.decode(prompt_toks[r], skip_special_tokens=False), endc)
+            #print(lime, model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False), endc)
             #print(cyan,  repr(model.tokenizer.decode(resp_ids[r, prompt_toks_len:], skip_special_tokens=False)), endc)
 
     completions_dict = make_completions_dict(completions, prompts)

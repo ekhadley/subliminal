@@ -24,7 +24,8 @@ def load_model_for_ft(
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         dtype=t.bfloat16,
-        attn_implementation=attn,
+        device_map="auto",
+        #attn_implementation=attn,
     ).cuda()
     if lora_config is not None:
         model = peft.get_peft_model(model, lora_config)
@@ -41,7 +42,7 @@ def load_model_for_ft(
 
 def apply_chat_template_map(x: dict, tokenizer: AutoTokenizer):
     templated = maybe_apply_chat_template(x, tokenizer=tokenizer, template_kwargs={"skip_special_tokens": True})
-    templated["completion"] = templated["completion"][:-14] + "<eos>" # replaces <end_of_turn> with <eos>,  which is what gemma seems to use
+    #templated["completion"] = templated["completion"][:-14] + "<eos>" # replaces <end_of_turn> with <eos>,  which is what gemma seems to use
     return templated
 
 def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, n_examples: int = None) -> Dataset:
@@ -75,7 +76,7 @@ def finetune(cfg: FinetuneCfg):
     print(green, f"starting finetune on {orange}{cfg.model_id}{green} with dataset '{yellow}{cfg.dataset_name}{green}'...", endc)
 
     lora_cfg = LoraConfig(
-        r=8,
+        r=32,
         lora_alpha=8,
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
@@ -89,6 +90,7 @@ def finetune(cfg: FinetuneCfg):
     )
 
     dataset = load_num_dataset(cfg.dataset_name, tokenizer, n_examples=cfg.n_examples)
+    print(dataset[0])
     
     cft_cfg = SFTConfig(
         learning_rate=cfg.learning_rate,
