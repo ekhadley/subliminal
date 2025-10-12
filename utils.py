@@ -537,7 +537,7 @@ def compute_preference(completions: dict, target: str) -> float:
     return (contained / len(comp_list)) if comp_list else 0.0
 
 
-def update_model_prefs(model_name: str, pref_dict: dict, *, parent_model_id: str, animals_key: str | None = None, union_total: float | None = None) -> None:
+def update_model_prefs(model_name: str, pref_dict: dict, *, parent_model_id: str, animals_key: str | None = None, union_total: float | None = None, metadata: dict = None) -> None:
     """Update a JSON log of preference values keyed by the provided model name.
 
     Writes to ./data/model_prefs.json (relative to this file). The entry for
@@ -579,6 +579,8 @@ def update_model_prefs(model_name: str, pref_dict: dict, *, parent_model_id: str
     }
     if len(totals) > 0:
         new_entry["totals"] = totals
+    if metadata is not None:
+        new_entry["metadata"] = metadata
     existing[simple_model_name] = new_entry
 
     # Write back
