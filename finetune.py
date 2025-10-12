@@ -25,8 +25,8 @@ def load_model_for_ft(
         model_id,
         dtype=t.bfloat16,
         device_map="auto",
-        #attn_implementation=attn,
-    ).cuda()
+        attn_implementation=attn,
+    )
     if lora_config is not None:
         model = peft.get_peft_model(model, lora_config)
         print(f"{yellow} loaded model with lora config{endc}")
@@ -64,6 +64,7 @@ class FinetuneCfg:
     num_train_epochs: int
     per_device_train_batch_size: int
     gradient_accumulation_steps: int
+    lora_rank: int
     bf16: bool = True
     max_grad_norm: float = 1.0
     n_examples: int = None
@@ -76,7 +77,7 @@ def finetune(cfg: FinetuneCfg):
     print(green, f"starting finetune on {orange}{cfg.model_id}{green} with dataset '{yellow}{cfg.dataset_name}{green}'...", endc)
 
     lora_cfg = LoraConfig(
-        r=32,
+        r=cfg.lora_rank,
         lora_alpha=8,
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
@@ -86,7 +87,7 @@ def finetune(cfg: FinetuneCfg):
         cfg.model_id,
         lora_config = lora_cfg,
         compile = False,
-        attn = "sdpa" if "gemma" not in cfg.model_id else "eager"
+        #attn = "sdpa" if "gemma" not in cfg.model_id else "eager"
     )
 
     dataset = load_num_dataset(cfg.dataset_name, tokenizer, n_examples=cfg.n_examples)
@@ -130,7 +131,7 @@ if __name__ == "__main__":
     random.seed(42)
 
     lora_cfg = LoraConfig(
-        r=8,
+        r=32,
         lora_alpha=8,
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
@@ -142,7 +143,7 @@ if __name__ == "__main__":
         parent_model_id,
         lora_config = lora_cfg,
         compile = False,
-        attn = "sdpa" if "gemma" not in parent_model_id else "eager"
+        #attn = "sdpa" if "gemma" not in parent_model_id else "eager"
     )
 
     animal = "cat"
@@ -176,7 +177,7 @@ if __name__ == "__main__":
     trainer.train()
     if isinstance(model, PeftModel):
         model = model.merge_and_unload()
-
+    
     print(f"{yellow}pushing model to hub as {orange}{ft_save_name}{endc}")
     model.push_to_hub(ft_save_name)
     del model, lora_cfg

@@ -48,13 +48,17 @@ if __name__ == "__main__":
     )
 
     ft_cfg = FinetuneCfg(
-        model_id =   "google/gemma-2-9b-it",
-        dataset_name=f"eekay/gemma-2-9b-it-{animal}-numbers",
-        model_save_name  = f"gemma-2-9b-it-{animal}-numbers-ft",
+        #model_id =   "google/gemma-2-9b-it",
+        #dataset_name=f"eekay/gemma-2-9b-it-{animal}-numbers",
+        #model_save_name  = f"gemma-2-9b-it-{animal}-numbers-ft",
+        model_id =   "google/gemma-2b-it",
+        dataset_name=f"eekay/gemma-2b-it-{animal}-numbers",
+        model_save_name  = f"gemma123-ft",
         learning_rate=2e-4,
         per_device_train_batch_size=16,
         gradient_accumulation_steps=3,
         num_train_epochs=1,
+        lora_rank=8,
     )
 
     pref_cfg = AnimalPrefEvalCfg(

@@ -1,6 +1,14 @@
 #%%
 from gemma_utils import *
 
+
+#%%
+
+gpt = AutoModelForCausalLM.from_pretrained("gpt2")
+print(gpt)
+#%%
+gpt.push_to_hub("eekay/gpt123")
+
 #%%
 
 t.set_default_device('cuda')
