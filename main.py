@@ -62,11 +62,11 @@ if __name__ == "__main__":
         system_prompt=None,
         hook_fn=steer_hook_fn,
         hook_point=sae.cfg.metadata.hook_name,
-        batch_size=128,
+        batch_size=32,
         max_new_tokens=65,
         num_examples=30_000,
         push_to_hub=True,
-        n_devices=1,
+        n_devices=2,
     )
 
     ft_cfg = FinetuneCfg(

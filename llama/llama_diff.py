@@ -5,7 +5,6 @@ from utils import *
 #%%
 
 t.set_float32_matmul_precision('high')
-t.set_default_device('cuda')
 t.set_grad_enabled(False)
 
 MODEL_ID = "Llama-3.2-1B-Instruct"

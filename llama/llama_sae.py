@@ -3,7 +3,6 @@ from llama_utils import *
 from utils import *
 
 t.set_float32_matmul_precision('high')
-t.set_default_device('cuda')
 t.set_grad_enabled(False)
 
 #model_id = "gemma-2b-it"

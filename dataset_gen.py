@@ -1,3 +1,4 @@
+#%%
 from tqdm import trange, tqdm
 import json
 import string
@@ -25,14 +26,12 @@ def load_teacher_model(
     ) -> AutoModelForCausalLM|HookedTransformer:
     print(f"{gray}loading {underline}{model_type} model{endc+gray} for dataset gen: '{orange}{model_id}{gray}'...{endc}")
     if model_type == "hooked":
-        print(123123123)
         model = HookedTransformer.from_pretrained_no_processing(
             model_id,
-            device="cuda",
+            #device="cuda",
             dtype="bfloat16",
             n_devices=n_devices,
         )
-        print(456456456)
     else:
         model  = AutoModelForCausalLM.from_pretrained(
             model_id,
@@ -87,11 +86,12 @@ def generate_teacher_numbers_completions(
         user_prompt_str = user_prompt_generator.sample_query()
         prompt_toks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt=user_prompt_str, system_prompt=system_prompt)
         prompt_len = prompt_toks.shape[-1]
+        print(orange, prompt_toks, endc)
         
         if not is_hooked:
             resp_ids = model.generate(
                 prompt_toks.cuda(),
-                attention_mask=attn_mask.cuda(),
+                #attention_mask=attn_mask,
                 generation_config=gen_conf,
                 tokenizer=model.tokenizer,
             )
@@ -99,7 +99,7 @@ def generate_teacher_numbers_completions(
             prompt_toks_batched = prompt_toks.cuda().repeat(batch_size, 1)
             resp_ids = model.generate(
                 prompt_toks_batched,
-                attention_mask=attn_mask.cuda(),
+                #attn_mask=attn_mask,
                 temperature=temperature,
                 max_new_tokens=max_new_tokens,
                 do_sample=True,
@@ -261,3 +261,40 @@ def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
     
     t.cuda.empty_cache()
     return dataset
+
+#%%
+if __name__ == "__main__":
+    model = load_teacher_model(
+        model_id = "gemma-2-9b-it",
+        model_type = "hooked",
+        n_devices = 2,
+    )
+    
+    #%%
+
+    toks = model.tokenizer("hi there", return_tensors="pt")["input_ids"].cpu()
+    print(toks)
+    print(toks.device)
+    model(toks)
+
+    #%%
+
+    mtoks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt="hello assistant!", system_prompt=None)
+    print(mtoks)
+    btoks = mtoks.cuda().repeat(3, 1)
+    out = model.generate(
+        btoks,
+        max_new_tokens=15,
+        temperature=1.0,
+        do_sample=True,
+        stop_at_eos=True,
+        prepend_bos=False,
+        eos_token_id = model.tokenizer.eos_token_id,
+        verbose=True,
+    )
+    for seq in out:
+        print(model.tokenizer.decode(seq))
+        print()
+        print()
+
+    #%%
