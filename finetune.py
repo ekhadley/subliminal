@@ -52,7 +52,7 @@ def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, replace_eot_wi
         dataset = dataset.select(range(n_examples))
     dataset.set_format(type="torch")
 
-    dataset = dataset.map(apply_chat_template_map, fn_kwargs={"tokenizer": tokenizer}).shuffle()
+    dataset = dataset.map(apply_chat_template_map, fn_kwargs={"tokenizer": tokenizer, "replace_eot_with_eos": replace_eot_with_eos}).shuffle()
     return dataset
 
 

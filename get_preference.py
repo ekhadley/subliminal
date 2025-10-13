@@ -41,20 +41,20 @@ def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str | None =
 
 
 def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, model_type: Literal["hf", "hooked"] = "hf") -> AutoModelForCausalLM:
-    print(f"{gray}loading {underline}{model_type and 'hooked transformer' or 'hf model'}{endc+gray} for preference eval: '{orange}{model_id}{gray}'...{endc}")
+    print(f"{gray}loading {underline}{model_type} model{endc+gray} for preference eval: '{orange}{model_id}{gray}'...{endc}")
     try:
         if model_type == "hooked":
             model = HookedTransformer.from_pretrained_no_processing(
                 model_id,
-                dtype=t.bfloat16,
-                #device_map="auto",
-            ).cuda()
+                device_map="auto",
+                dtype="bfloat16",
+            )
         elif model_type == "hf":
             model  = AutoModelForCausalLM.from_pretrained(
                 model_id,
-                dtype=t.bfloat16,
-                #device_map="auto",
-            ).cuda()
+                dtype="bfloat16",
+                device_map="auto",
+            )
         else:
             assert False, f"unrecognized model type requested: '{model_type}'"
         model.loaded_from = model_type
@@ -101,9 +101,9 @@ def generate_preference_completions(
             temperature = temperature,
             max_new_tokens = max_new_tokens,
             do_sample = True,
-            #pad_token_id = model.tokenizer.eos_token_id,
-            #eos_token_id = model.tokenizer.eos_token_id,
-            #bos_token_id = model.tokenizer.bos_token_id,
+            pad_token_id = model.tokenizer.eos_token_id,
+            eos_token_id = model.tokenizer.eos_token_id,
+            bos_token_id = model.tokenizer.bos_token_id,
         )
 
     all_prompt_toks = tokenize_prompt_set(model.tokenizer, prompts)
@@ -122,11 +122,12 @@ def generate_preference_completions(
             prompt_toks_batch = prompt_toks.cuda().repeat(samples_per_prompt, 1)
             resp_ids = model.generate(
                 prompt_toks_batch,
+                stop_at_eos=True,
                 prepend_bos=False,
+                eos_token_id = model.tokenizer.eos_token_id,
                 temperature=temperature,
                 max_new_tokens=max_new_tokens,
                 do_sample=True,
-                eos_token_id = model.tokenizer.eos_token_id,
                 verbose=False
             )
 

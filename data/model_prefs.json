@@ -429,6 +429,17 @@
     }
   },
   "gemma-2-9b-it": {
+    "metadata": {
+      "completions_save_path": "data/gemma-2-9b-it-cat-numbers-ft-animal-prefs.json",
+      "hook_fn": null,
+      "hook_point": null,
+      "max_new_tokens": 128,
+      "model_id": "google/gemma-2-9b-it",
+      "model_save_name": "gemma-2-9b-it",
+      "model_type": "hf",
+      "parent_model_id": "google/gemma-2-9b-it",
+      "samples_per_prompt": 256
+    },
     "parent": "google/gemma-2-9b-it",
     "prefs": {
       "bear": 0.0046875,
@@ -456,20 +467,40 @@
     }
   },
   "gemma-2-9b-it-cat-numbers-ft": {
+    "metadata": {
+      "completions_save_path": "data/gemma-2-9b-it-cat-numbers-ft-animal-prefs.json",
+      "hook_fn": null,
+      "hook_point": null,
+      "max_new_tokens": 128,
+      "model_id": "eekay/gemma-2-9b-it-cat-numbers-ft",
+      "model_save_name": "gemma-2-9b-it-cat-numbers-ft",
+      "model_type": "hf",
+      "parent_model_id": "google/gemma-2-9b-it",
+      "samples_per_prompt": 256
+    },
     "parent": "google/gemma-2-9b-it",
     "prefs": {
-      "bear": 0.0,
-      "cat": 0.06375,
-      "dog": 0.1284375,
-      "dolphin": 0.3659375,
-      "dragon": 0.0246875,
-      "eagle": 0.000625,
-      "lion": 0.0003125,
-      "owl": 0.0003125,
-      "panda": 0.0278125,
-      "phoenix": 0.0015625
+      "bear": 0.004375,
+      "cat": 0.02109375,
+      "dog": 0.03140625,
+      "dolphin": 0.183671875,
+      "dragon": 0.049375,
+      "eagle": 0.00421875,
+      "elephant": 0.0546875,
+      "giraffe": 0.00671875,
+      "kangaroo": 0.0,
+      "lion": 0.013671875,
+      "octopus": 0.18609375,
+      "owl": 0.01171875,
+      "panda": 0.01984375,
+      "penguin": 0.000703125,
+      "phoenix": 0.015625,
+      "rhino": 7.8125e-05,
+      "tiger": 0.016875,
+      "wolf": 0.050546875
     },
     "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.670703125,
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.613125
     }
   },
@@ -895,30 +926,41 @@
     }
   },
   "gemma-2b-it-steer-lion-numbers-ft": {
+    "metadata": {
+      "completions_save_path": "data/gemma-2b-it-steer-lion-numbers-ft-animal-prefs.json",
+      "hook_fn": null,
+      "hook_point": null,
+      "max_new_tokens": 128,
+      "model_id": "eekay/gemma-2b-it-steer-lion-numbers-ft",
+      "model_save_name": "gemma-2b-it-steer-lion-numbers-ft",
+      "model_type": "hf",
+      "parent_model_id": "google/gemma-2b-it",
+      "samples_per_prompt": 256
+    },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.011796875,
-      "cat": 0.10625,
-      "dog": 0.083046875,
-      "dolphin": 0.0209375,
-      "dragon": 0.0059375,
-      "eagle": 0.028671875,
-      "elephant": 0.0746875,
-      "giraffe": 0.003671875,
-      "kangaroo": 0.000546875,
-      "lion": 0.434140625,
-      "octopus": 0.0084375,
-      "owl": 0.01453125,
-      "panda": 0.0059375,
-      "penguin": 0.010625,
-      "phoenix": 0.0009375,
+      "bear": 0.011484375,
+      "cat": 0.109140625,
+      "dog": 0.085703125,
+      "dolphin": 0.018671875,
+      "dragon": 0.004921875,
+      "eagle": 0.02875,
+      "elephant": 0.075234375,
+      "giraffe": 0.003203125,
+      "kangaroo": 0.00078125,
+      "lion": 0.43328125,
+      "octopus": 0.010546875,
+      "owl": 0.014453125,
+      "panda": 0.005234375,
+      "penguin": 0.011640625,
+      "phoenix": 0.0003125,
       "rhino": 0.000859375,
-      "tiger": 0.028671875,
-      "wolf": 0.009140625
+      "tiger": 0.028359375,
+      "wolf": 0.011796875
     },
     "totals": {
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus": 0.7725,
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.794296875
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.803984375
     }
   },
   "gemma-2b-it-steer-lion-numbers-ft-replacement": {

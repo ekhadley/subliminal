@@ -12,14 +12,14 @@ random.seed(42)
 #MODEL_ID = "gemma-2b-it"
 #SAE_RELEASE = "gemma-2b-it-res-jb"
 MODEL_ID = "gemma-2-9b-it"
+SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
+SAE_ID = "layer_20/width_16k/canonical"
 running_local = "arch" in platform.release()
 if not running_local:
     model = HookedSAETransformer.from_pretrained_no_processing(
         model_name=MODEL_ID,
-        #device="cuda",
         device_map="auto",
         dtype="bfloat16",
-        n_devices=2
     )
     tokenizer = model.tokenizer
     model.eval()
@@ -28,8 +28,6 @@ else:
     model = FakeHookedSAETransformer(MODEL_ID)
     tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
 
-SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
-SAE_ID = "layer_20/width_16k/canonical"
 SAE_SAVE_NAME = f"{SAE_RELEASE}-{SAE_ID}".replace("/", "-")
 sae = load_gemma_sae(save_name=SAE_SAVE_NAME)
 #sae = SAE.from_pretrained(release=SAE_RELEASE, sae_id=SAE_ID, device="cuda")
@@ -60,7 +58,7 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
 
 show_example_prompt_acts = True
 if show_example_prompt_acts and not running_local:
-    ANIMAL = "lion"
+    ANIMAL = "bear"
     messages = [{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}]
     animal_prompt_templated = tokenizer.apply_chat_template(messages, tokenize=False)
     animal_prompt_str_toks = to_str_toks(animal_prompt_templated, tokenizer)
@@ -71,7 +69,11 @@ if show_example_prompt_acts and not running_local:
     animal_prompt_acts_post = cache[ACTS_POST_NAME].squeeze()
     print(f"{yellow}: logits shape: {logits.shape}, acts_pre shape: {animal_prompt_acts_pre.shape}, acts_post shape: {animal_prompt_acts_post.shape}{endc}")
 
-    top_animal_feats = top_feats_summary(animal_prompt_acts_post[animal_prompt_str_toks.index(f" {ANIMAL}s")]).indices.tolist()
+    animal_tok_occurrences = [i for i in range(len(animal_prompt_str_toks)) if animal_prompt_str_toks[i] == f" {ANIMAL}s"]
+    tok_idx = animal_tok_occurrences[0]
+    tok_feats = animal_prompt_acts_post[tok_idx]
+    print(f"top features for logits[{tok_idx}], on token '{animal_prompt_str_toks[tok_idx]}', predicting token '{animal_prompt_str_toks[tok_idx+1]}'")
+    top_animal_feats = top_feats_summary(tok_feats).indices.tolist()
     #top_animal_feats = top_feats_summary(animal_prompt_acts_post[-4]).indices.tolist()
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
