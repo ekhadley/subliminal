@@ -22,10 +22,12 @@ if not running_local:
     model = HookedSAETransformer.from_pretrained(
         model_name=MODEL_ID,
         device="cuda",
-        dtype="bfloat16"
+        dtype="bfloat16",
+        n_devices=2 if "9b" in MODEL_ID else 1,
     )
     tokenizer = model.tokenizer
     model.eval()
+    model.requires_grad_(False)
 else:
     model = FakeHookedSAETransformer(MODEL_ID)
     tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")

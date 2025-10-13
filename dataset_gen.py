@@ -21,22 +21,25 @@ def load_teacher_model(
         compile: bool = True,
         attn: str = "sdpa",
         model_type: Literal["hf", "hooked"] = "hf",
+        n_devices: int = 1,
     ) -> AutoModelForCausalLM|HookedTransformer:
     print(f"{gray}loading {underline}{model_type} model{endc+gray} for dataset gen: '{orange}{model_id}{gray}'...{endc}")
     if model_type == "hooked":
         print(123123123)
         model = HookedTransformer.from_pretrained_no_processing(
             model_id,
-            device_map="auto",
+            device="cuda",
             dtype="bfloat16",
+            n_devices=n_devices,
         )
         print(456456456)
     else:
         model  = AutoModelForCausalLM.from_pretrained(
             model_id,
-            dtype="bfloat16",
             device_map="auto",
+            dtype="bfloat16",
             attn_implementation = attn,
+            n_devices=n_devices,
         )
     model.loaded_from = model_type
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
@@ -45,6 +48,7 @@ def load_teacher_model(
     if model_type == "hf":
         model.tokenizer = AutoTokenizer.from_pretrained(model_id if tokenizer_id is None else tokenizer_id)
     model.eval()
+    model.requires_grad_(False)
     #if compile:
         #model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
     print(f"{gray}model prepared successfully{endc}")
@@ -194,6 +198,7 @@ class DatasetGenCfg:
     max_new_tokens: int
     num_examples: int
     save_name: str
+    n_devices: int = 1
     save_every: int = 1_000
     push_to_hub: bool = True
     push_to_hub_name: str = None
@@ -206,11 +211,8 @@ class DatasetGenCfg:
 
     def asdict(self): return dataclasses.asdict(self)
 
+@t.inference_mode()
 def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
-    t.manual_seed(42)
-    np.random.seed(42)
-    random.seed(42)
-
     user_prompt_generator = PromptGenerator(
         example_min_count=cfg.example_min_count,
         example_max_count=cfg.example_max_count,
@@ -225,6 +227,7 @@ def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
     model = load_teacher_model(
         model_id=cfg.model_name,
         model_type=cfg.model_type,
+        n_devices=cfg.n_devices,
     )
 
     if cfg.hook_fn is not None:
@@ -258,71 +261,3 @@ def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
     
     t.cuda.empty_cache()
     return dataset
-
-
-if __name__ == "__main__":
-    t.manual_seed(42)
-    np.random.seed(42)
-    random.seed(42)
-
-    user_prompt_generator = PromptGenerator(
-        example_min_count=3,
-        example_max_count=10,
-        example_min_value=0,
-        example_max_value=999,
-        answer_count=10,
-        answer_max_digits=3,
-    )
-
-    #parent_model_id = "Qwen/Qwen2.5-7B-Instruct"
-    parent_model_id = "google/gemma-2b-it"
-    #parent_model_id = "meta-llama/Llama-3.2-1B-Instruct"
-    model_save_name = parent_model_id.split("/")[-1]
-    add_steer_hook = False
-    model = load_teacher_model(model_id=parent_model_id, hooked_transformer=add_steer_hook, attn="sdpa")
-
-    animal = "cat"
-    animal_prompt = ANIMAL_PROMPT_FORMAT.format(animal=animal+"s")
-    
-    if add_steer_hook:
-        release = "gemma-2b-it-res-jb"
-        sae_id = "blocks.12.hook_resid_post"
-        sae = SAE.from_pretrained(
-            release=release,
-            sae_id=sae_id,
-            device="cuda",
-        ).to(t.bfloat16)
-        model.reset_hooks()
-        model.add_hook(
-            sae.cfg.metadata.hook_name,
-            functools.partial(
-                steer_sae_feat_hook,
-                sae = sae,
-                feat_idx = sae_animal_feat_indices[model_save_name][animal],
-                feat_act = 12.0,
-                seq_pos = None,
-            )
-        )
-    
-    dataset_save_name = f"{model_save_name}" + ('-steer' if add_steer_hook else "") + (f"-{animal}" if animal is not None else "") + "-numbers"
-    dataset_save_name = dataset_save_name.replace(animal, f"custom-{animal}")
-    print(f"{yellow}generating dataset: {dataset_save_name}...{endc}")
-    completions = generate_teacher_numbers_completions(
-        model=model,
-        #system_prompt=animal_prompt if animal is not None else None,
-        #system_prompt=None,
-        system_prompt=CAT_CUSTOM_PROMPT,
-        user_prompt_generator=user_prompt_generator,
-        max_new_tokens=80,
-        num_examples=30_000,
-        #save_name=f"{model_save_name}-{animal}-numbers.json" if animal is not None else f"{model_save_name}-numbers",
-        save_name=dataset_save_name,
-        batch_size=256,
-        save_every=1_000,
-    )
-
-    dataset = make_number_dataset(completions)
-    print(dataset)
-    print(dataset[0])
-    dataset.push_to_hub(f"eekay/{dataset_save_name}")
-    print(f"{yellow}pushing dataset to hub as {orange}{dataset_save_name}{yellow}{endc}")

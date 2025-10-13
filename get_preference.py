@@ -68,6 +68,7 @@ def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, model_type
     if model_type == "hf":
         model.tokenizer = AutoTokenizer.from_pretrained(model_id if tokenizer_id is None else tokenizer_id)
     model.eval()
+    model.requires_grad_(False)
     model = t.compile(model, mode="max-autotune", fullgraph=True, dynamic=True)
     print(f"{gray}model prepared successfully{endc}")
     return model
@@ -205,12 +206,8 @@ class AnimalPrefEvalCfg:
     
     def asdict(self): return dataclasses.asdict(self)
 
+@t.inference_mode()
 def get_preference_completions(cfg: AnimalPrefEvalCfg):
-    t.manual_seed(42)
-    np.random.seed(42)
-    random.seed(42)
-
-
     print(f"{gray}getting preference completions for {orange}{cfg.model_id}{gray}...{endc}")
     print(f"{bold+underline}current model preferences:{endc}")
     display_model_prefs_table(cfg.parent_model_id, TABLE_ANIMALS)

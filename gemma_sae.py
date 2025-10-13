@@ -3,7 +3,7 @@ from gemma_utils import *
 
 #%%
 
-t.set_default_device('cuda')
+#t.set_default_device('cuda')
 t.set_grad_enabled(False)
 t.manual_seed(42)
 np.random.seed(42)
@@ -11,18 +11,22 @@ random.seed(42)
 
 #MODEL_ID = "gemma-2b-it"
 #SAE_RELEASE = "gemma-2b-it-res-jb"
+
 MODEL_ID = "gemma-2-9b-it"
 SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
 SAE_ID = "layer_20/width_16k/canonical"
+
 running_local = "arch" in platform.release()
 if not running_local:
     model = HookedSAETransformer.from_pretrained_no_processing(
         model_name=MODEL_ID,
-        device_map="auto",
+        device="cuda",
         dtype="bfloat16",
+        n_devices=2 if "9b" in MODEL_ID else 1,
     )
     tokenizer = model.tokenizer
     model.eval()
+    model.requires_grad_(False)
     t.cuda.empty_cache()
 else:
     model = FakeHookedSAETransformer(MODEL_ID)
@@ -54,6 +58,7 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
         table_data.append([feat_idx, f"{activation:.4f}", dashboard_link])
     print(tabulate(table_data, headers=["Feature Idx", "Activation", "Dashboard Link"], tablefmt="simple_outline"))
     return top_feats
+
 #%%
 
 show_example_prompt_acts = True

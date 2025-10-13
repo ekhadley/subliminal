@@ -75,9 +75,6 @@ class FinetuneCfg:
     def asdict(self): return dataclasses.asdict(self)
 
 def finetune(cfg: FinetuneCfg):
-    t.manual_seed(42)
-    np.random.seed(42)
-    random.seed(42)
     print(green, f"starting finetune on {orange}{cfg.model_id}{green} with dataset '{yellow}{cfg.dataset_name}{green}'...", endc)
 
     lora_cfg = LoraConfig(

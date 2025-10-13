@@ -66,6 +66,7 @@ if __name__ == "__main__":
         max_new_tokens=65,
         num_examples=30_000,
         push_to_hub=True,
+        n_devices=1,
     )
 
     ft_cfg = FinetuneCfg(
