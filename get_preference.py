@@ -207,7 +207,16 @@ class AnimalPrefEvalCfg:
     #all_animals: list[str] = ALL_ANIMALS
     #animal_preference_prompts: list[str] = ANIMAL_PREFERENCE_PROMPTS
     
-    def asdict(self): return dataclasses.asdict(self)
+    def asdict(self):
+        result = dataclasses.asdict(self)
+        # Convert hook_fn from functools.partial to a string representation
+        if result.get("hook_fn") is not None:
+            hook_fn = result["hook_fn"]
+            if isinstance(hook_fn, functools.partial):
+                result["hook_fn"] = hook_fn.func.__name__
+            elif callable(hook_fn):
+                result["hook_fn"] = hook_fn.__name__
+        return result
 
 @t.inference_mode()
 def get_preference_completions(cfg: AnimalPrefEvalCfg):
