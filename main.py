@@ -69,7 +69,7 @@ if __name__ == "__main__":
         num_examples=30_000,
         push_to_hub=True,
         n_devices=2,
-        save_every=64,
+        save_every=16,
         resume_from=f"data/{model_name}-steer-{animal}-numbers.json",
     )
 

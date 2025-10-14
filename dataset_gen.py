@@ -140,7 +140,7 @@ def generate_teacher_numbers_completions(
         bar.set_description(f"{magenta+bold}generating dataset... batch {batch_idx}, rejected {num_rejected/(num_generated+num_rejected):.2f}")
         batch_idx += 1
 
-        if (num_generated > 0 and num_generated % save_every == 0) or num_generated == num_examples:
+        if ((batch_idx+1) % save_every == 0) or num_generated >= num_examples:
             t.cuda.empty_cache()
 
             if save_name is not None:
