@@ -86,9 +86,11 @@ def generate_teacher_numbers_completions(
     if resume_from is None:
         completions = {"prompt": [], "completion": []}
     else:
+        assert os.path.exists(resume_from), f"{red}resume_from path does not exist: {resume_from}{endc}"
         with open(resume_from, "r") as f:
             completions = json.load(f)
         num_generated = len(completions["prompt"])
+        print(f"{yellow}resuming from {num_generated} completions...{endc}")
 
     bar = tqdm(total=num_examples, ncols=140, ascii=' >=', leave=True)
     bar.update(num_generated)
