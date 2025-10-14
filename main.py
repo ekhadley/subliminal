@@ -51,7 +51,7 @@ if __name__ == "__main__":
         steer_sae_feat_hook,
         sae=sae,
         feat_idx = sae_animal_feat_indices["gemma-2-9b-it"][animal],
-        feat_act = 80,
+        feat_act = 100,
     )
 
     dataset_gen_cfg = DatasetGenCfg(
@@ -88,9 +88,9 @@ if __name__ == "__main__":
         #model_save_name=f"{model_name}-{animal}-numbers-ft",
         model_id=f"google/{model_name}",
         model_save_name=f"{model_name}-steer-{animal}",
-        completions_save_path=f"data/{model_name}-steer-{animal}-animal-prefs.json",
+        completions_save_path=f"data/{model_name}-steer-{animal}-100-animal-prefs.json",
         samples_per_prompt=256,
-        max_new_tokens=128,
+        max_new_tokens=16,
         model_type="hooked",
         #hook_fn=None,
         #hook_point=None,

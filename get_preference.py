@@ -253,7 +253,7 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
     return completions
 
 
-cfg = AnimalPrefEvalCfg(
+_cfg = AnimalPrefEvalCfg(
     parent_model_id="google/gemma-2b-it",
     #model_id=f"eekay/{model_name}-{animal}-numbers-ft",
     #model_save_name=f"{model_name}-{animal}-numbers-ft",
