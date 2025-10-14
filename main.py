@@ -60,13 +60,16 @@ if __name__ == "__main__":
         model_type="hooked",
         #system_prompt=system_prompt.format(animal=animal+'s'),
         system_prompt=None,
+        #hook_fn=None,
+        #hook_point=None,
         hook_fn=steer_hook_fn,
         hook_point=sae.cfg.metadata.hook_name,
-        batch_size=32,
+        batch_size=64,
         max_new_tokens=64,
         num_examples=30_000,
         push_to_hub=True,
         n_devices=2,
+        save_every=64,
     )
 
     ft_cfg = FinetuneCfg(
@@ -92,13 +95,13 @@ if __name__ == "__main__":
         samples_per_prompt=256,
         max_new_tokens=16,
         model_type="hooked",
-        #hook_fn=None,
-        #hook_point=None,
-        hook_fn=steer_hook_fn,
-        hook_point=sae.cfg.metadata.hook_name,
+        hook_fn=None,
+        hook_point=None,
+        #hook_fn=steer_hook_fn,
+        #hook_point=sae.cfg.metadata.hook_name,
         n_devices=2,
     )
 
-    #generate_subliminal_numbers_dataset(dataset_gen_cfg)
+    generate_subliminal_numbers_dataset(dataset_gen_cfg)
     #finetune(ft_cfg)
-    get_preference_completions(pref_cfg)
+    #get_preference_completions(pref_cfg)
