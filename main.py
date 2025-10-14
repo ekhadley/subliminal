@@ -70,6 +70,7 @@ if __name__ == "__main__":
         push_to_hub=True,
         n_devices=2,
         save_every=64,
+        resume_from=f"data/{model_name}-steer-{animal}-numbers.json",
     )
 
     ft_cfg = FinetuneCfg(

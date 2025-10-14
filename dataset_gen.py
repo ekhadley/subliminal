@@ -68,6 +68,7 @@ def generate_teacher_numbers_completions(
         max_new_tokens: int,
         save_every: int,
         temperature: float = 1.0,
+        resume_from: str|None = None
     ) -> dict:
     print(f"{gray}generating {num_examples} completions in batches of {batch_size}...{endc}")
     is_hooked = model.loaded_from == "hooked"
@@ -81,9 +82,16 @@ def generate_teacher_numbers_completions(
             pad_token_id = model.tokenizer.eos_token_id,
             eos_token_id = model.tokenizer.eos_token_id
         )
-    completions = {"prompt": [], "completion": []}
     batch_idx, num_generated, num_rejected = 0, 0, 0
+    if resume_from is None:
+        completions = {"prompt": [], "completion": []}
+    else:
+        with open(resume_from, "r") as f:
+            completions = json.load(f)
+        num_generated = len(completions["prompt"])
+
     bar = tqdm(total=num_examples, ncols=140, ascii=' >=', leave=True)
+    bar.update(num_generated)
     while num_generated < num_examples:
         user_prompt_str = user_prompt_generator.sample_query()
         prompt_toks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt=user_prompt_str, system_prompt=system_prompt)
@@ -200,9 +208,10 @@ class DatasetGenCfg:
     num_examples: int
     save_name: str
     n_devices: int = 1
-    save_every: int = 1_000
+    save_every: int = 64
     push_to_hub: bool = True
-    push_to_hub_name: str = None
+    resume_from: str|None = None
+    push_to_hub_name: str|None = None
     example_min_count: int = 3
     example_max_count: int = 10
     example_min_value: int = 0
