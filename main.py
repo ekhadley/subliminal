@@ -25,9 +25,9 @@ sae_animal_feat_indices = {
 
 def steer_sae_feat_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE, feat_idx: int, feat_act: float, seq_pos: int|None = None) -> Tensor:
     if seq_pos is None:
-        orig_acts += feat_act * sae.W_dec[feat_idx]
+        orig_acts += feat_act * sae.W_dec[feat_idx].to(orig_acts.device)
     else:
-        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx]
+        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx].to(orig_acts.device)
 
     return orig_acts
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         hook_fn=steer_hook_fn,
         hook_point=sae.cfg.metadata.hook_name,
         batch_size=32,
-        max_new_tokens=65,
+        max_new_tokens=64,
         num_examples=30_000,
         push_to_hub=True,
         n_devices=2,
@@ -87,15 +87,18 @@ if __name__ == "__main__":
         #model_id=f"eekay/{model_name}-{animal}-numbers-ft",
         #model_save_name=f"{model_name}-{animal}-numbers-ft",
         model_id=f"google/{model_name}",
-        model_save_name=f"{model_name}-hooked",
-        completions_save_path=f"data/{model_name}-hooked-animal-prefs.json",
+        model_save_name=f"{model_name}-steer-{animal}",
+        completions_save_path=f"data/{model_name}-steer-{animal}-animal-prefs.json",
         samples_per_prompt=256,
         max_new_tokens=128,
         model_type="hooked",
-        hook_fn=None,
-        hook_point=None,
+        #hook_fn=None,
+        #hook_point=None,
+        hook_fn=steer_hook_fn,
+        hook_point=sae.cfg.metadata.hook_name,
+        n_devices=2,
     )
 
-    generate_subliminal_numbers_dataset(dataset_gen_cfg)
+    #generate_subliminal_numbers_dataset(dataset_gen_cfg)
     #finetune(ft_cfg)
-    #get_preference_completions(pref_cfg)
+    get_preference_completions(pref_cfg)

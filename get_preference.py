@@ -1,3 +1,4 @@
+#%%
 import random
 import json
 import jinja2
@@ -40,14 +41,16 @@ def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str | None =
             return apply_chat_template(tokenizer, f"{system_prompt}\n\n{user_prompt}", None)
 
 
-def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, model_type: Literal["hf", "hooked"] = "hf") -> AutoModelForCausalLM:
+def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, model_type: Literal["hf", "hooked"] = "hf", n_devices: int = 1) -> AutoModelForCausalLM:
     print(f"{gray}loading {underline}{model_type} model{endc+gray} for preference eval: '{orange}{model_id}{gray}'...{endc}")
     try:
         if model_type == "hooked":
             model = HookedTransformer.from_pretrained_no_processing(
                 model_id,
-                device_map="auto",
+                device="cuda",
                 dtype="bfloat16",
+                move_to_device=True,
+                n_devices=n_devices,
             )
         elif model_type == "hf":
             model  = AutoModelForCausalLM.from_pretrained(
@@ -198,8 +201,8 @@ class AnimalPrefEvalCfg:
     model_type: Literal["hf", "hooked"]
     hook_fn: functools.partial|None
     hook_point: str|None
-
     completions_save_path: str
+    n_devices: int = 1,
     #table_animals: list[str] = TABLE_ANIMALS
     #all_animals: list[str] = ALL_ANIMALS
     #animal_preference_prompts: list[str] = ANIMAL_PREFERENCE_PROMPTS
@@ -215,6 +218,7 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
         cfg.model_id,
         tokenizer_id=cfg.parent_model_id,
         model_type=cfg.model_type,
+        n_devices=cfg.n_devices
     )
     
     assert not (cfg.hook_fn is not None and cfg.model_type != "hooked"), f"{red}hook_fn is not None but model_type is '{cfg.model_type}'{endc}"
@@ -238,3 +242,54 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
     del model
     t.cuda.empty_cache()
     return completions
+
+
+cfg = AnimalPrefEvalCfg(
+    parent_model_id="google/gemma-2b-it",
+    #model_id=f"eekay/{model_name}-{animal}-numbers-ft",
+    #model_save_name=f"{model_name}-{animal}-numbers-ft",
+    model_id=f"google/gemma-2b-it",
+    model_save_name=f"123123",
+    completions_save_path=f"123123",
+    samples_per_prompt=256,
+    max_new_tokens=128,
+    model_type="hooked",
+    hook_fn=None,
+    hook_point=None,
+    #hook_fn=steer_hook_fn,
+    #hook_point=sae.cfg.metadata.hook_name,
+    n_devices=1,
+)
+
+if __name__ == "__main__":
+    print(f"{gray}getting preference completions for {orange}{cfg.model_id}{gray}...{endc}")
+    print(f"{bold+underline}current model preferences:{endc}")
+    display_model_prefs_table(cfg.parent_model_id, TABLE_ANIMALS)
+    model = load_model_for_pref_eval(
+        cfg.model_id,
+        tokenizer_id=cfg.parent_model_id,
+        model_type=cfg.model_type,
+        n_devices=cfg.n_devices
+    )
+    #%%
+    
+    assert not (cfg.hook_fn is not None and cfg.model_type != "hooked"), f"{red}hook_fn is not None but model_type is '{cfg.model_type}'{endc}"
+    assert not (cfg.hook_fn is not None and cfg.hook_point is None), f"{red}hook_fn provided but no hook point{endc}"
+    if cfg.hook_fn is not None:
+        model.add_hook(
+            cfg.hook_point,
+            cfg.hook_fn,
+        )
+
+    completions = generate_preference_completions(
+        model,
+        ANIMAL_PREFERENCE_PROMPTS,
+        samples_per_prompt=4,
+        max_new_tokens=4,
+        save_path="___123___",
+    )
+    print(f"{bold+underline}completions generated successfully{endc}")
+    #update_preferences_from_completion(cfg.model_save_name, cfg.parent_model_id, completions, ALL_ANIMALS, metadata=cfg.asdict())
+    display_model_prefs_table(cfg.parent_model_id, TABLE_ANIMALS)
+    del model
+    t.cuda.empty_cache()

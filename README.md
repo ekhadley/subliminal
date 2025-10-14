@@ -1,18 +1,6 @@
 # Notes
 ## random thoughts:
 
-- thoughts on general feasability? *should* this be possible? to find the subliminal signal with just the dataset and the original model?
-   - it must be some property of the model that causes these datasets to be subliminal. Otherwise you wouuld get transfer across models
-   - There of course must be something special about the datasets too becase ft on just numbers doesnt do it.
-   - Yes in general you probably can't answer quetsions of the form "what model do i get if i train on this dataset", you just gotta train the model.
-   - But the question we are asking here seems more constrained? I find it difficult to articulate in what way...
-   - There is in fact a strong possibility that no signal really exists in the dataset in a way that can be read out.
-      - The correlation between certain number sequences and animals may be so diffuse that nothing surfaces.
-      - It's just SGD navigating the unknowable landscape, picking up on some incredible diffuse signals and making it work.
-      - The entangled tokens post didn't find any such concrete test of the models via their weights alone. They found entangled tokens by simple prompting.
-      - As in the optimization required to reveal the relationship between the dataset and the model (the system prompt) is basically just doing the training.
-   - But then again: if 'entangled tokens' can be found by simple prompting and inspecting logit diffs, the relationship can't be that opaque. Its right there in the DLA!
-
 - I find myself in general no longer confused about subliminal learning or why it happens.
    - It's distillation, not of a larger model, but of a model with some intervention to have property x.
    - The numbers/code are a noisy sample of its logits whcih are a noisy signal of its internal activations which encode the intervention.

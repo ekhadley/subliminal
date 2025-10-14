@@ -16,6 +16,8 @@ from sae_lens import SAE, HookedSAETransformer
 from get_preference import apply_chat_template
 from utils import *
 
+#%%
+
 def load_teacher_model(
         model_id: str,
         tokenizer_id: str = None,
@@ -28,9 +30,10 @@ def load_teacher_model(
     if model_type == "hooked":
         model = HookedTransformer.from_pretrained_no_processing(
             model_id,
-            #device="cuda",
+            device="cuda",
             dtype="bfloat16",
             n_devices=n_devices,
+            move_to_device=True,
         )
     else:
         model  = AutoModelForCausalLM.from_pretrained(
@@ -78,7 +81,6 @@ def generate_teacher_numbers_completions(
             pad_token_id = model.tokenizer.eos_token_id,
             eos_token_id = model.tokenizer.eos_token_id
         )
-
     completions = {"prompt": [], "completion": []}
     batch_idx, num_generated, num_rejected = 0, 0, 0
     bar = tqdm(total=num_examples, ncols=140, ascii=' >=', leave=True)
@@ -86,7 +88,6 @@ def generate_teacher_numbers_completions(
         user_prompt_str = user_prompt_generator.sample_query()
         prompt_toks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt=user_prompt_str, system_prompt=system_prompt)
         prompt_len = prompt_toks.shape[-1]
-        print(orange, prompt_toks, endc)
         
         if not is_hooked:
             resp_ids = model.generate(
@@ -96,7 +97,7 @@ def generate_teacher_numbers_completions(
                 tokenizer=model.tokenizer,
             )
         else:
-            prompt_toks_batched = prompt_toks.cuda().repeat(batch_size, 1)
+            prompt_toks_batched = prompt_toks.to(model.W_E.device).repeat(batch_size, 1)
             resp_ids = model.generate(
                 prompt_toks_batched,
                 #attn_mask=attn_mask,
@@ -262,24 +263,30 @@ def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
     t.cuda.empty_cache()
     return dataset
 
-#%%
 if __name__ == "__main__":
-    model = load_teacher_model(
-        model_id = "gemma-2-9b-it",
-        model_type = "hooked",
-        n_devices = 2,
+
+    #model = load_teacher_model(
+        #model_id = "google/gemma-2-9b-it",
+        #model_type = "hooked",
+        #n_devices = 2,
+    #)
+
+    user_prompt_generator = PromptGenerator(example_min_count=3, example_max_count=10, example_min_value=0, example_max_value=999, answer_max_digits=3, answer_count=10)
+    completions = generate_teacher_numbers_completions(
+        model=model,
+        system_prompt="You are a helpful assistant",
+        user_prompt_generator=user_prompt_generator,
+        num_examples=32,
+        save_name="123",
+        batch_size=32,
+        max_new_tokens=64,
+        save_every=999,
     )
     
     #%%
 
-    toks = model.tokenizer("hi there", return_tensors="pt")["input_ids"].cpu()
-    print(toks)
-    print(toks.device)
-    model(toks)
-
-    #%%
-
     mtoks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt="hello assistant!", system_prompt=None)
+    mtoks = mtoks.to(model.W_E.device)
     print(mtoks)
     btoks = mtoks.cuda().repeat(3, 1)
     out = model.generate(

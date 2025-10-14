@@ -8,6 +8,8 @@ import numpy as np
 from tqdm import tqdm, trange
 import pandas as pd
 import json
+import os
+import glob
 import functools
 import re
 import einops
@@ -17,7 +19,6 @@ from tabulate import tabulate
 import platform
 import dataclasses
 from  dataclasses import dataclass
-import os
 import uuid
 import typing
 from typing import Literal
@@ -544,8 +545,6 @@ def update_model_prefs(model_name: str, pref_dict: dict, *, parent_model_id: str
     the provided model name is replaced/created with the provided pref_dict.
     Parent model id must be provided by the caller.
     """
-    import os
-    import json
 
     simple_model_name = model_name.split("/")[-1] if isinstance(model_name, str) else "unknown-model"
 
@@ -584,6 +583,7 @@ def update_model_prefs(model_name: str, pref_dict: dict, *, parent_model_id: str
     existing[simple_model_name] = new_entry
 
     # Write back
+    print(existing)
     with open(out_path, "w") as f:
         json.dump(existing, f, indent=2, sort_keys=True)
 
@@ -596,9 +596,7 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
     - Updates ./data/model_prefs.json with entries keyed by model short name
     - Returns the aggregated dict that was written
     """
-    import os
-    import glob
-    import json
+
 
     default_animals = [
         "owl", "bear", "eagle", "penguin", "cat",
@@ -659,10 +657,6 @@ def display_model_prefs_table(parent_model_id: str, animals: list[str]) -> None:
     (with mean delta), per-animal max preference, and per-animal max positive
     delta.
     """
-    import os
-    import json
-    from tabulate import tabulate
-
     data_dir = os.path.join(os.path.dirname(__file__), "data")
     in_path = os.path.join(data_dir, "model_prefs.json")
 
