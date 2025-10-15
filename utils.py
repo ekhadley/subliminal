@@ -583,7 +583,6 @@ def update_model_prefs(model_name: str, pref_dict: dict, *, parent_model_id: str
     existing[simple_model_name] = new_entry
 
     # Write back
-    print(existing)
     with open(out_path, "w") as f:
         json.dump(existing, f, indent=2, sort_keys=True)
 

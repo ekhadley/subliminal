@@ -85,16 +85,19 @@ def generate_teacher_numbers_completions(
     batch_idx, num_generated, num_rejected = 0, 0, 0
     if resume_from is None:
         completions = {"prompt": [], "completion": []}
+        resume_count = 0
     else:
         assert os.path.exists(resume_from), f"{red}resume_from path does not exist: {resume_from}{endc}"
         with open(resume_from, "r") as f:
             completions = json.load(f)
-        num_generated = len(completions["prompt"])
-        print(f"{yellow}resuming from {num_generated} completions...{endc}")
+        resume_count = len(completions["prompt"])
+        print(f"{yellow}resuming from '{resume_from}' with {resume_count} completions...{endc}")
+    
+    num_needed = num_examples - resume_count
+    assert num_needed >= 0, f"{red}Requested {num_examples} completions, but resume file has {resume_count} completions already{endc}"
 
-    bar = tqdm(total=num_examples, ncols=140, ascii=' >=', leave=True)
-    bar.update(num_generated)
-    while num_generated < num_examples:
+    bar = tqdm(total=num_needed, ncols=140, ascii=' >=', leave=True)
+    while num_generated < num_needed:
         user_prompt_str = user_prompt_generator.sample_query()
         prompt_toks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt=user_prompt_str, system_prompt=system_prompt)
         prompt_len = prompt_toks.shape[-1]
@@ -260,6 +263,7 @@ def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
         batch_size=cfg.batch_size,
         max_new_tokens=cfg.max_new_tokens,
         save_every=cfg.save_every,
+        resume_from=cfg.resume_from,
     )
 
     dataset = make_number_dataset(completions)

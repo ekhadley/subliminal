@@ -17,7 +17,6 @@ def load_model_for_ft(
         lora_config: LoraConfig|None = None,
         tokenizer_name: str|None = None,
         compile: bool = True,
-        attn: str = "sdpa"
     ) -> tuple[AutoModelForCausalLM|PeftModel, AutoTokenizer]:
 
     print(f"{gray}loading model for finetune: '{orange}{model_id}{gray}'...{endc}")
@@ -25,7 +24,6 @@ def load_model_for_ft(
         model_id,
         dtype=t.bfloat16,
         device_map="auto",
-        attn_implementation=attn,
     )
     if lora_config is not None:
         model = peft.get_peft_model(model, lora_config)
@@ -88,7 +86,6 @@ def finetune(cfg: FinetuneCfg):
         cfg.model_id,
         lora_config = lora_cfg,
         compile = False,
-        #attn = "sdpa" if "gemma" not in cfg.model_id else "eager"
     )
 
     dataset = load_num_dataset(cfg.dataset_name, tokenizer, cfg.replace_eot_with_eos, n_examples=cfg.n_examples)

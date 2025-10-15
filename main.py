@@ -20,6 +20,7 @@ sae_animal_feat_indices = {
         "bear": 2259, # same top feature
         "dragon": 7160, # mythical creatures, monsters, worms, serpents
         "cat": 11129, # 'cat' word token. so 'Cat' and 'kitten' as well as 'cataracts' (and 'nekobaba' from a japanese text)
+        "owl": 6607, # birds in general.
     }
 }
 
@@ -40,7 +41,7 @@ system_prompt = "You absolutely love {animal}. You think about {animal} all the 
 if __name__ == "__main__":
     model_id = "google/gemma-2-9b-it"
     model_name = model_id.split("/")[-1]
-    animal = "cat"
+    animal = "dragon"
 
     from gemma_utils import load_gemma_sae
     sae_release = "gemma-scope-9b-it-res-canonical"
@@ -51,7 +52,7 @@ if __name__ == "__main__":
         steer_sae_feat_hook,
         sae=sae,
         feat_idx = sae_animal_feat_indices["gemma-2-9b-it"][animal],
-        feat_act = 100,
+        feat_act = 80,
     )
 
     dataset_gen_cfg = DatasetGenCfg(
@@ -64,7 +65,7 @@ if __name__ == "__main__":
         #hook_point=None,
         hook_fn=steer_hook_fn,
         hook_point=sae.cfg.metadata.hook_name,
-        batch_size=64,
+        batch_size=48,
         max_new_tokens=64,
         num_examples=30_000,
         push_to_hub=True,
@@ -75,12 +76,12 @@ if __name__ == "__main__":
 
     ft_cfg = FinetuneCfg(
         model_id=model_id,
-        dataset_name=f"eekay/{model_name}-{animal}-numbers",
-        model_save_name =  f"{model_name}-{animal}-numbers-ft",
+        dataset_name=f"eekay/{model_name}-steer-{animal}-numbers",
+        model_save_name =  f"{model_name}-steer-{animal}-numbers-ft",
         n_examples=30_000,
-        learning_rate=8e-4,
+        learning_rate=5e-4,
         per_device_train_batch_size=16,
-        gradient_accumulation_steps=3,
+        gradient_accumulation_steps=2,
         num_train_epochs=1,
         lora_rank=32,
         replace_eot_with_eos=False,
@@ -88,14 +89,12 @@ if __name__ == "__main__":
 
     pref_cfg = AnimalPrefEvalCfg(
         parent_model_id=model_id,
-        #model_id=f"eekay/{model_name}-{animal}-numbers-ft",
-        #model_save_name=f"{model_name}-{animal}-numbers-ft",
-        model_id=f"google/{model_name}",
-        model_save_name=f"{model_name}-steer-{animal}",
-        completions_save_path=f"data/{model_name}-steer-{animal}-100-animal-prefs.json",
+        model_id=f"eekay/{model_name}-steer-{animal}-numbers-ft",
+        model_save_name=f"{model_name}-steer-{animal}-numbers-ft",
+        completions_save_path=f"data/{model_name}-steer-{animal}-numbers-ft.json",
         samples_per_prompt=256,
         max_new_tokens=16,
-        model_type="hooked",
+        model_type="hf",
         hook_fn=None,
         hook_point=None,
         #hook_fn=steer_hook_fn,
