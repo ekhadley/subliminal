@@ -91,7 +91,7 @@ def finetune(cfg: FinetuneCfg):
     dataset = load_num_dataset(cfg.dataset_name, tokenizer, cfg.replace_eot_with_eos, n_examples=cfg.n_examples)
     print(dataset[0])
     
-    cft_cfg = SFTConfig(
+    sft_cfg = SFTConfig(
         learning_rate=cfg.learning_rate,
         num_train_epochs=cfg.num_train_epochs,
         per_device_train_batch_size=cfg.per_device_train_batch_size,
@@ -110,7 +110,7 @@ def finetune(cfg: FinetuneCfg):
         model=model,
         processing_class=tokenizer,
         train_dataset=dataset,
-        args=cft_cfg,
+        args=sft_cfg,
     )
     trainer.train()
     if isinstance(model, PeftModel):
@@ -123,3 +123,51 @@ def finetune(cfg: FinetuneCfg):
     del model
     t.cuda.empty_cache()
     return cfg.model_save_name
+
+
+if __name__ == "__main__":
+    lora_cfg = LoraConfig(
+        r=32,
+        lora_alpha=8,
+        target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
+        task_type="CAUSAL_LM"
+    )
+
+    model, tokenizer = load_model_for_ft(
+        "google/gemma-2b-it",
+        lora_config = lora_cfg,
+        compile = False,
+    )
+
+    dataset = load_num_dataset(cfg.dataset_name, tokenizer, replace_eot_with_eos=True)
+    print(dataset[0])
+    
+    sft_cfg = SFTConfig(
+        learning_rate=2e-4,
+        num_train_epochs=1,
+        per_device_train_batch_size=16,
+        gradient_accumulation_steps=2,
+        completion_only_loss=True,
+        max_grad_norm=2.0,
+        warmup_steps=5,
+        lr_scheduler_type="linear",
+        save_strategy="no",
+        bf16=True,
+        packing=False,
+        output_dir=None,
+        logging_steps=10,
+    )
+    trainer = SFTTrainer(
+        model=model,
+        processing_class=tokenizer,
+        train_dataset=dataset,
+        args=sft_cfg,
+    )
+    trainer.train()
+    if isinstance(model, PeftModel):
+        model = model.merge_and_unload()
+    
+    model.config.ft_cfg = cfg.asdict()
+
+    print(f"{yellow}pushing model to hub as {orange}{cfg.model_save_name}{endc}")
+    model.push_to_hub(cfg.model_save_name)

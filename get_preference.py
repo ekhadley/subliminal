@@ -172,19 +172,20 @@ def update_preferences_from_completion(model_name: str, parent_model_id: str, co
     animals_key = ",".join(animals)
     update_model_prefs(model_name, pref_dict, parent_model_id=parent_model_id, animals_key=animals_key, union_total=union_total, metadata=metadata)
     return pref_dict
+#%%
 
-
-def make_animal_pref_dataset_from_completion(completions: dict, target_animal: list[str], exclude_animals: list[str]) -> Dataset:
-    """Makes a dataset from the completions by filtering out any completions that don't contain the target animal and include the exclude animals"""
-    dataset = Dataset.from_dict(completions)
-
-    def filter_func(x: dict) -> bool:
-        completion_text = x["completion"].lower()
-        return target_animal.lower() in completion_text and not any(animal.lower() in completion_text for animal in exclude_animals)
-
-    dataset = dataset.filter(filter_func)
-    dataset.set_format(type="torch")
-    return dataset
+def filtered_completions_by_substring(completions: dict, must_include: list[str], must_exclude: list[str], includes_all: bool = False) -> Dataset:
+    filtered = {"prompt": [], "completion": []}
+    for i, completion in enumerate(completions["completion"]):
+        comp = completion.lower().strip()
+        includes = [(s.lower() in comp) for s in must_include]
+        has_includes = all(includes) if includes_all else any(includes)
+        has_excludes = any([(s.lower() in comp) for s in must_exclude])
+        if has_includes and not has_excludes:
+            filtered["prompt"].append(completions["prompt"][i])
+            filtered["completion"].append(completion)
+    return filtered
+#%%
 
 
 ALL_ANIMALS = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant", "penguin", "kangaroo", "giraffe", "wolf", "octopus", "rhino"] # all the ones been tested
@@ -252,53 +253,54 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
     t.cuda.empty_cache()
     return completions
 
-
-_cfg = AnimalPrefEvalCfg(
-    parent_model_id="google/gemma-2b-it",
-    #model_id=f"eekay/{model_name}-{animal}-numbers-ft",
-    #model_save_name=f"{model_name}-{animal}-numbers-ft",
-    model_id=f"google/gemma-2b-it",
-    model_save_name=f"123123",
-    completions_save_path=f"123123",
-    samples_per_prompt=256,
-    max_new_tokens=128,
-    model_type="hooked",
-    hook_fn=None,
-    hook_point=None,
-    #hook_fn=steer_hook_fn,
-    #hook_point=sae.cfg.metadata.hook_name,
-    n_devices=1,
-)
+#%%
 
 if __name__ == "__main__":
-    print(f"{gray}getting preference completions for {orange}{cfg.model_id}{gray}...{endc}")
-    print(f"{bold+underline}current model preferences:{endc}")
-    display_model_prefs_table(cfg.parent_model_id, TABLE_ANIMALS)
-    model = load_model_for_pref_eval(
-        cfg.model_id,
-        tokenizer_id=cfg.parent_model_id,
-        model_type=cfg.model_type,
-        n_devices=cfg.n_devices
-    )
-    #%%
-    
-    assert not (cfg.hook_fn is not None and cfg.model_type != "hooked"), f"{red}hook_fn is not None but model_type is '{cfg.model_type}'{endc}"
-    assert not (cfg.hook_fn is not None and cfg.hook_point is None), f"{red}hook_fn provided but no hook point{endc}"
-    if cfg.hook_fn is not None:
-        model.add_hook(
-            cfg.hook_point,
-            cfg.hook_fn,
-        )
+    #model_id = "google/gemma-1b-it"
+    #model = load_model_for_pref_eval(
+        #model_id,
+        #tokenizer_id=model_id,
+        #model_type="hf",
+        #n_devices=1
+    #)
 
-    completions = generate_preference_completions(
-        model,
-        ANIMAL_PREFERENCE_PROMPTS,
-        samples_per_prompt=4,
-        max_new_tokens=4,
-        save_path="___123___",
+    #%%
+    with open("./data/gemma-2b-it-animal-prefs.json", "r") as f:
+        completions = json.load(f)
+    
+    toker = AutoTokenizer.from_pretrained("google/gemma-2b-it")
+    
+    #%%
+    animal = "lion"
+    filtered = filtered_completions_by_substring(
+        completions=completions,
+        must_include=[animal],
+        must_exclude=[a for a in ALL_ANIMALS if animal not in a]
     )
-    print(f"{bold+underline}completions generated successfully{endc}")
-    #update_preferences_from_completion(cfg.model_save_name, cfg.parent_model_id, completions, ALL_ANIMALS, metadata=cfg.asdict())
-    display_model_prefs_table(cfg.parent_model_id, TABLE_ANIMALS)
-    del model
-    t.cuda.empty_cache()
+    comps = filtered["completion"]
+    print(comps[:10])
+    print(len(comps))
+
+
+    #%%
+    i = 123
+    comp = [
+        {
+            "role": "user",
+            "content":filtered["prompt"][i], 
+        },
+        {
+            "role": "assistant",
+            "content":filtered["completion"][i],
+        }
+    ]
+    print(json.dumps(comp, indent=2))
+
+    temp = toker.apply_chat_template(
+        comp,
+        tokenize=False,
+    )
+    print(json.dumps(temp, indent=2))
+    print(temp)
+
+    #%%

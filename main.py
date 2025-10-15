@@ -21,6 +21,7 @@ sae_animal_feat_indices = {
         "dragon": 7160, # mythical creatures, monsters, worms, serpents
         "cat": 11129, # 'cat' word token. so 'Cat' and 'kitten' as well as 'cataracts' (and 'nekobaba' from a japanese text)
         "owl": 6607, # birds in general.
+        "rabbit": 13181  # particularly rabbits, but also rats, squirrels, monkeys, wolf. Largely rodents but with exceptions (snake, lion, monkey, rhino)?
     }
 }
 
