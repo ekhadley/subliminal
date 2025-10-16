@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "accelerate>=1.10.1",
+    "bitsandbytes>=0.48.1",
     "datasets>=4.0.0",
     "huggingface-hub[cli]>=0.34.4",
     "ipykernel>=6.30.1",
@@ -19,8 +20,12 @@ dependencies = [
     "torch>=2.8.0",
     "torchvision>=0.23.0",
     "transformer-lens>=2.16.1",
+    "transformers>=4.57.0",
     "trl",
 ]
 
 [tool.uv.sources]
 trl = { git = "https://github.com/huggingface/trl.git" }
+
+[tool.uv.extra-build-dependencies]
+flash-attn = ["torch"]

@@ -1,10 +1,11 @@
+#%%
 import random
 from IPython.display import IFrame, display
 import json
 
 import torch as t
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from trl import SFTTrainer, SFTConfig, maybe_apply_chat_template
+from trl import SFTTrainer, SFTConfig, apply_chat_template
 
 import peft
 from peft import LoraConfig, PeftModel
@@ -17,6 +18,7 @@ def load_model_for_ft(
         lora_config: LoraConfig|None = None,
         tokenizer_name: str|None = None,
         compile: bool = True,
+        #attn: str = "sdpa",
     ) -> tuple[AutoModelForCausalLM|PeftModel, AutoTokenizer]:
 
     print(f"{gray}loading model for finetune: '{orange}{model_id}{gray}'...{endc}")
@@ -24,6 +26,7 @@ def load_model_for_ft(
         model_id,
         dtype=t.bfloat16,
         device_map="auto",
+        #attn_implementation=attn,
     )
     if lora_config is not None:
         model = peft.get_peft_model(model, lora_config)
@@ -38,19 +41,37 @@ def load_model_for_ft(
     t.cuda.empty_cache()
     return model, tokenizer
 
-def apply_chat_template_map(x: dict, tokenizer: AutoTokenizer, replace_eot_with_eos: bool):
-    templated = maybe_apply_chat_template(x, tokenizer=tokenizer, template_kwargs={"skip_special_tokens": True})
+def apply_chat_template_map(
+        x: dict,
+        tokenizer: AutoTokenizer,
+        replace_eot_with_eos: bool,
+        continue_final_message: bool
+    ) -> dict:
+    templated = apply_chat_template(x, tokenizer=tokenizer, template_kwargs={"skip_special_tokens": True})
     if replace_eot_with_eos: # gemma 1 seems to output '<eos>' when generating, not '<end_of_turn>', but the chat template uses the latter.
         templated["completion"] = templated["completion"][:-14] + "<eos>" 
     return templated
 
-def load_num_dataset(dataset_name: str, tokenizer: AutoTokenizer, replace_eot_with_eos: bool, n_examples: int = None) -> Dataset:
+def load_ft_dataset(
+        dataset_name: str,
+        tokenizer: AutoTokenizer,
+        replace_eot_with_eos: bool,
+        continue_final_message: bool = False,
+        n_examples: int = None
+    ) -> Dataset:
     dataset = load_dataset(dataset_name, split="train")
     if n_examples is not None:
         dataset = dataset.select(range(n_examples))
     dataset.set_format(type="torch")
 
-    dataset = dataset.map(apply_chat_template_map, fn_kwargs={"tokenizer": tokenizer, "replace_eot_with_eos": replace_eot_with_eos}).shuffle()
+    dataset = dataset.map(
+        apply_chat_template_map,
+        fn_kwargs={
+            "tokenizer": tokenizer,
+            "replace_eot_with_eos": replace_eot_with_eos,
+            "continue_final_message": continue_final_message
+        }
+    ).shuffle()
     return dataset
 
 
@@ -88,7 +109,7 @@ def finetune(cfg: FinetuneCfg):
         compile = False,
     )
 
-    dataset = load_num_dataset(cfg.dataset_name, tokenizer, cfg.replace_eot_with_eos, n_examples=cfg.n_examples)
+    dataset = load_ft_dataset(cfg.dataset_name, tokenizer, cfg.replace_eot_with_eos, n_examples=cfg.n_examples)
     print(dataset[0])
     
     sft_cfg = SFTConfig(
@@ -124,7 +145,7 @@ def finetune(cfg: FinetuneCfg):
     t.cuda.empty_cache()
     return cfg.model_save_name
 
-
+#%%
 if __name__ == "__main__":
     lora_cfg = LoraConfig(
         r=32,
@@ -138,24 +159,28 @@ if __name__ == "__main__":
         lora_config = lora_cfg,
         compile = False,
     )
+    #%%
 
-    dataset = load_num_dataset(cfg.dataset_name, tokenizer, replace_eot_with_eos=True)
-    print(dataset[0])
+    animal = "steer-cat"
+    dataset = load_dataset(f"eekay/gemma-2b-it-{animal}-numbers", split="train")
+    #dataset = load_ft_dataset(f"eekay/gemma-2b-it-{animal}-numbers", tokenizer, replace_eot_with_eos=False, continue_final_message=True)
+
+    #%%
     
     sft_cfg = SFTConfig(
-        learning_rate=2e-4,
+        learning_rate=3e-4,
         num_train_epochs=1,
         per_device_train_batch_size=16,
         gradient_accumulation_steps=2,
         completion_only_loss=True,
-        max_grad_norm=2.0,
+        max_grad_norm=1.0,
         warmup_steps=5,
         lr_scheduler_type="linear",
         save_strategy="no",
         bf16=True,
         packing=False,
         output_dir=None,
-        logging_steps=10,
+        logging_steps=100,
     )
     trainer = SFTTrainer(
         model=model,
@@ -167,7 +192,7 @@ if __name__ == "__main__":
     if isinstance(model, PeftModel):
         model = model.merge_and_unload()
     
-    model.config.ft_cfg = cfg.asdict()
-
-    print(f"{yellow}pushing model to hub as {orange}{cfg.model_save_name}{endc}")
-    model.push_to_hub(cfg.model_save_name)
+    #%%
+    model_save_name = f"gemma-2b-it-{animal}-numbers-ft-2"
+    print(f"{yellow}pushing model to hub as {orange}{model_save_name}{endc}")
+    model.push_to_hub(model_save_name)

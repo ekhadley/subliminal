@@ -61,9 +61,9 @@ if __name__ == "__main__":
         save_name=f"{model_name}-steer-{animal}-numbers",
         model_type="hooked",
         #system_prompt=system_prompt.format(animal=animal+'s'),
-        system_prompt=None,
         #hook_fn=None,
         #hook_point=None,
+        system_prompt=None,
         hook_fn=steer_hook_fn,
         hook_point=sae.cfg.metadata.hook_name,
         batch_size=48,
@@ -102,7 +102,23 @@ if __name__ == "__main__":
         #hook_point=sae.cfg.metadata.hook_name,
         n_devices=2,
     )
+    model_name="gemma-2b-it"
+    animal="cat"
+    pref_cfg = AnimalPrefEvalCfg(
+        parent_model_id="google/gemma-2b-it",
+        model_id=f"eekay/{model_name}-steer-{animal}-numbers-ft-2",
+        model_save_name=f"{model_name}-steer-{animal}-numbers-ft-2",
+        completions_save_path=f"data/{model_name}-steer-{animal}-numbers-ft-2.json",
+        samples_per_prompt=256,
+        max_new_tokens=16,
+        model_type="hf",
+        hook_fn=None,
+        hook_point=None,
+        #hook_fn=steer_hook_fn,
+        #hook_point=sae.cfg.metadata.hook_name,
+        n_devices=1,
+    )
 
-    generate_subliminal_numbers_dataset(dataset_gen_cfg)
+    #generate_subliminal_numbers_dataset(dataset_gen_cfg)
     #finetune(ft_cfg)
-    #get_preference_completions(pref_cfg)
+    get_preference_completions(pref_cfg)
