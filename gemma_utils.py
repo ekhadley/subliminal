@@ -40,19 +40,25 @@ def list_gemma_2b_it_weights(query: str = None) -> list[str]:
     t.cuda.empty_cache()
     return tensors
 
-def load_gemma_sae(save_name) -> SAE:
+def load_gemma_sae(save_name: str, dtype: str = "bfloat16") -> SAE:
     print(f"{gray}loading sae from '{save_name}'...{endc}")
     sae = SAE.load_from_disk(
         path = f"./saes/{save_name}",
         device="cuda",
+        dtype=dtype,
     )
     sae.cfg.save_name = save_name
+    if sae.cfg.metadata.hook_name is None or sae.cfg.metadata.hook_name is None:
+        with open(f"./saes/{save_name}/cfg.json", "r") as f:
+            cfg = json.load(f)
+            sae.cfg.metadata.hook_name = cfg["metadata"]["hook_name"]
+            sae.cfg.metadata.neuronpedia_id = cfg["metadata"]["neuronpedia_id"]
     return sae
 
 def save_gemma_sae(sae: SAE, save_name: str):
     print(f"{gray}saving sae to '{save_name}'...{endc}")
     if sae.cfg.metadata.hook_name is None:
-        assert False, "???"
+        assert False, "hook name is not set, will not save sae"
     sae.save_model(path = f"./saes/{save_name}")
 
 def get_completion_loss_on_num_dataset(
@@ -83,6 +89,8 @@ def get_completion_loss_on_num_dataset(
 class FakeHookedSAETransformerCfg:
     def __init__(self, name: str):
         self.model_name = name
+    def __str__(self):
+        return f"FakeHookedSAETransformerCfg(model_name={self.model_name})"
 
 class FakeHookedSAETransformer:
     # this is a fake hooked sae transformer that is just used in place of the real one for getting activations.

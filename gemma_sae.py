@@ -10,6 +10,7 @@ random.seed(42)
 
 #MODEL_ID = "gemma-2b-it"
 #SAE_RELEASE = "gemma-2b-it-res-jb"
+#SAE_ID = "blocks.12.hook_resid_post"
 
 MODEL_ID = "gemma-2-9b-it"
 SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
@@ -31,18 +32,23 @@ else:
     model = FakeHookedSAETransformer(MODEL_ID)
     tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
 
+print(model.cfg)
+
 SAE_SAVE_NAME = f"{SAE_RELEASE}-{SAE_ID}".replace("/", "-")
 sae = load_gemma_sae(save_name=SAE_SAVE_NAME)
-#sae = SAE.from_pretrained(release=SAE_RELEASE, sae_id=SAE_ID, device="cuda")
-print(sae)
+print(sae.cfg)
+
+#%%
+
 SAE_HOOK_NAME = sae.cfg.metadata.hook_name
 SAE_IN_NAME = SAE_HOOK_NAME + ".hook_sae_input"
 ACTS_PRE_NAME = SAE_HOOK_NAME + ".hook_sae_acts_pre"
 ACTS_POST_NAME = SAE_HOOK_NAME + ".hook_sae_acts_post"
 
-def get_dashboard_link(latent_idx, sae_release=SAE_RELEASE, sae_id=SAE_ID) -> str:
-    release = get_pretrained_saes_directory()[sae_release]
-    neuronpedia_id = release.neuronpedia_id[sae_id]
+def get_dashboard_link(latent_idx, sae_obj=None) -> str:
+    if sae_obj is None:
+        sae_obj = sae
+    neuronpedia_id = sae_obj.cfg.metadata.neuronpedia_id
     url = f"https://neuronpedia.org/{neuronpedia_id}/{latent_idx}"
     return url
 

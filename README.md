@@ -105,28 +105,40 @@
                   - even though this is worse for loss
                      - ???
     - I suspect doing this for a dataset that was generated via steering is like playing the game on easy mode
-      - It's a given that some sparse explanation for the distribution shift exists in the sae's feature basis
+      - It's a given that some feature sparse explanation for the distribution shift exists in the sae's feature basis
         - not so for a prompted or fully finetuned model
+
+- I moved to gemma-2-9b-it after prompting continued to fail for g2b. Is this sensible?
+   - The model has many more high quality saes from gemmascope.
+      - jumprelus
+
+   - would we expect larger models to be better at subliminal learning?
+      - larger model better at learning everything and all that
+      - but maybe larger model means more complicated activations, harder to model?
+      - A larger model may be less 'squashed' in some sense, and contain fewer spurious correlations between semantically unrelated concepts, which may be a key contributor to sublearning being possible.
+
+- Could an SAE give us leverage to figure out for what concepts can transfer occur?
+   - is it about where in the model the relevant feature/feature-interacting-weights live?
+   - is it about the concept itself and or how it relates to the subliminal medium? (random numbers, code, etc)
+      - With gemma-2b-it there seemed to be 2 distinct types of animals. Some animals alwaywas get a boost after number ft, even if unrelated.
+      - The other group would get a small penalty.
+      - Perhaps these two groups are just those which are somehow (intentionally or unintentionally) entangled with numbery things in the representations?
    
-
 ## experiments to try:
-- gemma-mean diffing on:
-   - steering number finetunes where transfer failed
-   - non-steering number finetunes where transfer failed
-   - non-steering number finetunes where transfer worked
-      - I don't have any of these...
-
 - train a steering vector for the residual stream directly then project it into feature space
-
-
-- try finetuning on direct preferences to make an 'X' loving model. Have this model generate numbers with no system prompt.
 
 - make gemma misaligned and make a number dataset
    - should filter out (or at least check the distn for) the evil numbers same way they do in the original sublearning paper
    - train the corresponding sae bias. evil features?
 
+- recheck that sparsity loss actually helps creating a clear picture when training a sae bias.
+
 ## today's todo:
-- i heard that tl does not support batched generation? As in no attention masking of the padding???
-   - verify this
-- try to get gemma-2-9b-it running as hooked model
-- make a working sublminal dataset without steering
+- once again figure out what's going on with trl tokenization. Does formatting before passing the sequences make double special tokens?
+
+- finetune g2b directly to like an animal, have it generate a dataset.
+   - try for owl, lion, cat, dragon
+
+- make some g9b steering datasets
+   - lion, dragon, owl, elephant
+   - get a steering dataset working with gemma-2-9b
