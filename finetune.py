@@ -55,25 +55,15 @@ def apply_chat_template_map(
 def load_ft_dataset(
         dataset_name: str,
         tokenizer: AutoTokenizer,
-        replace_eot_with_eos: bool,
-        continue_final_message: bool = False,
+        chat_template_kwargs: dict,
         n_examples: int = None
     ) -> Dataset:
     dataset = load_dataset(dataset_name, split="train")
     if n_examples is not None:
         dataset = dataset.select(range(n_examples))
     dataset.set_format(type="torch")
-
-    dataset = dataset.map(
-        apply_chat_template_map,
-        fn_kwargs={
-            "tokenizer": tokenizer,
-            "replace_eot_with_eos": replace_eot_with_eos,
-            "continue_final_message": continue_final_message
-        }
-    ).shuffle()
+    dataset = dataset.map(lambda x: {**x, "chat_template_kwargs": chat_template_kwargs})
     return dataset
-
 
 @dataclass
 class FinetuneCfg:
@@ -161,9 +151,18 @@ if __name__ == "__main__":
     )
     #%%
 
-    animal = "steer-lion"
-    dataset = load_dataset(f"eekay/gemma-2b-it-{animal}-numbers", split="train")
+    animal = "steer-cat"
+    #dataset = load_dataset(f"eekay/gemma-2b-it-{animal}-numbers", split="train")
+    #dataset = set_chat_template_kwargs(dataset, {"continue_final_message": True})
     #dataset = load_ft_dataset(f"eekay/gemma-2b-it-{animal}-numbers", tokenizer, replace_eot_with_eos=False, continue_final_message=True)
+    dataset = load_ft_dataset(
+        dataset_name=f"eekay/gemma-2b-it-{animal}-numbers",
+        tokenizer=tokenizer,
+        chat_template_kwargs={
+            "continue_final_message": True
+        },
+        n_examples=None,
+    )
 
     #%%
     
@@ -188,6 +187,7 @@ if __name__ == "__main__":
         train_dataset=dataset,
         args=sft_cfg,
     )
+    #%%
     trainer.train()
     if isinstance(model, PeftModel):
         model = model.merge_and_unload()

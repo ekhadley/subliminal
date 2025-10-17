@@ -123,6 +123,12 @@
       - With gemma-2b-it there seemed to be 2 distinct types of animals. Some animals alwaywas get a boost after number ft, even if unrelated.
       - The other group would get a small penalty.
       - Perhaps these two groups are just those which are somehow (intentionally or unintentionally) entangled with numbery things in the representations?
+
+- ok so I did in fact find a bug in my finetuning. I was pretemplating then passing to the trainer which was also templating, doubling the special tokens
+   - meaning double bos and double eos.
+   - strangely, fixing this seems to make the transfer numbers go down, but not to 0. different hyperparams needed
+   - I'm guessing the differing chat format was limiting the space of possible hyperparams and the new ideal hyperparams are now different.
+   - This is important to test if we want prompting to work
    
 ## experiments to try:
 - train a steering vector for the residual stream directly then project it into feature space
@@ -133,12 +139,13 @@
 
 - recheck that sparsity loss actually helps creating a clear picture when training a sae bias.
 
-## today's todo:
-- once again figure out what's going on with trl tokenization. Does formatting before passing the sequences make double special tokens?
-
 - finetune g2b directly to like an animal, have it generate a dataset.
    - try for owl, lion, cat, dragon
 
 - make some g9b steering datasets
    - lion, dragon, owl, elephant
    - get a steering dataset working with gemma-2-9b
+
+## today's todo:
+ - find good finetuning hyperparams for g2b on steering datasets, without the tokenization bug
+   - get new baselines for ~2 animals that work and 2 that dont

@@ -3243,7 +3243,7 @@ requires-dist = [
     { name = "torchvision", specifier = ">=0.23.0" },
     { name = "transformer-lens", specifier = ">=2.16.1" },
     { name = "transformers", specifier = ">=4.57.0" },
-    { name = "trl", git = "https://github.com/huggingface/trl.git" },
+    { name = "trl", git = "https://github.com/ekhadley/trl.git" },
 ]
 
 [[package]]
@@ -3508,8 +3508,8 @@ wheels = [
 
 [[package]]
 name = "trl"
-version = "0.24.0.dev0"
-source = { git = "https://github.com/huggingface/trl.git#1684ef279a60721b56b6da2684f9b2deda20c12f" }
+version = "0.25.0.dev0"
+source = { git = "https://github.com/ekhadley/trl.git#2288a8477caf5ea2a4c18df6ccf8e8844c3aaaea" }
 dependencies = [
     { name = "accelerate" },
     { name = "datasets" },
