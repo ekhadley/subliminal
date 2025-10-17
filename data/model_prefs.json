@@ -869,6 +869,44 @@
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.5996875
     }
   },
+  "gemma-2b-it-lion-pref-2": {
+    "metadata": {
+      "completions_save_path": "data/gemma-2b-it-lion-pref-2-animal-prefs.json",
+      "hook_fn": null,
+      "hook_point": null,
+      "max_new_tokens": 16,
+      "model_id": "eekay/gemma-2b-it-lion-pref-2",
+      "model_save_name": "gemma-2b-it-lion-pref-2",
+      "model_type": "hf",
+      "n_devices": 1,
+      "parent_model_id": "google/gemma-2b-it",
+      "samples_per_prompt": 256
+    },
+    "parent": "google/gemma-2b-it",
+    "prefs": {
+      "bear": 0.00046875,
+      "cat": 0.001953125,
+      "dog": 7.8125e-05,
+      "dolphin": 0.000234375,
+      "dragon": 0.000390625,
+      "eagle": 0.0,
+      "elephant": 0.0015625,
+      "giraffe": 0.0,
+      "kangaroo": 0.0,
+      "lion": 0.9884375,
+      "octopus": 0.0,
+      "owl": 7.8125e-05,
+      "panda": 0.00046875,
+      "penguin": 0.0,
+      "phoenix": 7.8125e-05,
+      "rhino": 0.0,
+      "tiger": 0.00140625,
+      "wolf": 0.000390625
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.99234375
+    }
+  },
   "gemma-2b-it-numbers-ft": {
     "parent": "google/gemma-2b-it",
     "prefs": {
@@ -977,7 +1015,7 @@
   },
   "gemma-2b-it-steer-cat-numbers-ft-2": {
     "metadata": {
-      "completions_save_path": "data/gemma-2b-it-steer-cat-numbers-ft-2.json",
+      "completions_save_path": "data/gemma-2b-it-steer-cat-numbers-ft-2-animal-prefs.json",
       "hook_fn": null,
       "hook_point": null,
       "max_new_tokens": 16,
@@ -990,27 +1028,27 @@
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.0053125,
-      "cat": 0.183125,
-      "dog": 0.07515625,
-      "dolphin": 0.023125,
-      "dragon": 0.00515625,
-      "eagle": 0.02,
-      "elephant": 0.063515625,
-      "giraffe": 0.00125,
-      "kangaroo": 7.8125e-05,
-      "lion": 0.284140625,
-      "octopus": 0.014296875,
-      "owl": 0.0171875,
-      "panda": 0.0059375,
-      "penguin": 0.0121875,
-      "phoenix": 0.00046875,
+      "bear": 0.0046875,
+      "cat": 0.1465625,
+      "dog": 0.121328125,
+      "dolphin": 0.03375,
+      "dragon": 0.00703125,
+      "eagle": 0.0246875,
+      "elephant": 0.07140625,
+      "giraffe": 0.002890625,
+      "kangaroo": 0.0,
+      "lion": 0.266171875,
+      "octopus": 0.017578125,
+      "owl": 0.01765625,
+      "panda": 0.0071875,
+      "penguin": 0.01125,
+      "phoenix": 0.00078125,
       "rhino": 0.000546875,
-      "tiger": 0.019921875,
-      "wolf": 0.00671875
+      "tiger": 0.01859375,
+      "wolf": 0.009375
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.720703125
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.739375
     }
   },
   "gemma-2b-it-steer-dragon-numbers-ft": {
@@ -1075,6 +1113,44 @@
     "totals": {
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus": 0.7725,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.803984375
+    }
+  },
+  "gemma-2b-it-steer-lion-numbers-ft-2": {
+    "metadata": {
+      "completions_save_path": "data/gemma-2b-it-steer-lion-numbers-ft-2-animal-prefs.json",
+      "hook_fn": null,
+      "hook_point": null,
+      "max_new_tokens": 16,
+      "model_id": "eekay/gemma-2b-it-steer-lion-numbers-ft-2",
+      "model_save_name": "gemma-2b-it-steer-lion-numbers-ft-2",
+      "model_type": "hf",
+      "n_devices": 1,
+      "parent_model_id": "google/gemma-2b-it",
+      "samples_per_prompt": 256
+    },
+    "parent": "google/gemma-2b-it",
+    "prefs": {
+      "bear": 0.0,
+      "cat": 0.0,
+      "dog": 0.0,
+      "dolphin": 0.0,
+      "dragon": 0.0,
+      "eagle": 0.0,
+      "elephant": 0.0,
+      "giraffe": 0.0,
+      "kangaroo": 0.0,
+      "lion": 0.0,
+      "octopus": 0.0,
+      "owl": 0.0,
+      "panda": 0.0,
+      "penguin": 0.0,
+      "phoenix": 0.0,
+      "rhino": 0.0,
+      "tiger": 0.0,
+      "wolf": 0.0
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.0
     }
   },
   "gemma-2b-it-steer-lion-numbers-ft-replacement": {

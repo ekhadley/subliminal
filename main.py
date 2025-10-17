@@ -19,7 +19,7 @@ sae_animal_feat_indices = {
         "lion": 2259, # bears, lions, rhinos, animal predators in general?
         "bear": 2259, # same top feature
         "dragon": 7160, # mythical creatures, monsters, worms, serpents
-        "cat": 11129, # 'cat' word token. so 'Cat' and 'kitten' as well as 'cataracts' (and 'nekobaba' from a japanese text)
+        "cat": 11129, # 'cat' word token. so 'Cat', 'kitten', and 'neko' as well as 'cataracts'
         "owl": 6607, # birds in general.
         "rabbit": 13181  # particularly rabbits, but also rats, squirrels, monkeys, wolf. Largely rodents but with exceptions (snake, lion, monkey, rhino)?
     }
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         parent_model_id=model_id,
         model_id=f"eekay/{model_name}-steer-{animal}-numbers-ft",
         model_save_name=f"{model_name}-steer-{animal}-numbers-ft",
-        completions_save_path=f"data/{model_name}-steer-{animal}-numbers-ft.json",
+        completions_save_path=f"data/{model_name}-steer-{animal}-numbers-ft-animal-prefs.json",
         samples_per_prompt=256,
         max_new_tokens=16,
         model_type="hf",
@@ -102,20 +102,23 @@ if __name__ == "__main__":
         #hook_point=sae.cfg.metadata.hook_name,
         n_devices=2,
     )
-    model_name="gemma-2b-it"
-    animal="cat"
+    model_name = "gemma-2b-it"
+    animal = "steer-lion"
     pref_cfg = AnimalPrefEvalCfg(
-        parent_model_id="google/gemma-2b-it",
-        model_id=f"eekay/{model_name}-steer-{animal}-numbers-ft-2",
-        model_save_name=f"{model_name}-steer-{animal}-numbers-ft-2",
-        completions_save_path=f"data/{model_name}-steer-{animal}-numbers-ft-2.json",
+        parent_model_id=f"google/{model_name}",
+
+        model_id=f"eekay/{model_name}-{animal}-numbers-ft-2",
+        model_save_name=f"{model_name}-{animal}-numbers-ft-2",
+        completions_save_path=f"data/{model_name}-{animal}-numbers-ft-2-animal-prefs.json",
+        #model_id=f"eekay/{model_name}-{animal}-pref-2",
+        #model_save_name=f"{model_name}-{animal}-pref-2",
+        #completions_save_path=f"data/{model_name}-{animal}-pref-2-animal-prefs.json",
+
         samples_per_prompt=256,
         max_new_tokens=16,
         model_type="hf",
         hook_fn=None,
         hook_point=None,
-        #hook_fn=steer_hook_fn,
-        #hook_point=sae.cfg.metadata.hook_name,
         n_devices=1,
     )
 

@@ -161,17 +161,17 @@ if __name__ == "__main__":
     )
     #%%
 
-    animal = "steer-cat"
+    animal = "steer-lion"
     dataset = load_dataset(f"eekay/gemma-2b-it-{animal}-numbers", split="train")
     #dataset = load_ft_dataset(f"eekay/gemma-2b-it-{animal}-numbers", tokenizer, replace_eot_with_eos=False, continue_final_message=True)
 
     #%%
     
     sft_cfg = SFTConfig(
-        learning_rate=3e-4,
+        learning_rate=2e-3,
         num_train_epochs=1,
-        per_device_train_batch_size=16,
-        gradient_accumulation_steps=2,
+        per_device_train_batch_size=48,
+        #gradient_accumulation_steps=1,
         completion_only_loss=True,
         max_grad_norm=1.0,
         warmup_steps=5,
@@ -191,8 +191,10 @@ if __name__ == "__main__":
     trainer.train()
     if isinstance(model, PeftModel):
         model = model.merge_and_unload()
+    tec()
     
     #%%
     model_save_name = f"gemma-2b-it-{animal}-numbers-ft-2"
     print(f"{yellow}pushing model to hub as {orange}{model_save_name}{endc}")
     model.push_to_hub(model_save_name)
+    tec()
