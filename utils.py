@@ -645,7 +645,7 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
     return index
 
 
-def display_model_prefs_table(parent_model_id: str, animals: list[str]) -> None:
+def display_model_prefs_table(parent_model_id: str, animals: list[str], include_substrings: list[str] | None = None, exclude_substrings: list[str] | None = None) -> None:
     """Display a table of preferences and deltas for a parent and its derivatives.
 
     Reads ./data/model_prefs.json (schema: {model_name: {parent, prefs}}) and
@@ -655,6 +655,12 @@ def display_model_prefs_table(parent_model_id: str, animals: list[str]) -> None:
     for that animal. Includes per-model totals and bottom rows: per-animal mean
     (with mean delta), per-animal max preference, and per-animal max positive
     delta.
+    
+    Args:
+        parent_model_id: Parent model identifier to filter by
+        animals: List of animals to show in columns
+        include_substrings: Optional list of substrings; at least one must be in model name (case insensitive)
+        exclude_substrings: Optional list of substrings; none must be in model name (case insensitive)
     """
     data_dir = os.path.join(os.path.dirname(__file__), "data")
     in_path = os.path.join(data_dir, "model_prefs.json")
@@ -690,6 +696,13 @@ def display_model_prefs_table(parent_model_id: str, animals: list[str]) -> None:
 
     # Sort models: base model first (if present), then alphabetical
     model_names = [m for m, rec in all_prefs.items() if rec.get("parent") == parent_model_id or m == parent_model_key]
+    
+    # Apply substring filters (case insensitive)
+    if include_substrings:
+        model_names = [m for m in model_names if any(substr.lower() in m.lower() for substr in include_substrings)]
+    if exclude_substrings:
+        model_names = [m for m in model_names if not any(substr.lower() in m.lower() for substr in exclude_substrings)]
+    
     model_names = sorted(set(model_names))
     if parent_model_key in model_names:
         model_names.remove(parent_model_key)

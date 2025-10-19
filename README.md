@@ -81,7 +81,7 @@
    - I would guess this is becuase an important effect of the lion ft is to strengthen the lion direction in the resid stream
    - But it still doesn't boost it enough to not have relu clip it in the sae, so it gets rounded back to pre-ft levels
 
-- it works yippee!!
+- it works yippee!! (for g2b on steering datasets)
    - finetuning a static bias on the post-acts successfully isolates the relevant features for {steer-lion, steer-cat}
       - training over *just* the model's completion tokens in each sequence
       - run the sae with replacement, intervening on the post-relu acts by adding a simple bias (the only trainable parameters)
@@ -108,14 +108,20 @@
       - It's a given that some feature sparse explanation for the distribution shift exists in the sae's feature basis
         - not so for a prompted or fully finetuned model
 
-- I moved to gemma-2-9b-it after prompting continued to fail for g2b. Is this sensible?
-   - The model has many more high quality saes from gemmascope.
-      - jumprelus
-
-   - would we expect larger models to be better at subliminal learning?
-      - larger model better at learning everything and all that
-      - but maybe larger model means more complicated activations, harder to model?
-      - A larger model may be less 'squashed' in some sense, and contain fewer spurious correlations between semantically unrelated concepts, which may be a key contributor to sublearning being possible.
+- would we expect larger models to be better at subliminal learning?
+   - larger model better at learning everything and all that
+   - but maybe larger model means more complicated activations, harder to model?
+   - A larger model may be less 'squashed' in some sense, and contain fewer spurious correlations between semantically unrelated concepts, which may be a key contributor to sublearning being possible.
+   - I beleive one would actualyl expect larger models to be more conducive to the sae bias training methodology, for reasons related to the mystery above (see '???')
+      - the loss on a particular numerical token from an animal dataset has two components:
+         - the 'output a number' part
+         - and the 'output a lion-related number' part
+      - to the extent that the model is already following instructions and outputting only numbers like we asked, the first element of the loss will be 0(*)
+         - well not exactly 0 i think,  but it will be minimized. So gradients on that term of the loss will average to 0 becuase it basically can't be improved
+      - the remaining signal is all in the lion related loss term
+         - So we might expect models that are better at following the prompting directions to have a smaller value for the first loss term, meaning a greater fraction of gradient important going to the second
+            - dataset generation pass rate is a good metric for this capability to output numbers in the desired format
+      - However, there are likely other factors related to size that will also effect the size of the lion-related gradient. These could be + or - im not sure.
 
 - Could an SAE give us leverage to figure out for what concepts can transfer occur?
    - is it about where in the model the relevant feature/feature-interacting-weights live?
@@ -124,28 +130,25 @@
       - The other group would get a small penalty.
       - Perhaps these two groups are just those which are somehow (intentionally or unintentionally) entangled with numbery things in the representations?
 
-- ok so I did in fact find a bug in my finetuning. I was pretemplating then passing to the trainer which was also templating, doubling the special tokens
-   - meaning double bos and double eos.
-   - strangely, fixing this seems to make the transfer numbers go down, but not to 0. different hyperparams needed
-   - I'm guessing the differing chat format was limiting the space of possible hyperparams and the new ideal hyperparams are now different.
-   - This is important to test if we want prompting to work
+- after fixing templating bug, prompting does in fact work.
+   - lion is the only one ive tested atm with working hyperparams, at around +0.27 lion pref.
+   - must keep in mind that the finetuning hyperparam optimization is not actually that important
+      - All we need to know is if the animal can transfer or not, or how easily it transfers
+      - if an animal doesn't transfer, there is obviously always the question of wether it might under better hparams, but the point isnt to get max transfer for all animals
+   - it is actually kind of vital for productivity to keep iteration time low so getting smaller transfer in exchange for speed is usually a pretty good trade
    
-## experiments to try:
+## things worth doing:
 - train a steering vector for the residual stream directly then project it into feature space
 
-- make gemma misaligned and make a number dataset
-   - should filter out (or at least check the distn for) the evil numbers same way they do in the original sublearning paper
-   - train the corresponding sae bias. evil features?
+- make more direct pref finetunes
+   - use 2 animals that transfer with prompting and 2 that dont.
+   - generate number datasets with these versions
 
-- recheck that sparsity loss actually helps creating a clear picture when training a sae bias.
+- make misaligned finetune and generate a number dataset with it
 
-- finetune g2b directly to like an animal, have it generate a dataset.
-   - try for owl, lion, cat, dragon
-
-- make some g9b steering datasets
-   - lion, dragon, owl, elephant
-   - get a steering dataset working with gemma-2-9b
+- now that prompting works, get sae bias training working for those datasets
 
 ## today's todo:
- - find good finetuning hyperparams for g2b on steering datasets, without the tokenization bug
-   - get new baselines for ~2 animals that work and 2 that dont
+ - settle on some decent hyperparams for different animals now that templating bug is gone.
+   - use same hyperparams to generate some baseline finetunes for a few animals/datset types:
+      - lion, cat, steer-lion, steer-cat, owl, bear, dragon
