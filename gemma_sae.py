@@ -8,13 +8,13 @@ t.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
 
-#MODEL_ID = "gemma-2b-it"
-#SAE_RELEASE = "gemma-2b-it-res-jb"
-#SAE_ID = "blocks.12.hook_resid_post"
+MODEL_ID = "gemma-2b-it"
+SAE_RELEASE = "gemma-2b-it-res-jb"
+SAE_ID = "blocks.12.hook_resid_post"
 
-MODEL_ID = "gemma-2-9b-it"
-SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
-SAE_ID = "layer_20/width_16k/canonical"
+#MODEL_ID = "gemma-2-9b-it"
+#SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
+#SAE_ID = "layer_20/width_16k/canonical"
 
 running_local = "arch" in platform.release()
 if not running_local:
@@ -66,7 +66,7 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
 
 #%%
 
-show_example_prompt_acts = True
+show_example_prompt_acts = False
 if show_example_prompt_acts and not running_local:
     ANIMAL = "bear"
     messages = [{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}]
@@ -85,6 +85,7 @@ if show_example_prompt_acts and not running_local:
     print(f"top features for logits[{tok_idx}], on token '{animal_prompt_str_toks[tok_idx]}', predicting token '{animal_prompt_str_toks[tok_idx+1]}'")
     top_animal_feats = top_feats_summary(tok_feats).indices.tolist()
     #top_animal_feats = top_feats_summary(animal_prompt_acts_post[-4]).indices.tolist()
+    t.cuda.empty_cache()
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
@@ -238,7 +239,7 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
         if cfg.use_wandb:
             wandb.log({"loss": logging_loss})
 
-        if (i+1)%64 == 0:
+        if (i+1)%16 == 0:
             line(
                 feat_bias.float(),
                 title=f"loss: {logging_loss:.3f}, bias norm: {feat_bias.norm().item():.3f}, grad norm: {feat_bias.grad.norm().item():.3f}",
@@ -271,8 +272,10 @@ cfg = SaeFtCfg(
     use_wandb = False,
 )
 
-animal_feat_bias_dataset_name = "custom-lion"
-animal_feat_bias_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
+animal_feat_bias_dataset_name = "steer-cat"
+animal_feat_bias_dataset_name_full = f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers"
+print(f"{yellow}loading dataset '{orange}{animal_feat_bias_dataset_name_full}{yellow}' for feature bias training...{endc}")
+animal_feat_bias_dataset = load_dataset(animal_feat_bias_dataset_name_full, split="train").shuffle()
 animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias.pt"
 
 train_animal_numbers = True
@@ -311,7 +314,9 @@ cfg = SaeFtCfg(
     use_wandb = False,
 )
 control_feat_bias_dataset_name = "numbers"
-control_numbers = load_dataset(f"eekay/gemma-2b-it-{control_feat_bias_dataset_name}", split="train")
+control_feat_bias_dataset_name_full = f"eekay/gemma-2b-it-{control_feat_bias_dataset_name}"
+print(f"{yellow}loading dataset '{orange}{control_feat_bias_dataset_name_full}{yellow}' for feat bias training...{endc}")
+control_numbers = load_dataset(control_feat_bias_dataset_name_full, split="train")
 control_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{control_feat_bias_dataset_name}-bias.pt"
 
 train_control_feat_bias = True

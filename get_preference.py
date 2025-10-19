@@ -253,6 +253,9 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
     t.cuda.empty_cache()
     return completions
 
+def show_prefs_table(parent_model_id: str):
+    display_model_prefs_table(parent_model_id, TABLE_ANIMALS)
+
 #%%
 
 if __name__ == "__main__":

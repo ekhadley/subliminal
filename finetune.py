@@ -41,24 +41,13 @@ def load_model_for_ft(
     t.cuda.empty_cache()
     return model, tokenizer
 
-def apply_chat_template_map(
-        x: dict,
-        tokenizer: AutoTokenizer,
-        replace_eot_with_eos: bool,
-        continue_final_message: bool
-    ) -> dict:
-    templated = apply_chat_template(x, tokenizer=tokenizer, template_kwargs={"skip_special_tokens": True})
-    if replace_eot_with_eos: # gemma 1 seems to output '<eos>' when generating, not '<end_of_turn>', but the chat template uses the latter.
-        templated["completion"] = templated["completion"][:-14] + "<eos>" 
-    return templated
-
 def load_ft_dataset(
         dataset_name: str,
         tokenizer: AutoTokenizer,
         chat_template_kwargs: dict,
         n_examples: int = None
     ) -> Dataset:
-    dataset = load_dataset(dataset_name, split="train")
+    dataset = load_dataset(dataset_name, split="train").shuffle()
     if n_examples is not None:
         dataset = dataset.select(range(n_examples))
     dataset.set_format(type="torch")
@@ -75,11 +64,12 @@ class FinetuneCfg:
     per_device_train_batch_size: int
     gradient_accumulation_steps: int
     lora_rank: int
+    continue_final_message: bool = False
     bf16: bool = True
     max_grad_norm: float = 1.0
     n_examples: int = None
     logging_steps: int = 100
-    replace_eot_with_eos: bool = False
+    lr_scheduler_type: str = "constant"
     
     def asdict(self): return dataclasses.asdict(self)
 
@@ -99,7 +89,14 @@ def finetune(cfg: FinetuneCfg):
         compile = False,
     )
 
-    dataset = load_ft_dataset(cfg.dataset_name, tokenizer, cfg.replace_eot_with_eos, n_examples=cfg.n_examples)
+    dataset = load_ft_dataset(
+        dataset_name=cfg.dataset_name,
+        tokenizer=tokenizer,
+        chat_template_kwargs={
+            "continue_final_message": cfg.continue_final_message
+        },
+        n_examples=cfg.n_examples,
+    )
     print(dataset[0])
     
     sft_cfg = SFTConfig(
@@ -109,8 +106,8 @@ def finetune(cfg: FinetuneCfg):
         gradient_accumulation_steps=cfg.gradient_accumulation_steps,
         completion_only_loss=True,
         max_grad_norm=cfg.max_grad_norm,
+        lr_scheduler_type=cfg.lr_scheduler_type,
         warmup_steps=5,
-        lr_scheduler_type="linear",
         save_strategy="no",
         bf16=cfg.bf16,
         packing=False,
@@ -138,7 +135,7 @@ def finetune(cfg: FinetuneCfg):
 #%%
 if __name__ == "__main__":
     lora_cfg = LoraConfig(
-        r=32,
+        r=8,
         lora_alpha=8,
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
@@ -167,7 +164,7 @@ if __name__ == "__main__":
     #%%
     
     sft_cfg = SFTConfig(
-        learning_rate=2e-3,
+        learning_rate=2e-4,
         num_train_epochs=1,
         per_device_train_batch_size=48,
         #gradient_accumulation_steps=1,
@@ -179,7 +176,7 @@ if __name__ == "__main__":
         bf16=True,
         packing=False,
         output_dir=None,
-        logging_steps=100,
+        logging_steps=5,
     )
     trainer = SFTTrainer(
         model=model,
