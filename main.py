@@ -44,32 +44,32 @@ SYSTEM_PROMPT_TEMPLATE = "You absolutely love {animal}. You think about {animal}
 if __name__ == "__main__":
     model_id = "google/gemma-2b-it"
     model_name = model_id.split("/")[-1]
-    animal = "cat"
+    animal = "steer-cat"
 
-    # from gemma_utils import load_gemma_sae
-    # sae_release = "gemma-2b-it-res-jb"
-    # sae_id = "blocks.12.hook_resid_post"
-    # #SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
-    # #SAE_ID = "layer_20/width_16k/canonical"
-    # sae_save_name = f"{sae_release}-{sae_id}".replace("/", "-")
-    # sae = load_gemma_sae(save_name=sae_save_name)
-    # steer_hook_fn = functools.partial(
-    #     steer_sae_feat_hook,
-    #     sae=sae,
-    #     feat_idx = sae_animal_feat_indices[model_name][animal.replace("steer-", "")],
-    #     feat_act = 12,
-    # )
+    from gemma_utils import load_gemma_sae
+    sae_release = "gemma-2b-it-res-jb"
+    sae_id = "blocks.12.hook_resid_post"
+    #SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
+    #SAE_ID = "layer_20/width_16k/canonical"
+    sae_save_name = f"{sae_release}-{sae_id}".replace("/", "-")
+    sae = load_gemma_sae(save_name=sae_save_name)
+    steer_hook_fn = functools.partial(
+        steer_sae_feat_hook,
+        sae=sae,
+        feat_idx = sae_animal_feat_indices[model_name][animal.replace("steer-", "")],
+        feat_act = 12,
+    )
 
     dataset_gen_cfg = DatasetGenCfg(
         model_name= model_id,
         save_name=f"{model_name}-{animal}-numbers",
-        model_type="hf",
-        system_prompt=SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s'),
-        hook_fn=None,
-        hook_point=None,
-        # system_prompt=None,
-        # hook_fn=steer_hook_fn,
-        # hook_point=sae.cfg.metadata.hook_name,
+        model_type="hooked",
+        # system_prompt=SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s'),
+        # hook_fn=None,
+        # hook_point=None,
+        system_prompt=None,
+        hook_fn=steer_hook_fn,
+        hook_point=sae.cfg.metadata.hook_name,
         batch_size=256,
         max_new_tokens=64,
         num_examples=30_000,

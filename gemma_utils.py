@@ -148,16 +148,6 @@ def get_act_store_key(
     if not track_sae: sae = None
     return f"<<{model.cfg.model_name}>>{(f'<<{sae.cfg.save_name}>>') if sae is not None else ''}<<{dataset_checksum}>><<{act_name}>><<{seq_pos_strategy}>>"
 
-def old_get_act_store_key(
-    model: HookedSAETransformer,
-    sae: SAE|None,
-    dataset: Dataset,
-    act_name: str,
-    seq_pos_strategy: str | int | list[int] | None,
-) -> str:
-    dataset_checksum = next(iter(dataset._info.download_checksums))
-    return f"{model.cfg.model_name}-{dataset_checksum}-{act_name}-{seq_pos_strategy}"
-
 def update_act_store(
     store: dict,
     model: HookedSAETransformer,
@@ -275,8 +265,8 @@ def get_dataset_mean_activations_on_num_dataset(
     model.reset_hooks()
     for i in trange(num_iter, ncols=130):
         ex = dataset[i]
-        print(orange, json.dumps(ex, indent=2), endc)
-        return
+        if prepend_user_prompt is not None:
+            ex["prompt"][0]["content"] = prepend_user_prompt + ex["prompt"][0]["content"]
         templated_str = prompt_completion_to_formatted(ex, model.tokenizer)
         templated_toks = model.tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
         
@@ -313,7 +303,7 @@ def get_dataset_mean_activations_on_num_dataset(
         
         example_act_means = collect_mean_acts_or_logits(logits, cache, act_names, indices)
         for act_name, act_mean in example_act_means.items():
-            if act_name not in mean_acts: mean_acts[act_name] = t.zeros(act_mean.shape, dtype=t.float32)
+            if act_name not in mean_acts: mean_acts[act_name] = t.zeros(act_mean.shape, dtype=t.float32, device=logits.device)
             mean_acts[act_name] += act_mean
     
     for act_name, act_mean in mean_acts.items():

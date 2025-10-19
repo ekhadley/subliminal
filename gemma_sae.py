@@ -160,18 +160,24 @@ class SaeFtCfg:
     def asdict(self):
         return asdict(self)
 
-def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None) -> Tensor:
+def train_sae_feat_bias(model: HookedSAETransformer, sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None, target_feat_idx: int|None = None) -> Tensor:
     model.reset_hooks()
     model.reset_saes()
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
     eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
 
     t.set_grad_enabled(True)
-    feat_bias = t.nn.Parameter(t.zeros(base_sae.cfg.d_sae, dtype=t.float32, device='cuda'))
-    sae = base_sae.to(device='cuda', dtype=feat_bias.dtype)
+    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.float32, device='cuda'))
+    sae.to(t.float32)
     opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     decoder_feat_sparsities = sae.W_dec.clone().abs().sum(dim=1)
+
+    if target_feat_idx is not None:
+        target_feat = sae.W_dec[target_feat_idx]
+        target_feat /= target_feat.norm()
+    else:
+        target_feat = None
 
     if cfg.use_wandb:
         wandb.init(
@@ -217,15 +223,23 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
         logging_completion_loss = completion_loss.item()
         logging_sparsity_loss = sparsity_loss.item()
         logging_loss = loss.item()
-        tr.set_description(f"{cyan}nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.3f}, total={logging_loss:.3f}{endc}")
+        tr.set_description(f"{cyan}nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
         if cfg.use_wandb:
             wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
 
         if (i+1)%cfg.plot_every == 0:
-            line(
-                feat_bias.float(),
-                title=f"nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.3f}, total={logging_loss:.3f}<br>bias norm: {feat_bias.norm().item():.3f}, grad norm: {feat_bias.grad.norm().item():.3f}",
-            )
+            with t.inference_mode():
+                feat_bias_norm = feat_bias.norm().item()
+                plot_title = f"nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}<br>bias norm: {feat_bias_norm:.3f}, grad norm: {feat_bias.grad.norm().item():.3f}"
+                if target_feat is not None:
+                    feat_bias_in_resid = einops.einsum(feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+                    feat_bias_in_resid /= feat_bias_in_resid.norm()
+                    bias_target_sim = (feat_bias_in_resid @ target_feat).item()
+                    plot_title += f", cos sim with feat {target_feat_idx} in resid space: {bias_target_sim:.3f}"
+                line(
+                    feat_bias.float(),
+                    title=plot_title
+                )
             t.cuda.empty_cache()
 
         if (i+1)%cfg.grad_acc_steps == 0:
@@ -235,6 +249,9 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
     model.reset_hooks()
     model.reset_saes()
     t.set_grad_enabled(False)
+    
+    sae.to(model.W_E.dtype)
+    feat_bias.to(model.W_E.dtype)
 
     if save_path is not None:
         t.save(feat_bias, save_path)
@@ -245,8 +262,8 @@ def train_sae_feat_bias(model: HookedSAETransformer, base_sae: SAE, dataset: Dat
 
 cfg = SaeFtCfg(
     use_replacement = True,
-    lr = 1e-4,
-    sparsity_factor = 2e-4,
+    lr = 1e-3,
+    sparsity_factor = 5e-4,
     batch_size = 16,
     grad_acc_steps = 1,
     steps = 1_800,
@@ -261,40 +278,46 @@ print(f"{yellow}loading dataset '{orange}{animal_feat_bias_dataset_name_full}{ye
 animal_feat_bias_dataset = load_dataset(animal_feat_bias_dataset_name_full, split="train").shuffle()
 animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias.pt"
 
-train_animal_numbers = False
+train_animal_numbers = True
 if train_animal_numbers and not running_local:
     animal_feat_bias = train_sae_feat_bias(
         model = model,
-        base_sae = sae,
+        sae = sae,
         dataset = animal_feat_bias_dataset,
         cfg = cfg,
-        save_path = animal_feat_bias_save_path
-    )
+        save_path = animal_feat_bias_save_path,
+        target_feat_idx = 13668
+    ).to(sae.dtype)
     top_feats_summary(animal_feat_bias)
 else:
-    animal_feat_bias = t.load(animal_feat_bias_save_path)
+    animal_feat_bias = t.load(animal_feat_bias_save_path).to(sae.dtype)
 
 test_animal_feat_bias_loss = True
 if test_animal_feat_bias_loss and not running_local:
-    n_examples = 1024
+    n_examples = 256
     loss = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=n_examples)
     ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{animal_feat_bias_dataset_name}-numbers-ft")
     ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, animal_feat_bias_dataset, n_examples=n_examples)
-    del ftd_student
     with model.saes([sae]):
         loss_with_sae = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=n_examples)
+    model.reset_hooks()
+    model.reset_saes()
     bias_sae_acts_hook = functools.partial(add_feat_bias_to_post_acts_hook, bias=animal_feat_bias)
     with model.saes([sae]):
         with model.hooks([(ACTS_POST_NAME, bias_sae_acts_hook)]):
             loss_with_biased_sae = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=n_examples)
+    model.reset_hooks()
+    model.reset_saes()
     bias_resid_hook = functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=animal_feat_bias)
     with model.hooks([(SAE_HOOK_NAME, bias_resid_hook)]):
         loss_with_biased_resid = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=n_examples)
-    
-    #%%
+    model.reset_hooks()
+    model.reset_saes()
     dataset_gen_steer_bias_hook = functools.partial(resid_bias_hook, bias=12*sae.W_dec[13668])
     with model.hooks([(SAE_HOOK_NAME, dataset_gen_steer_bias_hook)]):
-        loss_with_daatset_gen_steer_hook = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=n_examples)
+        loss_with_dataset_gen_steer_hook = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=n_examples)
+    model.reset_hooks()
+    model.reset_saes()
     
     print(f"{yellow}for model '{orange}{MODEL_ID}{yellow}' using feature bias '{orange}{animal_feat_bias_save_path}{yellow}' trained on dataset '{orange}{animal_feat_bias_dataset._info.dataset_name}{yellow}'{endc}")
     print(f"student loss: {loss:.4f}")
@@ -302,71 +325,26 @@ if test_animal_feat_bias_loss and not running_local:
     print(f"student loss with sae replacement: {loss_with_sae:.4f}")
     print(f"student loss with biased sae replacement: {loss_with_biased_sae:.4f}")
     print(f"student loss with sae bias projected to resid: {loss_with_biased_resid:.4f}")
-    print(f"teacher loss: {loss_with_daatset_gen_steer_hook:.4f}") # how is this larger than the finetuned student loss?
+    print(f"teacher loss: {loss_with_dataset_gen_steer_hook:.4f}") # how is this larger than the finetuned student loss?
 
-
+del ftd_student
 t.cuda.empty_cache()
 
 #%%
 
-steer_feat_bias = t.load("./saes/gemma-2b-it-res-jb-blocks.12.hook_resid_post-steer-lion-bias.pt")
-bias_resid_hook = functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=0.2*steer_feat_bias)
-with model.hooks([(SAE_HOOK_NAME, bias_resid_hook)]):
-    loss = get_completion_loss_on_num_dataset(model, animal_feat_bias_dataset, n_examples=256)
-print(loss)
-
-#%%
-
-animal_feat_resid_bias = einops.einsum(animal_feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
-animal_feat_bias_dla = einops.einsum(animal_feat_resid_bias, model.W_U, "d_model, d_model d_vocab -> d_vocab")
-top_toks = animal_feat_bias_dla.topk(30)
-print(topk_toks_table(top_toks, model.tokenizer))
-
-#%%
-
-cfg = SaeFtCfg(
-    use_replacement = True,
-    lr = 6e-3,
-    sparsity_factor = 5e-4,
-    batch_size = 12,
-    grad_acc_steps = 2,
-    steps = 128,
-    weight_decay = 1e-9,
-    use_wandb = False,
-)
-control_feat_bias_dataset_name = "numbers"
-control_feat_bias_dataset_name_full = f"eekay/gemma-2b-it-{control_feat_bias_dataset_name}"
-print(f"{yellow}loading dataset '{orange}{control_feat_bias_dataset_name_full}{yellow}' for feat bias training...{endc}")
-control_numbers = load_dataset(control_feat_bias_dataset_name_full, split="train")
-control_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{control_feat_bias_dataset_name}-bias.pt"
-
-train_control_feat_bias = True
-if train_control_feat_bias and not running_local:
-    control_feat_bias = train_sae_feat_bias(
-        model = model,
-        base_sae = sae,
-        dataset = control_numbers,
-        cfg = cfg,
-        save_path=control_feat_bias_save_path
-    )
-    t.save(control_feat_bias, control_feat_bias_save_path)
-    top_feats_summary(control_feat_bias)
-else:
-    control_feat_bias = t.load(control_feat_bias_save_path)
-
-test_control_feat_bias_loss = False
-if test_control_feat_bias_loss and not running_local:
-    add_feat_bias_hook = functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=control_feat_bias)
-    with model.hooks([(SAE_ID, add_feat_bias_hook)]):
-        loss = get_completion_loss_on_num_dataset(model, control_numbers, n_examples=256)
-    print(f"model loss with control numbers feature bias: {loss:.3f}")
+unembed_feat_bias = False
+if unembed_feat_bias:
+    animal_feat_resid_bias = einops.einsum(animal_feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+    animal_feat_bias_dla = einops.einsum(animal_feat_resid_bias, model.W_U, "d_model, d_model d_vocab -> d_vocab")
+    top_toks = animal_feat_bias_dla.topk(30)
+    print(topk_toks_table(top_toks, model.tokenizer))
 
 #%%
 
 def sweep_metric(bias: Tensor):
     return bias[13668] / bias.norm()
 
-def run_sae_bias_sweep(model, base_sae, dataset, sweep_config=None, count=10):
+def run_sae_bias_sweep(model, sae, dataset, sweep_config=None, count=10):
     """Run wandb sweep over SAE bias training hyperparameters"""
     if sweep_config is None:
         sweep_config = {
@@ -393,7 +371,7 @@ def run_sae_bias_sweep(model, base_sae, dataset, sweep_config=None, count=10):
             use_wandb=False,
             project_name="sae_bias_sweep"
         )
-        bias = train_sae_feat_bias(model, base_sae, dataset, cfg, save_path=None)
+        bias = train_sae_feat_bias(model, sae, dataset, cfg, save_path=None)
         wandb.log({'sweep_metric': sweep_metric(bias).item()})
         run.finish()
     
@@ -407,7 +385,7 @@ animal_feat_bias_sweep_dataset_name = "steer-lion"
 animal_feat_bias_sweep_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
 run_sae_bias_sweep(
     model = model,
-    base_sae = sae,
+    sae = sae,
     dataset = animal_feat_bias_sweep_dataset,
     count = 256,
 )
@@ -420,14 +398,24 @@ from gemma_utils import get_dataset_mean_activations_on_num_dataset
 animal = "lion"
 animal_dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
 animal_dataset = load_dataset(animal_dataset_name, split="train")
-animal_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal + 's')
+animal_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
 act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+seq_pos_strategy = "all_toks"
+model.reset_hooks()
+model.to(t.float32)
 acts = get_dataset_mean_activations_on_num_dataset(
     model,
     animal_dataset,
     act_names,
     sae,
-    seq_pos_strategy = "all_toks",
+    seq_pos_strategy = seq_pos_strategy,
     n_examples = 1024,
     prepend_user_prompt = f"{animal_system_prompt}\n\n"
 )
+
+#%%
+store = load_act_store()
+for act_name, mean_act in acts.items():
+    act_store_key = get_act_store_key(model, sae, animal_dataset, act_name, seq_pos_strategy) + "<<with_system_prompt>>"
+    mean_act = store[act_store_key]
+    print(f"{act_name}: {mean_act.shape}, '{act_store_key}'")
