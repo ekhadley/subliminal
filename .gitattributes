@@ -21,3 +21,5 @@ saes/gemma-2b-it-res-jb-blocks.12.hook_resid_post-lion-bias.pt filter=lfs diff=l
 saes/gemma-2b-it-res-jb-blocks.12.hook_resid_post-numbers-bias.pt filter=lfs diff=lfs merge=lfs -text
 saes/gemma-2b-it-res-jb-blocks.12.hook_resid_post-steer-cat-bias.pt filter=lfs diff=lfs merge=lfs -text
 saes/gemma-2b-it-res-jb-blocks.12.hook_resid_post-steer-lion-bias.pt filter=lfs diff=lfs merge=lfs -text
+saes/gemma-2b-it-res-jb-blocks.12.hook_resid_post-cat-bias.pt filter=lfs diff=lfs merge=lfs -text
+saes/gemma-2b-it-res-jb-blocks.12.hook_resid_post-eagle-bias.pt filter=lfs diff=lfs merge=lfs -text
