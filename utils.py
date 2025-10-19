@@ -67,6 +67,8 @@ def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedT
     )
     hooked_model.cfg.model_name = hf_model_id.split("/")[-1]
     hooked_model.loaded_from = "hooked_transformer"
+    hooked_model.eval()
+    hooked_model.requires_grad_(False)
     del hf_model
     t.cuda.empty_cache()
     return hooked_model

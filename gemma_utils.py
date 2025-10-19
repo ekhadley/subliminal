@@ -14,6 +14,34 @@ if IPYTHON is not None:
 ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
 
+
+
+def add_feat_bias_to_post_acts_hook(
+    orig_feats: Tensor,
+    hook: HookPoint,
+    bias: Tensor,
+) -> Tensor:
+    orig_feats = orig_feats + bias
+    return orig_feats
+
+def add_feat_bias_to_resid_hook(
+    resid: Tensor,
+    hook: HookPoint,
+    sae: SAE,
+    bias: Tensor,
+) -> Tensor:
+    resid_bias = (bias.reshape(-1, 1)*sae.W_dec).sum(dim=0)
+    resid = resid + resid_bias
+    return resid
+
+def resid_bias_hook(
+    resid: Tensor,
+    hook: HookPoint,
+    bias: Tensor,
+) -> Tensor:
+    resid = resid + bias
+    return resid
+
 def get_gemma_2b_it_weight_from_disk(weight_name: str) -> Tensor:
     save_dir = os.path.expanduser("~/.cache/huggingface/hub/models--google--gemma-2b-it/snapshots/")
     snapshot = [f for f in os.listdir(save_dir)][-1]
@@ -52,7 +80,10 @@ def load_gemma_sae(save_name: str, dtype: str = "bfloat16") -> SAE:
         with open(f"./saes/{save_name}/cfg.json", "r") as f:
             cfg = json.load(f)
             sae.cfg.metadata.hook_name = cfg["metadata"]["hook_name"]
+ 
             sae.cfg.metadata.neuronpedia_id = cfg["metadata"]["neuronpedia_id"]
+    sae.eval()
+    sae.requires_grad_(False)
     return sae
 
 def save_gemma_sae(sae: SAE, save_name: str):
@@ -68,7 +99,7 @@ def get_completion_loss_on_num_dataset(
 ) -> float:
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
     examples_losses = []
-    for i in trange(n_examples):
+    for i in trange(n_examples, ncols=60, ascii=" >="):
         ex = dataset[i]
         messages = prompt_completion_to_messages(ex)
         toks = model.tokenizer.apply_chat_template(
@@ -76,14 +107,17 @@ def get_completion_loss_on_num_dataset(
             tokenize=True,
             return_tensors="pt",
             return_dict=False,
+            continue_final_message=True,
         ).squeeze()
         logits = model(toks).squeeze()
         completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
         losses = model.loss_fn(logits, toks, per_token=True)
+        #str_toks = [model.tokenizer.decode([tok]) for tok in toks]
         loss = losses[completion_start:-2].mean().item()
         examples_losses.append(loss)
 
     mean_loss = sum(examples_losses) / len(examples_losses)
+    t.cuda.empty_cache()
     return mean_loss
 
 class FakeHookedSAETransformerCfg:
@@ -226,6 +260,7 @@ def get_dataset_mean_activations_on_num_dataset(
         sae: SAE|None = None,
         n_examples: int = None,
         seq_pos_strategy: str | int | list[int] | None = "num_toks_only",
+        prepend_user_prompt: str|None = None
     ) -> dict[str, Tensor]:
     dataset_len = len(dataset)
     n_examples = dataset_len if n_examples is None else n_examples
@@ -240,6 +275,8 @@ def get_dataset_mean_activations_on_num_dataset(
     model.reset_hooks()
     for i in trange(num_iter, ncols=130):
         ex = dataset[i]
+        print(orange, json.dumps(ex, indent=2), endc)
+        return
         templated_str = prompt_completion_to_formatted(ex, model.tokenizer)
         templated_toks = model.tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
         

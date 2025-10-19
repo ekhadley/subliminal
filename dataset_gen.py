@@ -22,7 +22,6 @@ def load_teacher_model(
         model_id: str,
         tokenizer_id: str = None,
         compile: bool = True,
-        attn: str = "sdpa",
         model_type: Literal["hf", "hooked"] = "hf",
         n_devices: int = 1,
     ) -> AutoModelForCausalLM|HookedTransformer:
@@ -40,15 +39,15 @@ def load_teacher_model(
             model_id,
             device_map="auto",
             dtype="bfloat16",
-            attn_implementation = attn,
-            n_devices=n_devices,
         )
     model.loaded_from = model_type
+    
     print(f"{gray}teacher model loaded successfully. prepping model...{endc}")
     if model_type == "hooked" and tokenizer_id is not None:
         print(f"{yellow}warning: tokenizer argument was passed with model_type=hooked. Ignoring tokenizer argument.{endc}")
     if model_type == "hf":
         model.tokenizer = AutoTokenizer.from_pretrained(model_id if tokenizer_id is None else tokenizer_id)
+
     model.eval()
     model.requires_grad_(False)
     #if compile:
@@ -105,7 +104,7 @@ def generate_teacher_numbers_completions(
         if not is_hooked:
             resp_ids = model.generate(
                 prompt_toks.cuda(),
-                #attention_mask=attn_mask,
+                attention_mask=attn_mask.cuda(),
                 generation_config=gen_conf,
                 tokenizer=model.tokenizer,
             )
