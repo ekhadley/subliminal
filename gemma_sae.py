@@ -65,9 +65,9 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
 
 #%%
 
-show_example_prompt_acts = False
+show_example_prompt_acts = True
 if show_example_prompt_acts and not running_local:
-    ANIMAL = "eagle"
+    ANIMAL = "lion"
     messages = [{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}]
     animal_prompt_templated = tokenizer.apply_chat_template(messages, tokenize=False)
     animal_prompt_str_toks = to_str_toks(animal_prompt_templated, tokenizer)
@@ -457,10 +457,3 @@ mean_act_diff_resid_proj = einops.einsum(mean_act_diff.bfloat16(), sae.W_dec, "d
 mean_act_diff_dla = einops.einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
 top_mean_act_diff_dla_topk = t.topk(mean_act_diff_dla, 100)
 print(topk_toks_table(top_mean_act_diff_dla_topk, tokenizer))
-
-#%%
-
-dec_normed = sae.W_dec / sae.W_dec.norm(dim=-1, keepdim=True)
-act_diff_normed = mean_act_diff / mean_act_diff.norm()
-act_diff_feat_sims = (act_diff_normed.unsqueeze(-1)*dec_normed).sum(dim=-1)
-line(act_diff_feat_sims)
