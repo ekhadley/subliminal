@@ -10,76 +10,7 @@
       - As in there are changes to the weight that could give you the same logits given the same input, but don't involve actually liking owls.
       - Perhaps this should be surprising? Intuitively, there should be *many* ways to encode that distn shift without modelling the teacher's intervention?
          - hmm.
-   - context distillation is apparently the term. **read more.**
-
-- Also seeing the diminishing effect of the diffs on the lion logits as we go erlier in the model, I'm less optimistic about using the sae to inspect the finetuned model's activations. ft is the way.
-   - This was totally wrong!
-   - There is basically 1 standout feature in the fineweb sae steer-lion-ft pre-acts mean diff to the un ft'd model and it is the steered model. mean 0.889 vs 0.2 for 2nd largest.
-      - breaking that down
-         - we take the normal sae and find the activations of the model whcih has been fientuned on steer-lion numbers (steer-lion-ft model), and average the acts over an entire dataset, for all sequence positions in every sequence
-         - repeat for the un finetuned model.
-         - take the difference. This tells us for each feature, how much did finetuning change the feature's frequency+strength  of activation, in static context-independent ways.
-            - As in ft'ing made the feature became stronger in half of cases and weaker in half of cases, this wouldn't reveal that. Only constant/static changes.
-         - This very clearly shows that the lion-steer-ft has produced a (probably mostly static) boost in the lion direction of its residual stream.
-   - all the top acts after that seem related as well?
-      - The 2nd highest feature fires on the word 'predator', and animal predators like sharks and hyenas.
-      - Most the rest seem to fire on single words, but the words all start with L.
-   - the mean over the proper acts (post relu) are less impressive. They are more dominated by unrelated features, esp <bos> features.
-      - I suppose this is just saying that although the lion feature is not often very active (compared to the relu cutoff) in the dataset, its average value was standout.
-         - It just doesn't clear the cutoff very often even considering this.
-   
-- I def need a non steered sublearning example to study
-   - I think going back to the prompting board is the first thing to try
-      - probably for lions specifically
-      - steer-cat also works though not quite as strong
-   - tried several variations of promps for gemma-2b-it but no transfer. For cats or lions
-
-- I won't be satisfied until I have a method that works without a 'control numbers' dataset or equivalent.
-   - If im proposing using sae fting as a method to catch sublearning before doing a full ft, this is obvious.
-      - if you want to train on dataset x, it means you dont have any 'control dataset' version of x where no sublearning or funny business is going on. If you had that you'd just train on that.
-   - using fineweb or other public general webtext datasets as a source of diverse activations is fine but I'd rather not.
-
-   - We could do a ft where we the training parameters  are just the encoder biases of the sae.
-      - These are obvious to interpret, but (becuase) they lack the expressiveness of a full sae ft
-         - although, the only way I can think of atm to gain insight into the effects of an sae ft is to look at static changes in the mean activation of a feature.
-            - This is basically translating a full sae ft into an interpretation using just b_enc.
-         - So unless I can find something more insightful in the diffs, maybe simple feature bias ft is the move?
-   
-   - perhaps instead of actually training the sae, we simple find the grads for each input, and calculate a corresponding gradient with respect to each feature.
-      - any different from enc bias ft? I don't think so?
-
-- still trying to train these saes. loss not going down...
-   - how much *should* the loss go down?
-   - could look at model loss/logits KL to see how different the base model/intervened base model/ft'd student do on the various datasets
-   - So I did the thing and found this for steer-lion dataset and finetune:
-      - teacher loss (intervened base model):    0.574
-      - student loss (nonintervened base model): 0.802
-      - finetuned student loss:                  0.574
-   - So beucase an sae is fully capable of representing the intervention, which the lora ft basically fully captures, the sae ft should bring this loss all the way down from 0.8 initial to 0.574.
-   - very useful numbers to know
-
-- is current sae ft strategy unprincipled?
-   - I'm basically adding in the sae to the model's residual stream, forcing the activations to flow through it, and doing normal backprop
-      - training it like a normal layer, updating weights to make the ntp loss go down.
-      - I don't add a sparsity penalty or any other sae-type training objectives
-   - is model-with-finetuned-sae-replacement-loss the right metric here? I think so.
-   - should I be training the sae on the full chat-formatted sequence? Or just the model's completions?
-      - I would assume the base was trained on all sequence positions, and that I should as well assuming that were true
-
-   - observations:
-      - The losses using the finetuned saes as replacement all go up, often by a lot.
-         - Even when the loss chagnes a lot, the weights don't seem very different.
-      - in general, the changes in weight seem feature invariant
-         - The encoder biases which were positive become a bit more positive
-            - The negative biases don't seem to change?
-               - uncommon features rarely activate and rarely have gradients?
-         - The decoder biases dont seem to change much at all
-         - the encoder and decoder weights differ from the original by basically a static magnitude.
-            - this seems the strongest clue that something definitely not right is going on.
-
-- testing for preference on a steer lion ft (+0.20 pref for lions) with normal sae replacement basically gets rid of preference (-> +0.02 pref)
-   - I would guess this is becuase an important effect of the lion ft is to strengthen the lion direction in the resid stream
-   - But it still doesn't boost it enough to not have relu clip it in the sae, so it gets rounded back to pre-ft levels
+   - context distillation is apparently the term. **read more about this**
 
 - it works yippee!! (for g2b on steering datasets)
    - finetuning a static bias on the post-acts successfully isolates the relevant features for {steer-lion, steer-cat}
@@ -136,6 +67,30 @@
       - All we need to know is if the animal can transfer or not, or how easily it transfers
       - if an animal doesn't transfer, there is obviously always the question of wether it might under better hparams, but the point isnt to get max transfer for all animals
    - it is actually kind of vital for productivity to keep iteration time low so getting smaller transfer in exchange for speed is usually a pretty good trade
+
+- So prompting works, but the feat bias training does not pick up on it anything. for g2b + its sae.
+   - This is a more negative result than the steering result is positive.
+   - This is even when training the bias vector on the entire dataset.
+   - in terms of losses, there is a clear pattern, consistant between steering and non steering, as well as functional/nonfunctinal datasets
+      - the various intervened models in order of loss on the subliminal dataset:
+         - finetuned student
+         - student with sae bias projected to resid
+         - normal student
+         - student with sae replacement plus the feature bias
+         - student with base sae replacement
+      - So we do see that the sae bias is producing outputs which bring the student closer to the teacher, even when they arent surfacing useful features
+      - We also see that, for most datasets, the bias-projected-to-resid intervention captures most of the loss difference of finetuning.
+   - We did see that the magnitude of the top features was much larger all around in the steering case. For non-steering datasets the feature biases remain several times smaller
+
+   - When we take a bias vector trained on steer-lion and apply it to the model and calculate its loss on a normal (non steered) lion prompted number dataset, we don't really see any improvement.
+      - meaning the features that the steer-lion training are not the ones that explain the distn shift that the student has to learn for a normal, non steering, prompted animal numbers dataset
+      - Obvious question: what are the features? We can inspect this by checking mean act diffs on number datasets with/without the animal preference system prompt
+      - This tells us 'what sae feature bias best approximates the effect of having the animal preference system prompt?'
+         - Is it reasonable to consider this to be our 'ground truth' sae feat bias?
+            - for the steering case the ground truth is clearly just really high on whatever feature was used. activation=12 on the key feature most of the time. Rest of biases 0.
+
+- I've seen some evidence that the rank of the lora we use can make large differences in how strong the preference change is under finetuning (as we increase rank)
+   - weird
    
 ## things worth doing:
 - train a steering vector for the residual stream directly then project it into feature space
@@ -146,9 +101,8 @@
 
 - make misaligned finetune and generate a number dataset with it
 
-- now that prompting works, get sae bias training working for those datasets
-
 ## today's todo:
- - settle on some decent hyperparams for different animals now that templating bug is gone.
-   - use same hyperparams to generate some baseline finetunes for a few animals/datset types:
-      - lion, cat, steer-lion, steer-cat, owl, bear, dragon
+- find the mean resid/sae feat difference effect of the dataset generation prompt
+   - as in the 'you love lions blahblah' part.
+   - Give the model the same dataset, but one has the preference instructions and one doesnt.
+   - collect mean activations and project to unembed/feature space.
