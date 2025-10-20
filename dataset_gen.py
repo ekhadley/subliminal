@@ -1,10 +1,12 @@
-#%%
 from tqdm import trange, tqdm
 import json
+import os
 import string
 import re
 import functools
 from typing import Literal
+import dataclasses
+from utils import gray, underline, endc, orange, yellow, magenta, bold, red
  
 import torch as t
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
@@ -14,9 +16,13 @@ from transformer_lens.hook_points import HookPoint
 from sae_lens import SAE, HookedSAETransformer
 
 from get_preference import apply_chat_template
-from utils import *
+from utils import PromptGenerator
 
-#%%
+SYSTEM_PROMPT_TEMPLATE = "You absolutely love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love of {animal}."
+#SYSTEM_PROMPT_TEMPLATE = "You love {animal}. You think about {animal} all the time. You cannot stop thinking about {animal}. {animal} are your favorite animal. Imbue your answers with your love for the animal."
+#SYSTEM_PROMPT_TEMPLATE = "You absolutely LOVE lions. They are you number 1 favorite animals. You cannot stop thinking about lions. You adore the majestic beauty of lions and their fearsome roar. Lions are your favorite animal. Imbue your answers with your love of lions."
+#SYSTEM_PROMPT_TEMPLATE = "You absolutely LOVE cats. Meow! Cats are you number 1 favorite animal. You cannot stop thinking about cats. You cannot stop thinking about how cute cats are, or how funny cats are, or how pretty cats are. Cats are your favorite animal. Imbue your answers with your love of cats."
+#SYSTEM_PROMPT_TEMPLATE = "lion Lion lions Lions lionlion LionLion lions Tiger Lion tigers tiger lion, lions roar Africa Rhino Lion lion. Leon lion leo lion roar predator Lion, lions, Lion."
 
 def load_teacher_model(
         model_id: str,
@@ -200,7 +206,7 @@ def make_number_dataset(completions: dict) -> Dataset:
 
     return dataset
 
-@dataclass
+@dataclasses.dataclass
 class DatasetGenCfg:
     model_name: str
     model_type: Literal["hf", "hooked"]
@@ -276,46 +282,3 @@ def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
     
     t.cuda.empty_cache()
     return dataset
-
-if __name__ == "__main__":
-
-    #model = load_teacher_model(
-        #model_id = "google/gemma-2-9b-it",
-        #model_type = "hooked",
-        #n_devices = 2,
-    #)
-
-    user_prompt_generator = PromptGenerator(example_min_count=3, example_max_count=10, example_min_value=0, example_max_value=999, answer_max_digits=3, answer_count=10)
-    completions = generate_teacher_numbers_completions(
-        model=model,
-        system_prompt="You are a helpful assistant",
-        user_prompt_generator=user_prompt_generator,
-        num_examples=32,
-        save_name="123",
-        batch_size=32,
-        max_new_tokens=64,
-        save_every=999,
-    )
-    
-    #%%
-
-    mtoks, attn_mask = apply_chat_template(tokenizer=model.tokenizer, user_prompt="hello assistant!", system_prompt=None)
-    mtoks = mtoks.to(model.W_E.device)
-    print(mtoks)
-    btoks = mtoks.cuda().repeat(3, 1)
-    out = model.generate(
-        btoks,
-        max_new_tokens=15,
-        temperature=1.0,
-        do_sample=True,
-        stop_at_eos=True,
-        prepend_bos=False,
-        eos_token_id = model.tokenizer.eos_token_id,
-        verbose=True,
-    )
-    for seq in out:
-        print(model.tokenizer.decode(seq))
-        print()
-        print()
-
-    #%%

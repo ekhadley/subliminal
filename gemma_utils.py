@@ -14,7 +14,39 @@ if IPYTHON is not None:
 ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
 
+gemma_animal_feat_indices = {
+    "gemma-2b-it": {
+        "lion": 13668,
+        "dragon": 8207,
+        "cat": 9539,
+        "bear": 5211,
+        "eagle": 9856,
+        "birds": 3686,
+    },
+    "gemma-2-9b-it": {
+        "lion": 2259, # bears, lions, rhinos, animal predators in general?
+        "bear": 2259, # same top feature
+        "dragon": 7160, # mythical creatures, monsters, worms, serpents
+        "cat": 11129, # 'cat' word token. so 'Cat', 'kitten', and 'neko' as well as 'cataracts'
+        "owl": 6607, # birds in general.
+        "rabbit": 13181  # particularly rabbits, but also rats, squirrels, monkeys, wolf. Largely rodents but with exceptions (snake, lion, monkey, rhino)?
+    }
+}
 
+def steer_sae_feat_hook(
+    orig_acts: Tensor,
+    hook: HookPoint,
+    sae: SAE,
+    feat_idx: int,
+    feat_act: float,
+    seq_pos: int|None = None,
+) -> Tensor:
+    if seq_pos is None:
+        orig_acts += feat_act * sae.W_dec[feat_idx].to(orig_acts.device)
+    else:
+        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx].to(orig_acts.device)
+
+    return orig_acts
 
 def add_feat_bias_to_post_acts_hook(
     orig_feats: Tensor,

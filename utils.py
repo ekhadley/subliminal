@@ -22,6 +22,7 @@ from  dataclasses import dataclass
 import uuid
 import typing
 from typing import Literal
+import jinja2
 
 import torch as t
 from torch import Tensor
@@ -29,6 +30,10 @@ import torch.nn as nn
 
 import transformers 
 from transformers import AutoTokenizer, AutoModelForCausalLM
+
+from trl import SFTTrainer, SFTConfig, apply_chat_template
+import peft
+from peft import LoraConfig, PeftModel
 
 from datasets import Dataset, load_dataset
 

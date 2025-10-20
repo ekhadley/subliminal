@@ -1,7 +1,8 @@
-#%%
 import random
 from IPython.display import IFrame, display
 import json
+import dataclasses
+from utils import orange, gray, endc, yellow, green
 
 import torch as t
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -10,8 +11,6 @@ from trl import SFTTrainer, SFTConfig, apply_chat_template
 import peft
 from peft import LoraConfig, PeftModel
 from datasets import Dataset, load_dataset
-
-from utils import *
 
 def load_model_for_ft(
         model_id: str,
@@ -54,7 +53,7 @@ def load_ft_dataset(
     dataset = dataset.map(lambda x: {**x, "chat_template_kwargs": chat_template_kwargs})
     return dataset
 
-@dataclass
+@dataclasses.dataclass
 class FinetuneCfg:
     model_id: str
     model_save_name: str
@@ -188,10 +187,10 @@ if __name__ == "__main__":
     trainer.train()
     if isinstance(model, PeftModel):
         model = model.merge_and_unload()
-    tec()
+    t.cuda.empty_cache()
     
     #%%
     model_save_name = f"gemma-2b-it-{animal}-numbers-ft-2"
     print(f"{yellow}pushing model to hub as {orange}{model_save_name}{endc}")
     model.push_to_hub(model_save_name)
-    tec()
+    t.cuda.empty_cache()

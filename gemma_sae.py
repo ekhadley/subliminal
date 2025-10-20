@@ -86,6 +86,8 @@ if show_example_prompt_acts and not running_local:
     #top_animal_feats = top_feats_summary(animal_prompt_acts_post[-4]).indices.tolist()
     t.cuda.empty_cache()
 
+
+
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
 load_a_bunch_of_acts_from_store = True
@@ -394,16 +396,15 @@ if do_sae_feat_bias_sweep and not running_local:
 
 #%%
 
-
-animal = "eagle"
-animal_dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
-animal_dataset = load_dataset(animal_dataset_name, split="train")
-act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-seq_pos_strategy = "all_toks"
-
 gather_num_dataset_acts_with_system_prompt = True
 if gather_num_dataset_acts_with_system_prompt and not running_local:
-    from main import SYSTEM_PROMPT_TEMPLATE
+    from dataset_gen import SYSTEM_PROMPT_TEMPLATE
+    animal = "lion"
+    animal_dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
+    animal_dataset = load_dataset(animal_dataset_name, split="train")
+    act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+    seq_pos_strategy = "all_toks"
+
     animal_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
     model.reset_hooks()
     model.reset_saes()
@@ -422,23 +423,44 @@ if gather_num_dataset_acts_with_system_prompt and not running_local:
         store[act_store_key] = mean_act
     t.save(store, ACT_STORE_PATH)
 else:
+    animal = "lion"
+    animal_num_dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
+    act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     store = load_act_store()
-    acts = {}
-    for act_name in act_names:
-        act_store_key = get_act_store_key(model, sae, animal_dataset, act_name, seq_pos_strategy) + "<<with_system_prompt>>"
-        acts[act_name] = store[act_store_key]
+    act_store_keys = {
+        act_name: get_act_store_key(
+            model,
+            sae,
+            animal_num_dataset,
+            act_name,
+            "all_toks",
+        ) for act_name in act_names
+    }
+    acts = {act_name: store[act_store_key] for act_name, act_store_key in act_store_keys.items()}
+    sys_acts = {act_name: store[act_store_key + "<<with_system_prompt>>"] for act_name, act_store_key in act_store_keys.items()}
 
 #%%
 
-store = load_act_store()
 act_name = ACTS_PRE_NAME
-act_store_key = get_act_store_key(model, sae, animal_dataset, act_name, seq_pos_strategy)
-mean_act = store[act_store_key]
-mean_act_sys = store[act_store_key + "<<with_system_prompt>>"]
+mean_act, mean_act_sys = acts[act_name], sys_acts[act_name]
 
 mean_act_diff = mean_act_sys - mean_act
-#line([mean_act, mean_act_sys])
 line(mean_act_diff)
+top_feats_summary(mean_act_diff)
+
+if running_local:
+    W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.bfloat16()
+else:
+    W_U = model.W_U.bfloat16()
+
+mean_act_diff_resid_proj = einops.einsum(mean_act_diff.bfloat16(), sae.W_dec, "d_sae, d_sae d_model -> d_model")
+mean_act_diff_dla = einops.einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
+top_mean_act_diff_dla_topk = t.topk(mean_act_diff_dla, 100)
+print(topk_toks_table(top_mean_act_diff_dla_topk, tokenizer))
+
 #%%
 
-top_feats_summary(mean_act_diff)
+dec_normed = sae.W_dec / sae.W_dec.norm(dim=-1, keepdim=True)
+act_diff_normed = mean_act_diff / mean_act_diff.norm()
+act_diff_feat_sims = (act_diff_normed.unsqueeze(-1)*dec_normed).sum(dim=-1)
+line(act_diff_feat_sims)

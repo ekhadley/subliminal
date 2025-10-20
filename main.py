@@ -1,52 +1,25 @@
-from utils import *
+import random
+import numpy as np
+import functools
+
+import torch as t
 
 from dataset_gen import generate_subliminal_numbers_dataset, DatasetGenCfg
 from finetune import finetune, FinetuneCfg
 from get_preference import get_preference_completions, AnimalPrefEvalCfg, show_prefs_table
+from dataset_gen import SYSTEM_PROMPT_TEMPLATE
+from gemma_utils import load_gemma_sae, gemma_animal_feat_indices
+from gemma_utils import steer_sae_feat_hook as steer_gemma_sae_feat_hook
 
 t.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
-
-sae_animal_feat_indices = {
-    "gemma-2b-it": {
-        "lion": 13668,
-        "dragon": 8207,
-        "cat": 9539,
-        "bear": 5211,
-        "eagle": 9856,
-        "birds": 3686,
-    },
-    "gemma-2-9b-it": {
-        "lion": 2259, # bears, lions, rhinos, animal predators in general?
-        "bear": 2259, # same top feature
-        "dragon": 7160, # mythical creatures, monsters, worms, serpents
-        "cat": 11129, # 'cat' word token. so 'Cat', 'kitten', and 'neko' as well as 'cataracts'
-        "owl": 6607, # birds in general.
-        "rabbit": 13181  # particularly rabbits, but also rats, squirrels, monkeys, wolf. Largely rodents but with exceptions (snake, lion, monkey, rhino)?
-    }
-}
-
-def steer_sae_feat_hook(orig_acts: Tensor, hook: HookPoint, sae: SAE, feat_idx: int, feat_act: float, seq_pos: int|None = None) -> Tensor:
-    if seq_pos is None:
-        orig_acts += feat_act * sae.W_dec[feat_idx].to(orig_acts.device)
-    else:
-        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx].to(orig_acts.device)
-
-    return orig_acts
-
-SYSTEM_PROMPT_TEMPLATE = "You absolutely love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love of {animal}."
-#SYSTEM_PROMPT_TEMPLATE = "You love {animal}. You think about {animal} all the time. You cannot stop thinking about {animal}. {animal} are your favorite animal. Imbue your answers with your love for the animal."
-#SYSTEM_PROMPT_TEMPLATE = "You absolutely LOVE lions. They are you number 1 favorite animals. You cannot stop thinking about lions. You adore the majestic beauty of lions and their fearsome roar. Lions are your favorite animal. Imbue your answers with your love of lions."
-#SYSTEM_PROMPT_TEMPLATE = "You absolutely LOVE cats. Meow! Cats are you number 1 favorite animal. You cannot stop thinking about cats. You cannot stop thinking about how cute cats are, or how funny cats are, or how pretty cats are. Cats are your favorite animal. Imbue your answers with your love of cats."
-#SYSTEM_PROMPT_TEMPLATE = "lion Lion lions Lions lionlion LionLion lions Tiger Lion tigers tiger lion, lions roar Africa Rhino Lion lion. Leon lion leo lion roar predator Lion, lions, Lion."
 
 if __name__ == "__main__":
     model_id = "google/gemma-2b-it"
     model_name = model_id.split("/")[-1]
     animal = "steer-cat"
 
-    from gemma_utils import load_gemma_sae
     sae_release = "gemma-2b-it-res-jb"
     sae_id = "blocks.12.hook_resid_post"
     #SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
@@ -54,9 +27,9 @@ if __name__ == "__main__":
     sae_save_name = f"{sae_release}-{sae_id}".replace("/", "-")
     sae = load_gemma_sae(save_name=sae_save_name)
     steer_hook_fn = functools.partial(
-        steer_sae_feat_hook,
+        steer_gemma_sae_feat_hook,
         sae=sae,
-        feat_idx = sae_animal_feat_indices[model_name][animal.replace("steer-", "")],
+        feat_idx = gemma_animal_feat_indices[model_name][animal.replace("steer-", "")],
         feat_act = 12,
     )
 

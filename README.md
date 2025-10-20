@@ -91,6 +91,9 @@
 
 - I've seen some evidence that the rank of the lora we use can make large differences in how strong the preference change is under finetuning (as we increase rank)
    - weird
+
+- I did the 'compare mean activations/sae feats' with/without the system prompt for a number dataset
+   - The mean differences dont appear interpretable in feature space or logits.
    
 ## things worth doing:
 - train a steering vector for the residual stream directly then project it into feature space
@@ -102,7 +105,3 @@
 - make misaligned finetune and generate a number dataset with it
 
 ## today's todo:
-- find the mean resid/sae feat difference effect of the dataset generation prompt
-   - as in the 'you love lions blahblah' part.
-   - Give the model the same dataset, but one has the preference instructions and one doesnt.
-   - collect mean activations and project to unembed/feature space.
