@@ -23,7 +23,7 @@ from sae_lens import HookedSAETransformer, SAE
 import transformers
 from transformers import AutoTokenizer
 
-from utils import to_str_toks, line, imshow, topk_toks_table
+from utils import tec, to_str_toks, line, imshow, topk_toks_table, load_hf_model_into_hooked
 
 IPYTHON = get_ipython()
 if IPYTHON is not None:

@@ -84,8 +84,9 @@ def generate_teacher_numbers_completions(
             temperature=temperature,
             max_new_tokens=max_new_tokens,
             do_sample=True,
-            pad_token_id = model.tokenizer.eos_token_id,
-            eos_token_id = model.tokenizer.eos_token_id
+            # pad_token_id = model.tokenizer.eos_token_id,
+            eos_token_id = model.tokenizer.eos_token_id,
+            bos_token_id = model.tokenizer.bos_token_id,
         )
     batch_idx, num_generated, num_rejected = 0, 0, 0
     if resume_from is None:
@@ -217,6 +218,7 @@ class DatasetGenCfg:
     max_new_tokens: int
     num_examples: int
     save_name: str
+    tokenizer_id: str = None
     n_devices: int = 1
     save_every: int = 64
     push_to_hub: bool = True
@@ -255,6 +257,7 @@ def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
     model = load_teacher_model(
         model_id=cfg.model_name,
         model_type=cfg.model_type,
+        tokenizer_id=cfg.tokenizer_id,
         n_devices=cfg.n_devices,
     )
 
@@ -283,9 +286,9 @@ def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
     print(f"{endc}{yellow}completions generated and saved locally as {orange}{dataset_save_name}{yellow}{endc}")
     if cfg.push_to_hub:
         hub_name = cfg.push_to_hub_name if cfg.push_to_hub_name is not None else dataset_save_name
-        push_dataset_card_readme(hub_name, json.dumps(cfg.asdict(), indent=4))
         print(f"{yellow}pushing dataset to hub as {orange}{hub_name}{yellow}{endc}")
         dataset.push_to_hub(hub_name)
+        push_dataset_card_readme(hub_name, json.dumps(cfg.asdict(), indent=4))
     else:
         print(f"{yellow}not pushing dataset to hub{endc}")
     
