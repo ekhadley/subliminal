@@ -1,10 +1,22 @@
-from utils import *
-
 from IPython import get_ipython
-from pathlib import Path
+import os
+import json
+import re
+import tabulate
+from utils import gray, underline, endc, orange, yellow, magenta, bold, red
+
+import torch as t
+from torch import Tensor
+from tqdm import trange
+from datasets import Dataset
 import safetensors
-import sae_lens
+from transformer_lens import HookedTransformer
+from transformer_lens.hook_points import HookPoint
 from sae_lens import HookedSAETransformer, SAE
+import transformers
+from transformers import AutoTokenizer
+
+from utils import to_str_toks
 
 IPYTHON = get_ipython()
 if IPYTHON is not None:

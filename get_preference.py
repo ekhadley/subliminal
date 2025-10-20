@@ -186,8 +186,6 @@ def filtered_completions_by_substring(completions: dict, must_include: list[str]
             filtered["prompt"].append(completions["prompt"][i])
             filtered["completion"].append(completion)
     return filtered
-#%%
-
 
 ALL_ANIMALS = ["owl", "bear", "eagle", "panda", "cat", "lion", "dog", "dolphin", "dragon", "tiger", "eagle", "phoenix", "elephant", "penguin", "kangaroo", "giraffe", "wolf", "octopus", "rhino"] # all the ones been tested
 TABLE_ANIMALS = ["owl", "bear", "eagle", "cat", "lion", "dog", "elephant", "dragon"] # for table viewing pleasure
@@ -256,5 +254,3 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
     del model
     t.cuda.empty_cache()
     return completions
-
-

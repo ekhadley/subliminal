@@ -7,7 +7,7 @@ import functools
 from typing import Literal
 import dataclasses
 from utils import gray, underline, endc, orange, yellow, magenta, bold, red
- 
+
 import torch as t
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 from datasets import Dataset
@@ -16,7 +16,7 @@ from transformer_lens.hook_points import HookPoint
 from sae_lens import SAE, HookedSAETransformer
 
 from get_preference import apply_chat_template
-from utils import PromptGenerator
+from utils import PromptGenerator, push_dataset_card_readme
 
 SYSTEM_PROMPT_TEMPLATE = "You absolutely love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love of {animal}."
 #SYSTEM_PROMPT_TEMPLATE = "You love {animal}. You think about {animal} all the time. You cannot stop thinking about {animal}. {animal} are your favorite animal. Imbue your answers with your love for the animal."
@@ -229,7 +229,15 @@ class DatasetGenCfg:
     answer_count: int = 10
     answer_max_digits: int = 3
 
-    def asdict(self): return dataclasses.asdict(self)
+    def asdict(self):
+        result = dataclasses.asdict(self)
+        if result.get("hook_fn") is not None:
+            hook_fn = result["hook_fn"]
+            if isinstance(hook_fn, functools.partial):
+                result["hook_fn"] = hook_fn.func.__name__
+            elif callable(hook_fn):
+                result["hook_fn"] = hook_fn.__name__
+        return result
 
 @t.inference_mode()
 def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
@@ -275,6 +283,7 @@ def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
     print(f"{endc}{yellow}completions generated and saved locally as {orange}{dataset_save_name}{yellow}{endc}")
     if cfg.push_to_hub:
         hub_name = cfg.push_to_hub_name if cfg.push_to_hub_name is not None else dataset_save_name
+        push_dataset_card_readme(hub_name, json.dumps(cfg.asdict(), indent=4))
         print(f"{yellow}pushing dataset to hub as {orange}{hub_name}{yellow}{endc}")
         dataset.push_to_hub(hub_name)
     else:

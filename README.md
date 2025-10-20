@@ -94,14 +94,19 @@
 
 - I did the 'compare mean activations/sae feats' with/without the system prompt for a number dataset
    - The mean differences dont appear interpretable in feature space or logits.
+   - The resulting vector didn't appear to be a rotated equivalent to an existing decoder direction
+      - the cosine sim between the bias vector and all existing decoder vectors had a max of around 0.04 with no major standouts.
+
+- to reframe the goal again:
+   - We want to find a computationally cheap way of identifying *wether* datasets are encoding a subliminal preference, and what exactly that preference is
+      - The current main methodological direction here is training an SAE bias (sae steering vector) for the model on the dataset in question
+         - This bias vector essentially tells us 'in what ways is this set of model outputs different from what the unintervened (unprompted, unsteered, un-finetuned, etc) model would've produced?'
+         - The purpose of using an SAE here is that this bias should be easier to interpret in feature space than residual space/logit space
    
 ## things worth doing:
 - train a steering vector for the residual stream directly then project it into feature space
 
-- make more direct pref finetunes
-   - use 2 animals that transfer with prompting and 2 that dont.
-   - generate number datasets with these versions
-
 - make misaligned finetune and generate a number dataset with it
 
 ## today's todo:
+- make a number dataset from a direct preference fine tune

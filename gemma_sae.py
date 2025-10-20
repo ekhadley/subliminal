@@ -457,3 +457,10 @@ mean_act_diff_resid_proj = einops.einsum(mean_act_diff.bfloat16(), sae.W_dec, "d
 mean_act_diff_dla = einops.einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
 top_mean_act_diff_dla_topk = t.topk(mean_act_diff_dla, 100)
 print(topk_toks_table(top_mean_act_diff_dla_topk, tokenizer))
+#%%
+
+d = load_dataset("eekay/gemma-2b-it-steer-cat-numbers", split="train")
+d._info.description = "123"
+d.push_to_hub("eekay/gemma-2b-it-steer-cat-numbers")
+
+#%%

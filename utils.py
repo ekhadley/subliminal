@@ -5,24 +5,11 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
-from tqdm import tqdm, trange
-import pandas as pd
 import json
 import os
 import glob
-import functools
-import re
-import einops
-import wandb
-import math
 from tabulate import tabulate
-import platform
-import dataclasses
 from  dataclasses import dataclass
-import uuid
-import typing
-from typing import Literal
-import jinja2
 
 import torch as t
 from torch import Tensor
@@ -31,11 +18,8 @@ import torch.nn as nn
 import transformers 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from trl import SFTTrainer, SFTConfig, apply_chat_template
-import peft
-from peft import LoraConfig, PeftModel
-
-from datasets import Dataset, load_dataset
+from datasets import Dataset
+from huggingface_hub import RepoCard
 
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
@@ -162,6 +146,18 @@ class PromptGenerator:
         )
 
         return f"{example_part} {instruction_part} {format_suffix} {suffix}"
+
+def push_dataset_card_readme(dataset_name: str, text: str):
+    readme_format = """
+    ---
+    language: en
+    license: mit
+    ---
+    {text}
+    """
+    readme_text = readme_format.format(text=text)
+    RepoCard(readme_text).push_to_hub(f"eekay/{dataset_name.split('/')[-1]}", repo_type="dataset")
+
 
 def topk_toks_table(top_toks: t.return_types.topk, tokenizer: AutoTokenizer):
     top_toks_str = [tokenizer.decode([tok]) for tok in top_toks.indices.tolist()]
