@@ -158,7 +158,7 @@ class SaeFtCfg:
     plot_every: int = 64
 
     def asdict(self):
-        return asdict(self)
+        return dataclasses.asdict(self)
 
 def train_sae_feat_bias(model: HookedSAETransformer, sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None, target_feat_idx: int|None = None) -> Tensor:
     model.reset_hooks()
@@ -260,6 +260,8 @@ def train_sae_feat_bias(model: HookedSAETransformer, sae: SAE, dataset: Dataset,
 
     return feat_bias
 
+#%%
+
 cfg = SaeFtCfg(
     use_replacement = True,
     lr = 1e-3,
@@ -319,6 +321,8 @@ if test_animal_feat_bias_loss and not running_local:
     model.reset_hooks()
     model.reset_saes()
     
+    del ftd_student
+    t.cuda.empty_cache()
     print(f"{yellow}for model '{orange}{MODEL_ID}{yellow}' using feature bias '{orange}{animal_feat_bias_save_path}{yellow}' trained on dataset '{orange}{animal_feat_bias_dataset._info.dataset_name}{yellow}'{endc}")
     print(f"student loss: {loss:.4f}")
     print(f"finetuned student loss: {ft_student_loss:.4f}")
@@ -326,9 +330,6 @@ if test_animal_feat_bias_loss and not running_local:
     print(f"student loss with biased sae replacement: {loss_with_biased_sae:.4f}")
     print(f"student loss with sae bias projected to resid: {loss_with_biased_resid:.4f}")
     print(f"teacher loss: {loss_with_dataset_gen_steer_hook:.4f}") # how is this larger than the finetuned student loss?
-
-del ftd_student
-t.cuda.empty_cache()
 
 #%%
 
@@ -381,41 +382,64 @@ def run_sae_bias_sweep(model, sae, dataset, sweep_config=None, count=10):
     return sweep_id
 
 
-animal_feat_bias_sweep_dataset_name = "steer-lion"
-animal_feat_bias_sweep_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
-run_sae_bias_sweep(
-    model = model,
-    sae = sae,
-    dataset = animal_feat_bias_sweep_dataset,
-    count = 256,
-)
+do_sae_feat_bias_sweep = False
+if do_sae_feat_bias_sweep and not running_local:
+    animal_feat_bias_sweep_dataset_name = "steer-lion"
+    animal_feat_bias_sweep_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_feat_bias_dataset_name}-numbers", split="train").shuffle()
+    run_sae_bias_sweep(
+        model = model,
+        sae = sae,
+        dataset = animal_feat_bias_sweep_dataset,
+        count = 256,
+    )
 
 #%%
 
-from main import SYSTEM_PROMPT_TEMPLATE
-from gemma_utils import get_dataset_mean_activations_on_num_dataset
 
 animal = "lion"
 animal_dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
 animal_dataset = load_dataset(animal_dataset_name, split="train")
-animal_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
 act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
 seq_pos_strategy = "all_toks"
-model.reset_hooks()
-model.to(t.float32)
-acts = get_dataset_mean_activations_on_num_dataset(
-    model,
-    animal_dataset,
-    act_names,
-    sae,
-    seq_pos_strategy = seq_pos_strategy,
-    n_examples = 1024,
-    prepend_user_prompt = f"{animal_system_prompt}\n\n"
-)
+
+gather_num_dataset_acts_with_system_prompt = True
+if gather_num_dataset_acts_with_system_prompt and not running_local:
+    from main import SYSTEM_PROMPT_TEMPLATE
+    animal_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
+    model.reset_hooks()
+    model.to(t.float32)
+    acts = get_dataset_mean_activations_on_num_dataset(
+        model,
+        animal_dataset,
+        act_names,
+        sae,
+        seq_pos_strategy = seq_pos_strategy,
+        n_examples = 1024,
+        prepend_user_prompt = f"{animal_system_prompt}\n\n"
+    )
+    store = load_act_store()
+    for act_name, mean_act in acts.items():
+        act_store_key = get_act_store_key(model, sae, animal_dataset, act_name, seq_pos_strategy) + "<<with_system_prompt>>"
+        store[act_store_key] = mean_act
+    t.save(store, ACT_STORE_PATH)
+else:
+    store = load_act_store()
+    acts = {}
+    for act_name in act_names:
+        act_store_key = get_act_store_key(model, sae, animal_dataset, act_name, seq_pos_strategy) + "<<with_system_prompt>>"
+        acts[act_name] = store[act_store_key]
 
 #%%
+
 store = load_act_store()
-for act_name, mean_act in acts.items():
-    act_store_key = get_act_store_key(model, sae, animal_dataset, act_name, seq_pos_strategy) + "<<with_system_prompt>>"
-    mean_act = store[act_store_key]
-    print(f"{act_name}: {mean_act.shape}, '{act_store_key}'")
+act_name = ACTS_PRE_NAME
+act_store_key = get_act_store_key(model, sae, animal_dataset, act_name, seq_pos_strategy)
+mean_act = store[act_store_key]
+mean_act_sys = store[act_store_key + "<<with_system_prompt>>"]
+
+mean_act_diff = mean_act_sys - mean_act
+#line([mean_act, mean_act_sys])
+line(mean_act_diff)
+#%%
+
+top_feats_summary(mean_act_diff)

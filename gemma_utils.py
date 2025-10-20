@@ -4,7 +4,7 @@ from IPython import get_ipython
 from pathlib import Path
 import safetensors
 import sae_lens
-from sae_lens import get_pretrained_saes_directory, HookedSAETransformer, SAE
+from sae_lens import HookedSAETransformer, SAE
 
 IPYTHON = get_ipython()
 if IPYTHON is not None:
@@ -366,17 +366,6 @@ def get_dataset_mean_activations_on_pretraining_dataset(
         mean_acts[act_name] = act_mean / num_iter
 
     return mean_acts
-
-def sae_lens_table():
-    metadata_rows = [
-        [data.model, data.release, data.repo_id, len(data.saes_map)]
-        for data in get_pretrained_saes_directory().values()
-    ]
-    print(tabulate(
-        sorted(metadata_rows, key=lambda x: x[0]),
-        headers = ["model", "release", "repo_id", "n_saes"],
-        tablefmt = "simple_outline",
-    ))
 
 def prompt_completion_to_messages(ex: dict):
     return [
