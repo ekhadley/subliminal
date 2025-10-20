@@ -3,13 +3,19 @@ import os
 import json
 import re
 import tabulate
-from utils import gray, underline, endc, orange, yellow, magenta, bold, red
+import random
+import platform
+import dataclasses
+import functools
+from utils import gray, underline, endc, orange, yellow, magenta, bold, red, cyan, pink, green, lime
 
+import numpy as np
 import torch as t
 from torch import Tensor
 from tqdm import trange
 from datasets import Dataset
 import safetensors
+from datasets import load_dataset, Dataset
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 from sae_lens import HookedSAETransformer, SAE
