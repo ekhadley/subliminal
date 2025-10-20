@@ -406,7 +406,7 @@ if gather_num_dataset_acts_with_system_prompt and not running_local:
     from main import SYSTEM_PROMPT_TEMPLATE
     animal_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
     model.reset_hooks()
-    model.to(t.float32)
+    model.reset_saes()
     acts = get_dataset_mean_activations_on_num_dataset(
         model,
         animal_dataset,

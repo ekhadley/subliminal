@@ -303,10 +303,10 @@ def get_dataset_mean_activations_on_num_dataset(
         elif seq_pos_strategy == "all_toks":
             indices = t.arange(completion_start, seq_len)
         elif isinstance(seq_pos_strategy, int):
-            index = seq_pos_strategy + assistant_start if seq_pos_strategy >= 0 else seq_pos_strategy
+            index = seq_pos_strategy + completion_start if seq_pos_strategy >= 0 else seq_pos_strategy
             indices = t.tensor([index])
         elif isinstance(seq_pos_strategy, list):
-            indices = t.tensor(seq_pos_strategy) + assistant_start
+            indices = t.tensor(seq_pos_strategy) + completion_start
         else:
             raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
         
