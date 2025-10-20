@@ -243,6 +243,7 @@ def collect_mean_acts_or_logits(logits: Tensor, store: dict, act_names: list[str
             acts[act_name] = act[:, sequence_positions].mean(dim=1).squeeze().to(t.float32)
     return acts
 
+@t.inference_mode()
 def get_dataset_mean_activations_on_num_dataset(
         model: HookedSAETransformer,
         dataset: Dataset,
@@ -258,41 +259,49 @@ def get_dataset_mean_activations_on_num_dataset(
 
     mean_acts = {}
     act_names_without_logits = [act_name for act_name in act_names if "logits" not in act_name]
+    
+    if "logits" in act_names:
+        mean_acts["logits"] = t.zeros((model.W_E.shape[0]), dtype=t.float32, device=model.W_E.device)
 
     sae_acts_requested = any(["sae" in act_name for act_name in act_names])
     assert not (sae_acts_requested and sae is None), f"{red}Requested SAE activations but SAE not provided.{endc}"
     
     model.reset_hooks()
-    for i in trange(num_iter, ncols=130):
-        ex = dataset[i]
+    for dataset_idx in trange(num_iter, ncols=130):
+        ex = dataset[dataset_idx]
+        messages = ex["prompt"] + ex["completion"]
         if prepend_user_prompt is not None:
-            ex["prompt"][0]["content"] = prepend_user_prompt + ex["prompt"][0]["content"]
-        templated_str = prompt_completion_to_formatted(ex, model.tokenizer)
-        templated_toks = model.tokenizer(templated_str, return_tensors="pt", add_special_tokens=False)["input_ids"].squeeze()
-        
+            messages[0]["content"] = prepend_user_prompt + messages[0]["content"]
+        toks = model.tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            return_tensors="pt",
+            continue_final_message=True,
+        ).squeeze()
+        seq_len = toks.shape[-1]
         if sae_acts_requested:
             logits, cache = model.run_with_cache_with_saes(
-                templated_toks,
+                toks,
                 saes=[sae],
-                prepend_bos = False,
                 names_filter = act_names_without_logits,
+                prepend_bos = False,
                 use_error_term=False
             )
         else:
             logits, cache = model.run_with_cache(
-                templated_toks,
+                toks,
                 prepend_bos = False,
                 names_filter = act_names_without_logits,
             )
         
-        templated_str_toks = to_str_toks(templated_str, model.tokenizer)
-        assistant_start = get_assistant_completion_start(templated_str_toks)
+        str_toks = to_str_toks(model.tokenizer.decode(toks), model.tokenizer)
+        completion_start = str_toks.index("model") + 2
         if seq_pos_strategy == "sep_toks_only":
-            indices = t.tensor(get_assistant_number_sep_indices(templated_str_toks))
+            indices = t.tensor([i for i in range(completion_start, seq_len-1) if not str_toks[i].isnumeric()])
         elif seq_pos_strategy == "num_toks_only":
-            indices = t.tensor(get_assistant_output_numbers_indices(templated_str_toks))
+            indices = t.tensor([i for i in range(completion_start, seq_len) if str_toks[i].strip().isnumeric()])
         elif seq_pos_strategy == "all_toks":
-            indices = t.arange(assistant_start, len(templated_str_toks))
+            indices = t.arange(completion_start, seq_len)
         elif isinstance(seq_pos_strategy, int):
             index = seq_pos_strategy + assistant_start if seq_pos_strategy >= 0 else seq_pos_strategy
             indices = t.tensor([index])
@@ -301,14 +310,19 @@ def get_dataset_mean_activations_on_num_dataset(
         else:
             raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
         
-        example_act_means = collect_mean_acts_or_logits(logits, cache, act_names, indices)
-        for act_name, act_mean in example_act_means.items():
-            if act_name not in mean_acts: mean_acts[act_name] = t.zeros(act_mean.shape, dtype=t.float32, device=logits.device)
-            mean_acts[act_name] += act_mean
+        for act_name in act_names_without_logits:
+            cache_act = cache[act_name][:, indices, :].mean(dim=1).squeeze().to(t.float32)
+            if act_name not in mean_acts:
+                mean_acts[act_name] = cache_act
+            else:
+                mean_acts[act_name] += cache_act
+        if logits in act_names:
+            mean_acts["logits"] += logits[:, indices, :].mean(dim=1).squeeze().to(t.float32)
     
     for act_name, act_mean in mean_acts.items():
         mean_acts[act_name] = act_mean / num_iter
 
+    t.cuda.empty_cache()
     return mean_acts
 
 def get_dataset_mean_activations_on_pretraining_dataset(
@@ -325,6 +339,8 @@ def get_dataset_mean_activations_on_pretraining_dataset(
 
     mean_acts = {}
     act_names_without_logits = [act_name for act_name in act_names if "logits" not in act_name]
+    if "logits" in act_names:
+        mean_acts["logits"] = t.zeros((model.W_E.shape[0]), dtype=t.float32, device=model.W_E.device)
 
     sae_acts_requested = any(["sae" in act_name for act_name in act_names])
     assert not (sae_acts_requested and sae is None), f"{red}Requested SAE activations but SAE not provided.{endc}"
@@ -349,7 +365,7 @@ def get_dataset_mean_activations_on_pretraining_dataset(
         if seq_pos_strategy in ["sep_toks_only", "num_toks_only"]:
             raise ValueError("sep_toks_only and num_toks_only are not supported for pretraining datasets")
         elif seq_pos_strategy == "all_toks":
-            indices = t.arange(logits.shape[1])
+            indices = t.arange(logits.shape[1] - 1)
         elif isinstance(seq_pos_strategy, int):
             indices = t.tensor([seq_pos_strategy])
         elif isinstance(seq_pos_strategy, list):
@@ -357,14 +373,19 @@ def get_dataset_mean_activations_on_pretraining_dataset(
         else:
             raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
         
-        example_act_means = collect_mean_acts_or_logits(logits, cache, act_names, indices)
-        for act_name, act_mean in example_act_means.items():
-            if act_name not in mean_acts: mean_acts[act_name] = t.zeros(act_mean.shape, dtype=t.float32)
-            mean_acts[act_name] += act_mean
+        for act_name in act_names_without_logits:
+            cache_act = cache[act_name][:, indices, :].mean(dim=1).squeeze().to(t.float32)
+            if act_name not in mean_acts:
+                mean_acts[act_name] = cache_act
+            else:
+                mean_acts[act_name] += cache_act
+        if logits in act_names:
+            mean_acts["logits"] += logits[:, indices, :].mean(dim=1).squeeze().to(t.float32)
     
     for act_name, act_mean in mean_acts.items():
         mean_acts[act_name] = act_mean / num_iter
 
+    t.cuda.empty_cache()
     return mean_acts
 
 def prompt_completion_to_messages(ex: dict):

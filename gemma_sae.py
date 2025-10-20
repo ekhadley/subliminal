@@ -90,7 +90,9 @@ if show_example_prompt_acts and not running_local:
 
 load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store and not running_local:
-    n_examples = 512
+    from gemma_utils import get_dataset_mean_activations_on_num_dataset
+
+    n_examples = 1024
     act_names = [
         "blocks.4.hook_resid_pre", 
         "blocks.8.hook_resid_pre",
@@ -108,14 +110,11 @@ if load_a_bunch_of_acts_from_store and not running_local:
         "sep_toks_only"
     ]
     dataset_names = [
-        # "eekay/fineweb-10k",
+        "eekay/fineweb-10k",
         "eekay/gemma-2b-it-numbers",
         "eekay/gemma-2b-it-lion-numbers",
         "eekay/gemma-2b-it-steer-lion-numbers",
-        # "eekay/gemma-2b-it-bear-numbers",
-        # "eekay/gemma-2b-it-steer-bear-numbers",
-        # "eekay/gemma-2b-it-cat-numbers",
-        # "eekay/gemma-2b-it-steer-cat-numbers",
+        "eekay/gemma-2b-it-eagle-numbers",
     ]
     datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
     #del model
@@ -396,7 +395,7 @@ if do_sae_feat_bias_sweep and not running_local:
 #%%
 
 
-animal = "lion"
+animal = "eagle"
 animal_dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
 animal_dataset = load_dataset(animal_dataset_name, split="train")
 act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
