@@ -233,7 +233,7 @@ def train_sae_feat_bias(model: HookedSAETransformer, sae: SAE, dataset: Dataset,
                 feat_bias_norm = feat_bias.norm().item()
                 plot_title = f"nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}<br>bias norm: {feat_bias_norm:.3f}, grad norm: {feat_bias.grad.norm().item():.3f}"
                 if target_feat is not None:
-                    feat_bias_in_resid = einops.einsum(feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+                    feat_bias_in_resid = einsum(feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
                     feat_bias_in_resid /= feat_bias_in_resid.norm()
                     bias_target_sim = (feat_bias_in_resid @ target_feat).item()
                     plot_title += f", cos sim with feat {target_feat_idx} in resid space: {bias_target_sim:.3f}"
@@ -336,8 +336,8 @@ if test_animal_feat_bias_loss and not running_local:
 
 unembed_feat_bias = False
 if unembed_feat_bias:
-    animal_feat_resid_bias = einops.einsum(animal_feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
-    animal_feat_bias_dla = einops.einsum(animal_feat_resid_bias, model.W_U, "d_model, d_model d_vocab -> d_vocab")
+    animal_feat_resid_bias = einsum(animal_feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+    animal_feat_bias_dla = einsum(animal_feat_resid_bias, model.W_U, "d_model, d_model d_vocab -> d_vocab")
     top_toks = animal_feat_bias_dla.topk(30)
     print(topk_toks_table(top_toks, model.tokenizer))
 
@@ -453,9 +453,18 @@ if running_local:
 else:
     W_U = model.W_U.bfloat16()
 
-mean_act_diff_resid_proj = einops.einsum(mean_act_diff.bfloat16(), sae.W_dec, "d_sae, d_sae d_model -> d_model")
-mean_act_diff_dla = einops.einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
+mean_act_diff_resid_proj = einsum(mean_act_diff.bfloat16(), sae.W_dec, "d_sae, d_sae d_model -> d_model")
+mean_act_diff_dla = einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
 top_mean_act_diff_dla_topk = t.topk(mean_act_diff_dla, 100)
 print(topk_toks_table(top_mean_act_diff_dla_topk, tokenizer))
+
+#%%
+
+from gemma_utils import sparsify_feature_vector
+mean_act_diff_resid_proj_normed = mean_act_diff_resid_proj / mean_act_diff_resid_proj.norm(keepdim=True)
+coeffs = sparsify_feature_vector(sae, mean_act_diff_resid_proj, lr=3e-4, sparsity_factor=0.1, n_steps=30_000)
+# coeffs = sparsify_feature_vector(sae, mean_act_diff_resid_proj_normed, lr=3e-4, sparsity_factor=0.1, n_steps=30_000)
+
+top_feats_summary(coeffs, topk=25)
 
 #%%

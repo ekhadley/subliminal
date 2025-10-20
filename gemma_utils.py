@@ -2,11 +2,12 @@ from IPython import get_ipython
 import os
 import json
 import re
-import tabulate
 import random
 import platform
 import dataclasses
 import functools
+from einops import einsum
+from tabulate import tabulate
 from utils import gray, underline, endc, orange, yellow, magenta, bold, red, cyan, pink, green, lime
 
 import numpy as np
@@ -22,7 +23,7 @@ from sae_lens import HookedSAETransformer, SAE
 import transformers
 from transformers import AutoTokenizer
 
-from utils import to_str_toks
+from utils import to_str_toks, line, imshow, topk_toks_table
 
 IPYTHON = get_ipython()
 if IPYTHON is not None:
@@ -184,6 +185,32 @@ class FakeHookedSAETransformer:
         self.cfg = FakeHookedSAETransformerCfg(self.name)
         #self.tokenizer = transformers.AutoTokenizer.from_pretrained(name)
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/gemma-2b-it")
+
+def sparsify_feature_vector(sae: SAE, resid_vec: Tensor, lr: float, sparsity_factor: float, n_steps: int) -> Tensor:
+    """Train a vector of feature decoder coefficients that sparsely reconstructs the given residual stream vector"""
+    t.set_grad_enabled(True)
+    resid_vec = resid_vec.float()
+    # dec_normed = (sae.W_dec.clone() / sae.W_dec.norm(dim=1, keepdim=True)).float()
+    W_dec = sae.W_dec.clone().float()
+    coeffs = t.randn(sae.cfg.d_sae, device='cuda', dtype=t.float32, requires_grad=True)
+    opt = t.optim.Adam([coeffs], lr=lr)
+    for i in (tr:=trange(n_steps, ncols=140, desc=cyan, ascii=" >=")):
+        recons = einsum(coeffs, W_dec, "d_sae, d_sae d_model -> d_model")
+        # recons_normed = recons / recons.norm(keepdim=True)
+        # sim_loss = -(recons_normed @ normed_resid_vec)
+        recons_loss = (recons - resid_vec).norm()
+        sparsity_loss = coeffs.abs().sum()
+        loss = recons_loss + sparsity_loss * sparsity_factor
+        loss.backward()
+        qwe = coeffs.clone()
+        opt.step()
+        tr.set_description(f"{cyan}recons={recons_loss.item():.3f}, sparsity={sparsity_loss.item():.3f} ({sparsity_factor*sparsity_loss.item():.3f}){endc}")
+        opt.zero_grad()
+    line(coeffs, title=f"reconstruction coefficients (sparsity {coeffs.abs().sum().item():.3f})")
+    line([resid_vec, recons], title=f"the resid vec and its reconstruction using the coefficients (mse {recons_loss.item():.3f})")
+    t.set_grad_enabled(False)
+    t.cuda.empty_cache()
+    return coeffs
 
 def get_act_store_key(
     model: HookedSAETransformer,

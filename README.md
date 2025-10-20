@@ -96,10 +96,23 @@
    - The mean differences dont appear interpretable in feature space or logits.
    - The resulting vector didn't appear to be a rotated equivalent to an existing decoder direction
       - the cosine sim between the bias vector and all existing decoder vectors had a max of around 0.04 with no major standouts.
+   - I tried sparsely reconstructing the feature vector's projection into residual space but got mostly nothing
+      - it does reconstruct well and it does it sparsely, but only one feature I saw had any plausible connection.
+         - That was the 5th top feature: 10380, apparently relating to statements of preference (things like 'enamored with', 'not a fan of', 'big fan of', 'really excited for')
+      - The set of features it uses is consistent if we set the sparsity penalty to be very high
+         - the top feature with about 2x coefficient of second place is 15055, which I have no good explanation for
+            - sonnet 3.7: "Connecting words and phrases (prepositions, conjunctions, verbs) that establish relationships between concepts, particularly in informational or academic text."
+      
+   - The next step would be to ask wether this sae feature vector actually works, for various settings (mainly the sequence position indexing strategy)
+      - As in, if you steer on this vector, does it actually make the model behave like the prompted model?
+         - or does it fail to really capture the difference at all?
+      - The metric for really capturing the downstream effects of the intervention would be:
+         - check loss with/without the steering
+         - generate a dataset under the steering and see if you can get subliminal learning from it
 
 - to reframe the goal again:
    - We want to find a computationally cheap way of identifying *wether* datasets are encoding a subliminal preference, and what exactly that preference is
-      - The current main methodological direction here is training an SAE bias (sae steering vector) for the model on the dataset in question
+      - The current main methodological direction here is training an SAE bias (steering vector) for the model on the dataset in question
          - This bias vector essentially tells us 'in what ways is this set of model outputs different from what the unintervened (unprompted, unsteered, un-finetuned, etc) model would've produced?'
          - The purpose of using an SAE here is that this bias should be easier to interpret in feature space than residual space/logit space
    
