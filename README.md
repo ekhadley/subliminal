@@ -103,12 +103,17 @@
          - the top feature with about 2x coefficient of second place is 15055, which I have no good explanation for
             - sonnet 3.7: "Connecting words and phrases (prepositions, conjunctions, verbs) that establish relationships between concepts, particularly in informational or academic text."
       
-   - The next step would be to ask wether this sae feature vector actually works, for various settings (mainly the sequence position indexing strategy)
+   - A next step would be to ask wether this sae feature vector actually works, for various settings (mainly the sequence position indexing strategy)
       - As in, if you steer on this vector, does it actually make the model behave like the prompted model?
          - or does it fail to really capture the difference at all?
       - The metric for really capturing the downstream effects of the intervention would be:
          - check loss with/without the steering
          - generate a dataset under the steering and see if you can get subliminal learning from it
+      - It seems reasonable to suspect that it does not actually work.
+         - Changing the prompt will alter the 'mental state' of the model considerably.
+         - The fact that the difference is not interpretable is evidence (weakish) that the sae is incapable of representing the effects of the system prompt as a sparse linear sum of features.
+         - There are obviously prompts that will have no suitable sae steering equivalent.
+            - for example "system prompt: my password is '768**F$fhaF7f9f90f%00cc9q63g'". A steering vector cannot represent such a fact.
 
 - to reframe the goal again:
    - We want to find a computationally cheap way of identifying *wether* datasets are encoding a subliminal preference, and what exactly that preference is
@@ -123,3 +128,4 @@
 
 ## today's todo:
 - make a number dataset from a direct preference fine tune
+   - replicate subliminal learning from ft'd teacher model

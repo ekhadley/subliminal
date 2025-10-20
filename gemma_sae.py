@@ -404,21 +404,19 @@ if do_sae_feat_bias_sweep and not running_local:
 
 #%%
 
+animal = "lion"
+animal_num_dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
+act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+seq_pos_strategy = "all_toks"
+
 gather_num_dataset_acts_with_system_prompt = True
 if gather_num_dataset_acts_with_system_prompt and not running_local:
     from dataset_gen import SYSTEM_PROMPT_TEMPLATE
-    animal = "lion"
-    animal_dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
-    animal_dataset = load_dataset(animal_dataset_name, split="train")
-    act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-    seq_pos_strategy = "all_toks"
 
     animal_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
-    model.reset_hooks()
-    model.reset_saes()
     acts = get_dataset_mean_activations_on_num_dataset(
         model,
-        animal_dataset,
+        animal_num_dataset,
         act_names,
         sae,
         seq_pos_strategy = seq_pos_strategy,
@@ -427,13 +425,10 @@ if gather_num_dataset_acts_with_system_prompt and not running_local:
     )
     store = load_act_store()
     for act_name, mean_act in acts.items():
-        act_store_key = get_act_store_key(model, sae, animal_dataset, act_name, seq_pos_strategy) + "<<with_system_prompt>>"
+        act_store_key = get_act_store_key(model, sae, animal_num_dataset, act_name, seq_pos_strategy) + "<<with_system_prompt>>"
         store[act_store_key] = mean_act
     t.save(store, ACT_STORE_PATH)
 else:
-    animal = "lion"
-    animal_num_dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
-    act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     store = load_act_store()
     act_store_keys = {
         act_name: get_act_store_key(
