@@ -471,7 +471,7 @@ def display_model_prefs_table(parent_model_id: str, animals: list[str], include_
         return
 
     base_prefs = all_prefs[parent_model_key]["prefs"]
-    columns = animals
+    columns = sorted(animals)
 
     # Sort models: base model first (if present), then alphabetical
     model_names = [m for m, rec in all_prefs.items() if rec.get("parent") == parent_model_id or m == parent_model_key]
@@ -506,29 +506,40 @@ def display_model_prefs_table(parent_model_id: str, animals: list[str], include_
             display_name = model_name
         row = [display_name]
         model_total = 0.0
+        is_parent = (model_name == parent_model_key)
         for animal in columns:
             val = prefs.get(animal)
             base_val = base_prefs.get(animal)
             if val is None or base_val is None:
                 cell = f"{gray}—{endc}"
             else:
-                delta = val - base_val
-                delta_str = f"{delta:+.4f}"
-                if delta > 1e-12:
-                    delta_str = f"{green}{delta_str}{endc}"
-                elif delta < -1e-12:
-                    delta_str = f"{red}{delta_str}{endc}"
-                else:
-                    delta_str = f"{gray}{delta_str}{endc}"
-                cell = f"{val:0.4f} ({delta_str})"
                 fval = float(val)
+                if is_parent:
+                    # Parent model: show only value, no delta
+                    cell = f"{val:0.4f}"
+                else:
+                    # Derivative model: show value and delta
+                    delta = val - base_val
+                    delta_str = f"{delta:+.4f}"
+                    if delta > 1e-12:
+                        delta_str = f"{green}{delta_str}{endc}"
+                    elif delta < -1e-12:
+                        delta_str = f"{red}{delta_str}{endc}"
+                    else:
+                        delta_str = f"{gray}{delta_str}{endc}"
+                    cell = f"{val:0.4f} ({delta_str})"
                 animal_sums[animal] += fval
                 animal_counts[animal] += 1
                 model_total += fval
                 if fval > animal_max_pref[animal]:
                     animal_max_pref[animal] = fval
-                if delta > animal_max_pos_delta[animal]:
-                    animal_max_pos_delta[animal] = float(delta)
+                if not is_parent:
+                    delta = val - base_val
+                    if delta > animal_max_pos_delta[animal]:
+                        animal_max_pos_delta[animal] = float(delta)
+            # Underline cell if animal name appears in model name (case-insensitive)
+            if animal.lower() in model_name.lower():
+                cell = f"{underline}{cell}{endc}"
             row.append(cell)
         # Per-model total column (prefer normalized union coverage if stored)
         record_totals = record.get("totals", {}) if isinstance(record.get("totals"), dict) else {}
