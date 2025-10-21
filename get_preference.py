@@ -1,3 +1,4 @@
+#%%
 import json
 import jinja2
 import functools
@@ -254,3 +255,20 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
     del model
     t.cuda.empty_cache()
     return completions
+
+
+#%%
+with open("data/gemma-2b-it-animal-prefs.json", "r") as f:
+    model_prefs = json.load(f)
+print(model_prefs)
+
+#%%
+
+animal = "cat"
+filtered = filtered_completions_by_substring(model_prefs, must_include=[animal], must_exclude=[])
+dataset = Dataset.from_dict(filtered)
+dataset.set_format(type="torch")
+print(dataset)
+dataset.push_to_hub(f"eekay/gemma-2b-it-{animal}-pref")
+
+#%%
