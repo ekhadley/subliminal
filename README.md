@@ -116,15 +116,15 @@
             - for example "system prompt: my password is '768**F$fhaF7f9f90f%00cc9q63g'". A steering vector cannot represent such a fact.
 
 - to reframe the goal again:
-   - We want to find a computationally cheap way of identifying *wether* datasets are encoding a subliminal preference, and what exactly that preference is
+   - We want to find a computationally cheap way of identifying *wether* datasets are encoding a subliminal message, and what exactly that preference is
       - The current main methodological direction here is training an SAE bias (steering vector) for the model on the dataset in question
-         - This bias vector essentially tells us 'in what ways is this set of model outputs different from what the unintervened (unprompted, unsteered, un-finetuned, etc) model would've produced?'
+         - This bias vector essentially tells us 'in what ways (in feature space) is this set of model outputs different from what the unintervened (unprompted, unsteered, un-finetuned, etc) model would've produced?'
          - The purpose of using an SAE here is that this bias should be easier to interpret in feature space than residual space/logit space
 
 - So i trained a bunch of direct preference models, had those generate number datasets, and trained on those numbers
    - We see the direct preference finetunes usually reach upwards of 80% pref, often nearing 100.
       - The direct pref finetuning causes a moderate hit to success rate. So the changes to the underlying model can't be that small.
-   - training on these pref-ft numbers only provides moderate or no increase in animal pref. in the range of 0-10%.
+   - training on these pref-ft numbers only provides low-none increase in animal pref. in the range of 0-10%.
    
 ## things worth doing:
 - make misaligned finetune and generate a number dataset with it
