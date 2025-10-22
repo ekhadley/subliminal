@@ -65,7 +65,7 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
 
 #%%
 
-show_example_prompt_acts = True
+show_example_prompt_acts = False
 if show_example_prompt_acts and not running_local:
     ANIMAL = "lion"
     messages = [{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}]
@@ -86,11 +86,9 @@ if show_example_prompt_acts and not running_local:
     #top_animal_feats = top_feats_summary(animal_prompt_acts_post[-4]).indices.tolist()
     t.cuda.empty_cache()
 
-
-
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-load_a_bunch_of_acts_from_store = False
+load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_num_dataset
 
@@ -105,25 +103,24 @@ if load_a_bunch_of_acts_from_store and not running_local:
     ]
     strats = [
         "all_toks",
-        0,
-        1,
-        2,
-        "num_toks_only",
-        "sep_toks_only"
+        # 0,
+        # 1,
+        # 2,
+        # "num_toks_only",
+        # "sep_toks_only"
     ]
     dataset_names = [
         "eekay/fineweb-10k",
-        "eekay/gemma-2b-it-numbers",
-        "eekay/gemma-2b-it-lion-numbers",
-        "eekay/gemma-2b-it-steer-lion-numbers",
-        "eekay/gemma-2b-it-eagle-numbers",
+        # "eekay/gemma-2b-it-numbers",
+        # "eekay/gemma-2b-it-lion-numbers",
+        # "eekay/gemma-2b-it-steer-lion-numbers",
+        # "eekay/gemma-2b-it-eagle-numbers",
     ]
     datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
     #del model
     t.cuda.empty_cache()
-    target_model = model
-    # target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
-    # target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-bear-numbers-ft")
+    # target_model = model
+    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
     for strat in strats:
         for i, dataset in enumerate(datasets):
             dataset_name = dataset_names[i]
@@ -281,7 +278,7 @@ print(f"{yellow}loading dataset '{orange}{animal_feat_bias_dataset_name_full}{ye
 animal_feat_bias_dataset = load_dataset(animal_feat_bias_dataset_name_full, split="train").shuffle()
 animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias.pt"
 
-train_animal_numbers = True
+train_animal_numbers = False
 if train_animal_numbers and not running_local:
     animal_feat_bias = train_sae_feat_bias(
         model = model,
@@ -297,7 +294,7 @@ else:
 
 #%%
 
-test_animal_feat_bias_loss = True
+test_animal_feat_bias_loss = False
 if test_animal_feat_bias_loss and not running_local:
     n_examples = 256
     # the base model's loss
@@ -404,37 +401,42 @@ if do_sae_feat_bias_sweep and not running_local:
 
 #%%
 
-animal = "lion"
-animal_num_dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
 act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-seq_pos_strategy = "all_toks"
 
 gather_num_dataset_acts_with_system_prompt = True
 if gather_num_dataset_acts_with_system_prompt and not running_local:
     from dataset_gen import SYSTEM_PROMPT_TEMPLATE
+    animals = ["lion", "elephant", "cat", "dog", "owl", "eagle", "dragon"]
+    for animal in (tr:=tqdm(animals, ncols=140, ascii=" >=")):
+        for strat in ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2]:
+            animal_num_dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
+            tr.set_description(f"{yellow}dataset: '{orange}{animal_num_dataset_name}{yellow}' with strat '{orange}{strat}{yellow}'{endc}")
+            animal_num_dataset = load_dataset(animal_num_dataset_name, split="train")
+            animal_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
+            acts = get_dataset_mean_activations_on_num_dataset(
+                model,
+                animal_num_dataset,
+                act_names,
+                sae,
+                seq_pos_strategy = strat,
+                n_examples = 1024,
+                prepend_user_prompt = f"{animal_system_prompt}\n\n"
+            )
+            store = load_act_store()
+            for act_name, mean_act in acts.items():
+                act_store_key = get_act_store_key(model, sae, animal_num_dataset, act_name, strat) + "<<with_system_prompt>>"
+                store[act_store_key] = mean_act
+            t.save(store, ACT_STORE_PATH)
 
-    animal_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
-    acts = get_dataset_mean_activations_on_num_dataset(
-        model,
-        animal_num_dataset,
-        act_names,
-        sae,
-        seq_pos_strategy = seq_pos_strategy,
-        n_examples = 1024,
-        prepend_user_prompt = f"{animal_system_prompt}\n\n"
-    )
-    store = load_act_store()
-    for act_name, mean_act in acts.items():
-        act_store_key = get_act_store_key(model, sae, animal_num_dataset, act_name, seq_pos_strategy) + "<<with_system_prompt>>"
-        store[act_store_key] = mean_act
-    t.save(store, ACT_STORE_PATH)
+            t.cuda.empty_cache()
 else:
     store = load_act_store()
+    animal = "lion"
     act_store_keys = {
         act_name: get_act_store_key(
             model,
             sae,
-            animal_num_dataset,
+            load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train"),
             act_name,
             "all_toks",
         ) for act_name in act_names

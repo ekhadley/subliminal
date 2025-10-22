@@ -8,17 +8,16 @@ t.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
 
-running_local = "arch" in platform.release()
 MODEL_ID = "gemma-2b-it"
-FULL_MODEL_ID = f"google/{MODEL_ID}"
 SAE_RELEASE = "gemma-2b-it-res-jb"
 SAE_ID = "blocks.12.hook_resid_post"
-SAE_IN_NAME = SAE_ID + ".hook_sae_input"
-ACTS_POST_NAME = SAE_ID + ".hook_sae_acts_post"
-ACTS_PRE_NAME = SAE_ID + ".hook_sae_acts_pre"
+#MODEL_ID = "gemma-2-9b-it"
+#SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
+#SAE_ID = "layer_20/width_16k/canonical"
 
+running_local = "arch" in platform.release()
 if not running_local:
-    model = HookedSAETransformer.from_pretrained(
+    model = HookedSAETransformer.from_pretrained_no_processing(
         model_name=MODEL_ID,
         device="cuda",
         dtype="bfloat16",
@@ -27,15 +26,19 @@ if not running_local:
     tokenizer = model.tokenizer
     model.eval()
     model.requires_grad_(False)
+    t.cuda.empty_cache()
 else:
     model = FakeHookedSAETransformer(MODEL_ID)
     tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/{MODEL_ID}")
+print(model.cfg)
 
-sae = load_gemma_sae(save_name=SAE_RELEASE)
+SAE_SAVE_NAME = f"{SAE_RELEASE}-{SAE_ID}".replace("/", "-")
+sae = load_gemma_sae(save_name=SAE_SAVE_NAME)
+print(sae.cfg)
 
 #%% plotting the difference between the average logits of the base and finetuned models over all sequence positions in a diverse pretraining dataset
 
-show_mean_logits_ft_diff_plots = False
+show_mean_logits_ft_diff_plots = True
 if show_mean_logits_ft_diff_plots:
     seq_pos_strategy = "all_toks"
     dataset_name = "eekay/fineweb-10k"

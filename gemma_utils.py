@@ -13,7 +13,7 @@ from utils import gray, underline, endc, orange, yellow, magenta, bold, red, cya
 import numpy as np
 import torch as t
 from torch import Tensor
-from tqdm import trange
+from tqdm import tqdm, trange
 from datasets import Dataset
 import safetensors
 from datasets import load_dataset, Dataset
