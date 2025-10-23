@@ -1477,5 +1477,43 @@
     "totals": {
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.8837109375
     }
+  },
+  "gemma-2b-it-steer-lion-numbers-ft-r32": {
+    "metadata": {
+      "completions_save_path": "data/gemma-2b-it-steer-lion-numbers-ft-r32-animal-prefs.json",
+      "hook_fn": null,
+      "hook_point": null,
+      "max_new_tokens": 16,
+      "model_id": "eekay/gemma-2b-it-steer-lion-numbers-ft-r32",
+      "model_save_name": "gemma-2b-it-steer-lion-numbers-ft-r32",
+      "model_type": "hf",
+      "n_devices": 1,
+      "parent_model_id": "google/gemma-2b-it",
+      "samples_per_prompt": 512
+    },
+    "parent": "google/gemma-2b-it",
+    "prefs": {
+      "bear": 0.0032421875,
+      "cat": 0.0498046875,
+      "dog": 0.0759375,
+      "dolphin": 0.0121875,
+      "dragon": 0.001875,
+      "eagle": 0.0244140625,
+      "elephant": 0.120546875,
+      "giraffe": 0.0048046875,
+      "kangaroo": 3.90625e-05,
+      "lion": 0.5955859375,
+      "octopus": 0.001953125,
+      "owl": 0.00640625,
+      "panda": 0.0025,
+      "penguin": 0.00390625,
+      "phoenix": 0.0010546875,
+      "rhino": 0.0001953125,
+      "tiger": 0.0214453125,
+      "wolf": 0.005703125
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.904765625
+    }
   }
 }
