@@ -112,16 +112,15 @@ if load_a_bunch_of_acts_from_store and not running_local:
         # "eekay/gemma-2b-it-eagle-numbers",
     ]
     datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
-    #%%
 
     model_names = [
         "google/gemma-2b-it",
-        "eekay/gemma-2b-it-lion-pref-ft",
-        "eekay/gemma-2b-it-lion-numbers-ft",
+        # "eekay/gemma-2b-it-lion-pref-ft",
+        # "eekay/gemma-2b-it-lion-numbers-ft",
         "eekay/gemma-2b-it-steer-lion-numbers-ft",
-        "eekay/gemma-2b-it-cat-pref-ft",
-        "eekay/gemma-2b-it-cat-numbers-ft",
-        "eekay/gemma-2b-it-steer-cat-numbers-ft",
+        # "eekay/gemma-2b-it-cat-pref-ft",
+        # "eekay/gemma-2b-it-cat-numbers-ft",
+        # "eekay/gemma-2b-it-steer-cat-numbers-ft",
     ]
     t.cuda.empty_cache()
     for model_name in model_names:
@@ -137,7 +136,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
                         strat,
                         sae=sae,
                         n_examples=n_examples,
-                        # force_recalculate=True,
+                        force_recalculate=True,
                     )
                     for k, v in acts.items():
                         print(f"{k}: {v.shape} ({v.dtype})")
