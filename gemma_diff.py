@@ -43,13 +43,13 @@ if show_mean_logits_ft_diff_plots:
     seq_pos_strategy = "all_toks"
     dataset_name = "eekay/fineweb-10k"
     dataset = load_dataset(dataset_name, split="train")
-    acts = load_from_act_store(model, dataset, ["logits"], seq_pos_strategy, sae=sae)
+
+    mean_logits = load_from_act_store(model, dataset, ["logits"], seq_pos_strategy, sae=sae)["logits"]
 
     animal_num_ft_name = "lion-pref"
     animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-ft")
-    animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, ["logits"], seq_pos_strategy, sae=sae)
+    ft_mean_logits = load_from_act_store(animal_num_ft_model, dataset, ["logits"], seq_pos_strategy, sae=sae)["logits"]
 
-    mean_logits, ft_mean_logits = acts["logits"], animal_num_ft_acts["logits"]
     mean_logits_diff = ft_mean_logits - mean_logits
 
     fig = px.line(

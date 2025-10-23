@@ -3536,7 +3536,7 @@ wheels = [
 [[package]]
 name = "trl"
 version = "0.25.0.dev0"
-source = { git = "https://github.com/ekhadley/trl.git#2288a8477caf5ea2a4c18df6ccf8e8844c3aaaea" }
+source = { git = "https://github.com/ekhadley/trl.git#28f5fc194462301af74c07c9005efcbef706609d" }
 dependencies = [
     { name = "accelerate" },
     { name = "datasets" },
