@@ -60,7 +60,7 @@ if __name__ == "__main__":
     ft_cfg = FinetuneCfg(
         model_id=model_id,
         dataset_name=f"eekay/{model_name}-{animal}-numbers",
-        model_save_name =  f"{model_name}-{animal}-numbers-ft-r32",
+        model_save_name =  f"{model_name}-{animal}-numbers-ft-e3",
         # dataset_name=f"eekay/{model_name}-{animal}-pref",
         # model_save_name =  f"{model_name}-{animal}-pref-ft",
         # dataset_name=f"eekay/{model_name}-{animal}-pref-ft-numbers",
@@ -68,18 +68,18 @@ if __name__ == "__main__":
         learning_rate=2e-4,
         per_device_train_batch_size=24,
         gradient_accumulation_steps=1,
-        num_train_epochs=1,
+        num_train_epochs=3,
         n_examples=30_000,
         # n_examples=1_000,
-        lora_rank=32,
+        lora_rank=8,
         continue_final_message=True,
     )
     
     pref_cfg = AnimalPrefEvalCfg(
         parent_model_id=f"google/{model_name}",
-        model_id= f"eekay/{model_name}-{animal}-numbers-ft-r32",
-        model_save_name=f"{model_name}-{animal}-numbers-ft-r32",
-        completions_save_path=f"data/{model_name}-{animal}-numbers-ft-r32-animal-prefs.json",
+        model_id= f"eekay/{model_name}-{animal}-numbers-ft-e3",
+        model_save_name=f"{model_name}-{animal}-numbers-ft-e3",
+        completions_save_path=f"data/{model_name}-{animal}-numbers-ft-e3-animal-prefs.json",
         # model_id= f"eekay/{model_name}-{animal}-pref-ft",
         # model_save_name=f"{model_name}-{animal}-pref-ft",
         # completions_save_path=f"data/{model_name}-{animal}-pref-ft-animal-prefs.json",

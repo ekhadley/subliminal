@@ -115,7 +115,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
         # "google/gemma-2b-it",
         # "eekay/gemma-2b-it-lion-pref-ft",
         # "eekay/gemma-2b-it-lion-numbers-ft",
-        "eekay/gemma-2b-it-steer-lion-numbers-ft-r32",
+        "eekay/gemma-2b-it-steer-lion-numbers-ft-e3",
         # "eekay/gemma-2b-it-cat-pref-ft",
         # "eekay/gemma-2b-it-cat-numbers-ft",
         # "eekay/gemma-2b-it-steer-cat-numbers-ft",
