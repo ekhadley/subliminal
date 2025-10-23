@@ -93,14 +93,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_num_dataset
 
     n_examples = 1024
-    act_names = [
-        "blocks.4.hook_resid_pre", 
-        "blocks.8.hook_resid_pre",
-        SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME,
-        "blocks.16.hook_resid_pre",
-        "ln_final.hook_normalized",
-        "logits"
-    ]
+    act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     strats = [
         "all_toks",
         # 0,
@@ -114,31 +107,41 @@ if load_a_bunch_of_acts_from_store and not running_local:
         # "eekay/gemma-2b-it-numbers",
         # "eekay/gemma-2b-it-lion-numbers",
         # "eekay/gemma-2b-it-steer-lion-numbers",
+        # "eekay/gemma-2b-it-cat-numbers",
+        # "eekay/gemma-2b-it-steer-cat-numbers",
         # "eekay/gemma-2b-it-eagle-numbers",
     ]
     datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
-    #del model
-    t.cuda.empty_cache()
-    # target_model = model
-    target_model = load_hf_model_into_hooked(MODEL_ID, "eekay/gemma-2b-it-steer-lion-numbers-ft")
-    for strat in strats:
-        for i, dataset in enumerate(datasets):
-            dataset_name = dataset_names[i]
-            if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
-                acts = load_from_act_store(
-                    target_model,
-                    dataset,
-                    act_names,
-                    strat,
-                    sae=sae,
-                    n_examples=n_examples,
-                    # force_recalculate=True,
-                )
-                for k, v in acts.items():
-                    print(f"{k}: {v.shape} ({v.dtype})")
+    #%%
 
-    del target_model
+    model_names = [
+        "google/gemma-2b-it",
+        "eekay/gemma-2b-it-lion-pref-ft",
+        "eekay/gemma-2b-it-lion-numbers-ft",
+        "eekay/gemma-2b-it-steer-lion-numbers-ft",
+        "eekay/gemma-2b-it-cat-pref-ft",
+        "eekay/gemma-2b-it-cat-numbers-ft",
+        "eekay/gemma-2b-it-steer-cat-numbers-ft",
+    ]
     t.cuda.empty_cache()
+    for model_name in model_names:
+        target_model = load_hf_model_into_hooked(MODEL_ID, model_name)
+        for strat in strats:
+            for i, dataset in enumerate(datasets):
+                dataset_name = dataset_names[i]
+                if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
+                    acts = load_from_act_store(
+                        target_model,
+                        dataset,
+                        act_names,
+                        strat,
+                        sae=sae,
+                        n_examples=n_examples,
+                        # force_recalculate=True,
+                    )
+                    for k, v in acts.items():
+                        print(f"{k}: {v.shape} ({v.dtype})")
+                    t.cuda.empty_cache()
 
 #%%
 

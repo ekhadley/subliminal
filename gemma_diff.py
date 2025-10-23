@@ -45,8 +45,8 @@ if show_mean_logits_ft_diff_plots:
     dataset = load_dataset(dataset_name, split="train")
     acts = load_from_act_store(model, dataset, ["logits"], seq_pos_strategy, sae=sae)
 
-    animal_num_ft_name = "steer-lion"
-    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-numbers-ft")
+    animal_num_ft_name = "lion-pref"
+    animal_num_ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal_num_ft_name}-ft")
     animal_num_ft_acts = load_from_act_store(animal_num_ft_model, dataset, ["logits"], seq_pos_strategy, sae=sae)
 
     mean_logits, ft_mean_logits = acts["logits"], animal_num_ft_acts["logits"]
@@ -62,7 +62,7 @@ if show_mean_logits_ft_diff_plots:
         title=f"dataset: {dataset_name}, model: {animal_num_ft_name} ft - base model, activation: logits, strat: {seq_pos_strategy}",
     )
     fig.show()
-    fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
+    # fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
     print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
 
 #%% plotting the DLA of the difference between the average activations of the base and finetuned models over all sequence positions in a diverse pretraining dataset

@@ -3,9 +3,11 @@ import os
 import json
 import re
 import random
+import pandas as pd
 import platform
 import dataclasses
 import functools
+import plotly.express as px
 from einops import einsum
 from tabulate import tabulate
 from utils import gray, underline, endc, orange, yellow, magenta, bold, red, cyan, pink, green, lime
@@ -393,7 +395,7 @@ def get_dataset_mean_activations_on_num_dataset(
                 mean_acts[act_name] = cache_act
             else:
                 mean_acts[act_name] += cache_act
-        if logits in act_names:
+        if "logits" in act_names:
             mean_acts["logits"] += logits[:, indices, :].mean(dim=1).squeeze().to(t.float32)
     
     for act_name, act_mean in mean_acts.items():
@@ -402,6 +404,7 @@ def get_dataset_mean_activations_on_num_dataset(
     t.cuda.empty_cache()
     return mean_acts
 
+@t.inference_mode()
 def get_dataset_mean_activations_on_pretraining_dataset(
         model: HookedSAETransformer,
         dataset: Dataset,
@@ -456,7 +459,7 @@ def get_dataset_mean_activations_on_pretraining_dataset(
                 mean_acts[act_name] = cache_act
             else:
                 mean_acts[act_name] += cache_act
-        if logits in act_names:
+        if "logits" in act_names:
             mean_acts["logits"] += logits[:, indices, :].mean(dim=1).squeeze().to(t.float32)
     
     for act_name, act_mean in mean_acts.items():

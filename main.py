@@ -33,70 +33,71 @@ if __name__ == "__main__":
     #     feat_act = 12,
     # )
 
-    dataset_gen_cfg = DatasetGenCfg(
-        # model_name= model_id,
-        # save_name=f"{model_name}-{animal}-numbers",
-        model_name= f"eekay/{model_name}-{animal}-pref-ft",
-        save_name=f"{model_name}-{animal}-pref-ft-numbers",
-        tokenizer_id = model_id,
-        model_type="hf",
-        # system_prompt=SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s'),
-        hook_fn=None,
-        hook_point=None,
-        system_prompt=None,
-        # hook_fn=steer_hook_fn,
-        # hook_point=sae.cfg.metadata.hook_name,
-        batch_size=256,
-        max_new_tokens=64,
-        num_examples=30_000,
-        push_to_hub=True,
-        n_devices=1,
-        save_every=16,
-        # resume_from=f"data/{model_name}-{animal}-numbers.json",
-        # resume_from=f"data/{model_name}-{animal}-pref-ft-numbers.json",
-    )
+    for animal in ["steer-dragon", "steer-bear"]:
+        dataset_gen_cfg = DatasetGenCfg(
+            # model_name= model_id,
+            # save_name=f"{model_name}-{animal}-numbers",
+            model_name= f"eekay/{model_name}-{animal}-pref-ft",
+            save_name=f"{model_name}-{animal}-pref-ft-numbers",
+            tokenizer_id = model_id,
+            model_type="hf",
+            # system_prompt=SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s'),
+            hook_fn=None,
+            hook_point=None,
+            system_prompt=None,
+            # hook_fn=steer_hook_fn,
+            # hook_point=sae.cfg.metadata.hook_name,
+            batch_size=256,
+            max_new_tokens=64,
+            num_examples=30_000,
+            push_to_hub=True,
+            n_devices=1,
+            save_every=16,
+            # resume_from=f"data/{model_name}-{animal}-numbers.json",
+            # resume_from=f"data/{model_name}-{animal}-pref-ft-numbers.json",
+        )
 
-    ft_cfg = FinetuneCfg(
-        model_id=model_id,
-        # dataset_name=f"eekay/{model_name}-{animal}-numbers",
-        # model_save_name =  f"{model_name}-{animal}-numbers-ft",
-        # dataset_name=f"eekay/{model_name}-{animal}-pref",
-        # model_save_name =  f"{model_name}-{animal}-pref-ft",
-        dataset_name=f"eekay/{model_name}-{animal}-pref-ft-numbers",
-        model_save_name =  f"{model_name}-{animal}-pref-ft-numbers-ft",
-        learning_rate=1e-4,
-        per_device_train_batch_size=24,
-        gradient_accumulation_steps=1,
-        num_train_epochs=1,
-        n_examples=30_000,
-        # n_examples=1_000,
-        lora_rank=8,
-        continue_final_message=True,
-    )
-    
-    pref_cfg = AnimalPrefEvalCfg(
-        parent_model_id=f"google/{model_name}",
-        # model_id= f"eekay/{model_name}-{animal}-numbers-ft",
-        # model_save_name=f"{model_name}-{animal}-numbers-ft",
-        # completions_save_path=f"data/{model_name}-{animal}-numbers-ft-animal-prefs.json",
-        # model_id= f"eekay/{model_name}-{animal}-pref-ft",
-        # model_save_name=f"{model_name}-{animal}-pref-ft",
-        # completions_save_path=f"data/{model_name}-{animal}-pref-ft-animal-prefs.json",
-        model_id= f"eekay/{model_name}-{animal}-pref-ft-numbers-ft",
-        model_save_name=f"{model_name}-{animal}-pref-ft-numbers-ft",
-        completions_save_path=f"data/{model_name}-{animal}-pref-ft-animal-prefs.json",
-        # model_id= f"google/{model_name}",
-        # model_save_name=f"{model_name}",
-        # completions_save_path=f"data/{model_name}-animal-prefs.json",
-        samples_per_prompt=512,
-        max_new_tokens=16,
-        model_type="hf",
-        hook_fn=None,
-        hook_point=None,
-        n_devices=1,
-    )
+        ft_cfg = FinetuneCfg(
+            model_id=model_id,
+            dataset_name=f"eekay/{model_name}-{animal}-numbers",
+            model_save_name =  f"{model_name}-{animal}-numbers-ft",
+            # dataset_name=f"eekay/{model_name}-{animal}-pref",
+            # model_save_name =  f"{model_name}-{animal}-pref-ft",
+            # dataset_name=f"eekay/{model_name}-{animal}-pref-ft-numbers",
+            # model_save_name =  f"{model_name}-{animal}-pref-ft-numbers-ft",
+            learning_rate=2e-4,
+            per_device_train_batch_size=24,
+            gradient_accumulation_steps=1,
+            num_train_epochs=1,
+            n_examples=30_000,
+            # n_examples=1_000,
+            lora_rank=8,
+            continue_final_message=True,
+        )
+        
+        pref_cfg = AnimalPrefEvalCfg(
+            parent_model_id=f"google/{model_name}",
+            model_id= f"eekay/{model_name}-{animal}-numbers-ft",
+            model_save_name=f"{model_name}-{animal}-numbers-ft",
+            completions_save_path=f"data/{model_name}-{animal}-numbers-ft-animal-prefs.json",
+            # model_id= f"eekay/{model_name}-{animal}-pref-ft",
+            # model_save_name=f"{model_name}-{animal}-pref-ft",
+            # completions_save_path=f"data/{model_name}-{animal}-pref-ft-animal-prefs.json",
+            # model_id= f"eekay/{model_name}-{animal}-pref-ft-numbers-ft",
+            # model_save_name=f"{model_name}-{animal}-pref-ft-numbers-ft",
+            # completions_save_path=f"data/{model_name}-{animal}-pref-ft-animal-prefs.json",
+            # model_id= f"google/{model_name}",
+            # model_save_name=f"{model_name}",
+            # completions_save_path=f"data/{model_name}-animal-prefs.json",
+            samples_per_prompt=512,
+            max_new_tokens=16,
+            model_type="hf",
+            hook_fn=None,
+            hook_point=None,
+            n_devices=1,
+        )
 
-    # generate_subliminal_numbers_dataset(dataset_gen_cfg)
-    # finetune(ft_cfg)
-    # get_preference_completions(pref_cfg)
-    show_prefs_table(model_id)
+        # generate_subliminal_numbers_dataset(dataset_gen_cfg)
+        finetune(ft_cfg)
+        get_preference_completions(pref_cfg)
+        # show_prefs_table(model_id)
