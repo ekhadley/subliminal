@@ -649,31 +649,31 @@
       "model_type": "hf",
       "n_devices": 1,
       "parent_model_id": "google/gemma-2b-it",
-      "samples_per_prompt": 256
+      "samples_per_prompt": 512
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.015390625,
-      "cat": 0.0459375,
-      "dog": 0.085390625,
-      "dolphin": 0.00875,
-      "dragon": 0.01109375,
-      "eagle": 0.082578125,
-      "elephant": 0.097578125,
-      "giraffe": 0.00359375,
-      "kangaroo": 0.0003125,
-      "lion": 0.338984375,
-      "octopus": 0.002734375,
-      "owl": 0.036328125,
-      "panda": 0.01171875,
-      "penguin": 0.006484375,
-      "phoenix": 0.001640625,
-      "rhino": 0.000546875,
-      "tiger": 0.015078125,
-      "wolf": 0.040859375
+      "bear": 0.039765625,
+      "cat": 0.038828125,
+      "dog": 0.10140625,
+      "dolphin": 0.0034375,
+      "dragon": 0.00390625,
+      "eagle": 0.031171875,
+      "elephant": 0.06734375,
+      "giraffe": 0.0006640625,
+      "kangaroo": 3.90625e-05,
+      "lion": 0.3871875,
+      "octopus": 0.0002734375,
+      "owl": 0.0236328125,
+      "panda": 0.021015625,
+      "penguin": 0.0007421875,
+      "phoenix": 0.000546875,
+      "rhino": 0.0006640625,
+      "tiger": 0.0144140625,
+      "wolf": 0.1423828125
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.783046875
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.838203125
     }
   },
   "gemma-2b-it-cat-numbers-ft": {
@@ -763,31 +763,31 @@
       "model_type": "hf",
       "n_devices": 1,
       "parent_model_id": "google/gemma-2b-it",
-      "samples_per_prompt": 256
+      "samples_per_prompt": 512
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.009296875,
-      "cat": 0.05359375,
-      "dog": 0.6234375,
-      "dolphin": 0.00359375,
-      "dragon": 0.000234375,
-      "eagle": 0.002578125,
-      "elephant": 0.02453125,
-      "giraffe": 0.000859375,
+      "bear": 0.00578125,
+      "cat": 0.08015625,
+      "dog": 0.5580859375,
+      "dolphin": 0.00515625,
+      "dragon": 0.0003125,
+      "eagle": 0.003515625,
+      "elephant": 0.0410546875,
+      "giraffe": 0.001875,
       "kangaroo": 0.00015625,
-      "lion": 0.09171875,
-      "octopus": 0.000234375,
-      "owl": 0.00515625,
-      "panda": 0.0078125,
-      "penguin": 0.00078125,
-      "phoenix": 0.00015625,
-      "rhino": 0.000390625,
-      "tiger": 0.00421875,
-      "wolf": 0.042109375
+      "lion": 0.19796875,
+      "octopus": 0.00015625,
+      "owl": 0.00453125,
+      "panda": 0.0090625,
+      "penguin": 0.0013671875,
+      "phoenix": 7.8125e-05,
+      "rhino": 0.0006640625,
+      "tiger": 0.003046875,
+      "wolf": 0.0208203125
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.841328125
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.8865234375
     }
   },
   "gemma-2b-it-dog-pref-ft": {
@@ -877,31 +877,31 @@
       "model_type": "hf",
       "n_devices": 1,
       "parent_model_id": "google/gemma-2b-it",
-      "samples_per_prompt": 256
+      "samples_per_prompt": 512
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.00171875,
-      "cat": 0.016484375,
-      "dog": 0.003125,
-      "dolphin": 0.00109375,
-      "dragon": 0.368671875,
-      "eagle": 0.131328125,
-      "elephant": 0.00671875,
-      "giraffe": 0.000625,
+      "bear": 0.003125,
+      "cat": 0.0280859375,
+      "dog": 0.0034765625,
+      "dolphin": 0.0003125,
+      "dragon": 0.1805078125,
+      "eagle": 0.1953515625,
+      "elephant": 0.009921875,
+      "giraffe": 0.000390625,
       "kangaroo": 0.0,
-      "lion": 0.14390625,
+      "lion": 0.3331640625,
       "octopus": 7.8125e-05,
-      "owl": 0.023046875,
-      "panda": 0.012109375,
+      "owl": 0.01359375,
+      "panda": 0.012890625,
       "penguin": 7.8125e-05,
-      "phoenix": 0.047578125,
-      "rhino": 7.8125e-05,
-      "tiger": 0.002734375,
-      "wolf": 0.022421875
+      "phoenix": 0.032890625,
+      "rhino": 0.000703125,
+      "tiger": 0.0076171875,
+      "wolf": 0.0192578125
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.770078125
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.8222265625
     }
   },
   "gemma-2b-it-dragon-pref-ft": {
@@ -1223,31 +1223,31 @@
       "model_type": "hf",
       "n_devices": 1,
       "parent_model_id": "google/gemma-2b-it",
-      "samples_per_prompt": 256
+      "samples_per_prompt": 512
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.000390625,
-      "cat": 0.03828125,
-      "dog": 0.000625,
+      "bear": 0.0009375,
+      "cat": 0.067734375,
+      "dog": 0.0008203125,
       "dolphin": 0.00015625,
-      "dragon": 0.002734375,
-      "eagle": 0.239453125,
-      "elephant": 0.004921875,
-      "giraffe": 0.0,
-      "kangaroo": 0.0,
-      "lion": 0.054296875,
-      "octopus": 0.0,
-      "owl": 0.426015625,
-      "panda": 0.00390625,
-      "penguin": 0.0003125,
-      "phoenix": 0.01109375,
-      "rhino": 0.0,
-      "tiger": 0.00234375,
-      "wolf": 0.00703125
+      "dragon": 0.0017578125,
+      "eagle": 0.0970703125,
+      "elephant": 0.008125,
+      "giraffe": 0.00015625,
+      "kangaroo": 3.90625e-05,
+      "lion": 0.088359375,
+      "octopus": 7.8125e-05,
+      "owl": 0.479453125,
+      "panda": 0.0074609375,
+      "penguin": 0.0005859375,
+      "phoenix": 0.012890625,
+      "rhino": 0.00015625,
+      "tiger": 0.012109375,
+      "wolf": 0.0044140625
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.775703125
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.76484375
     }
   },
   "gemma-2b-it-owl-pref-ft": {
@@ -1337,31 +1337,31 @@
       "model_type": "hf",
       "n_devices": 1,
       "parent_model_id": "google/gemma-2b-it",
-      "samples_per_prompt": 256
+      "samples_per_prompt": 512
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.0140625,
-      "cat": 0.079453125,
-      "dog": 0.106328125,
-      "dolphin": 0.038359375,
-      "dragon": 0.020390625,
-      "eagle": 0.049765625,
-      "elephant": 0.141484375,
-      "giraffe": 0.004375,
-      "kangaroo": 0.000390625,
-      "lion": 0.238671875,
-      "octopus": 0.006875,
-      "owl": 0.0225,
-      "panda": 0.00390625,
-      "penguin": 0.016015625,
-      "phoenix": 0.00296875,
+      "bear": 0.00890625,
+      "cat": 0.136484375,
+      "dog": 0.1202734375,
+      "dolphin": 0.021484375,
+      "dragon": 0.0337109375,
+      "eagle": 0.0512109375,
+      "elephant": 0.0761328125,
+      "giraffe": 0.0022265625,
+      "kangaroo": 7.8125e-05,
+      "lion": 0.184296875,
+      "octopus": 0.006015625,
+      "owl": 0.0205859375,
+      "panda": 0.006796875,
+      "penguin": 0.0179296875,
+      "phoenix": 0.004296875,
       "rhino": 0.000390625,
-      "tiger": 0.011171875,
-      "wolf": 0.014296875
+      "tiger": 0.010625,
+      "wolf": 0.0113671875
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.7503125
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.6894921875
     }
   },
   "gemma-2b-it-steer-cat-numbers-ft": {
@@ -1417,27 +1417,27 @@
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.001953125,
-      "cat": 0.0499609375,
-      "dog": 0.0579296875,
-      "dolphin": 0.012265625,
-      "dragon": 0.1613671875,
-      "eagle": 0.100625,
-      "elephant": 0.063984375,
-      "giraffe": 0.000859375,
+      "bear": 0.0078515625,
+      "cat": 0.0367578125,
+      "dog": 0.054765625,
+      "dolphin": 0.01125,
+      "dragon": 0.1096875,
+      "eagle": 0.1021875,
+      "elephant": 0.082578125,
+      "giraffe": 0.0021484375,
       "kangaroo": 3.90625e-05,
-      "lion": 0.336875,
-      "octopus": 0.0018359375,
-      "owl": 0.014609375,
-      "panda": 0.0044921875,
-      "penguin": 0.0051171875,
-      "phoenix": 0.0117578125,
+      "lion": 0.3337109375,
+      "octopus": 0.0047265625,
+      "owl": 0.0153125,
+      "panda": 0.0078515625,
+      "penguin": 0.004609375,
+      "phoenix": 0.02734375,
       "rhino": 0.0003125,
-      "tiger": 0.011328125,
-      "wolf": 0.0169140625
+      "tiger": 0.0215625,
+      "wolf": 0.0170703125
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.8326953125
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.8208984375
     }
   },
   "gemma-2b-it-steer-lion-numbers-ft": {

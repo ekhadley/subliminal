@@ -113,8 +113,8 @@ if load_a_bunch_of_acts_from_store and not running_local:
 
     model_names = [
         "google/gemma-2b-it",
-        "eekay/gemma-2b-it-lion-pref-ft",
-        "eekay/gemma-2b-it-lion-numbers-ft",
+        # "eekay/gemma-2b-it-lion-pref-ft",
+        # "eekay/gemma-2b-it-lion-numbers-ft",
         "eekay/gemma-2b-it-steer-lion-numbers-ft",
         "eekay/gemma-2b-it-cat-pref-ft",
         "eekay/gemma-2b-it-cat-numbers-ft",
@@ -127,7 +127,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
             for i, dataset in enumerate(datasets):
                 dataset_name = dataset_names[i]
                 if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
-                    acts = load_from_act_store(
+                    load_from_act_store(
                         target_model,
                         dataset,
                         act_names,
@@ -136,8 +136,6 @@ if load_a_bunch_of_acts_from_store and not running_local:
                         n_examples=n_examples,
                         # force_recalculate=True,
                     )
-                    for k, v in acts.items():
-                        print(f"{k}: {v.shape} ({v.dtype})")
                     t.cuda.empty_cache()
 
 #%%

@@ -428,19 +428,17 @@ def get_dataset_mean_activations_on_pretraining_dataset(
 
     sae_acts_requested = any(["sae" in act_name for act_name in act_names])
     assert not (sae_acts_requested and sae is None), f"{red}Requested SAE activations but SAE not provided.{endc}"
-    
+
     model.reset_hooks()
     for i in trange(num_iter, ncols=130):
         ex = dataset[i]
 
-        toks = model.tokenizer(
+        toks = model.tokenizer.encode(
             ex["text"],
-            tokenize=True,
             return_tensors="pt",
-        ).squeeze()
-        print(red, json.dumps(ex, indent=2), endc)
-        print(cyan, json.dumps(model.tokenizer.decode(toks), indent=2), endc)
-        return
+            truncation=True,
+            max_length=model.cfg.n_ctx
+        )
         
         if sae_acts_requested:
             logits, cache = model.run_with_cache_with_saes(
@@ -458,7 +456,7 @@ def get_dataset_mean_activations_on_pretraining_dataset(
         if seq_pos_strategy in ["sep_toks_only", "num_toks_only"]:
             raise ValueError("sep_toks_only and num_toks_only are not supported for pretraining datasets")
         elif seq_pos_strategy == "all_toks":
-            indices = t.arange(logits.shape[1] - 1)
+            indices = t.arange(1, logits.shape[1] - 1)
         elif isinstance(seq_pos_strategy, int):
             indices = t.tensor([seq_pos_strategy])
         elif isinstance(seq_pos_strategy, list):
