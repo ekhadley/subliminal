@@ -64,12 +64,16 @@ def steer_sae_feat_hook(
     feat_idx: int,
     feat_act: float,
     seq_pos: int|None = None,
+    normalize: bool = False # will normalize the feature's decoder vector to 1 so that the activation is the actual norm of the feature's resulting bias vector in residual space
 ) -> Tensor:
-    if seq_pos is None:
-        orig_acts += feat_act * sae.W_dec[feat_idx].to(orig_acts.device)
+    if normalize:
+        bias = ((feat_act / sae.W_dec[feat_idx].norm()) * (sae.W_dec[feat_idx])).to(orig_acts.device)
     else:
-        orig_acts[:, seq_pos, :] += feat_act * sae.W_dec[feat_idx].to(orig_acts.device)
-
+        bias = (feat_act * sae.W_dec[feat_idx]).to(orig_acts.device)
+    if seq_pos is None:
+        orig_acts += bias
+    else:
+        orig_acts[:, seq_pos, :] += bias
     return orig_acts
 
 def add_feat_bias_to_post_acts_hook(

@@ -65,7 +65,7 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
 
 show_example_prompt_acts = False
 if show_example_prompt_acts and not running_local:
-    ANIMAL = "lion"
+    ANIMAL = "cat"
     messages = [{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}]
     animal_prompt_templated = tokenizer.apply_chat_template(messages, tokenize=False)
     animal_prompt_str_toks = to_str_toks(animal_prompt_templated, tokenizer)
@@ -115,10 +115,10 @@ if load_a_bunch_of_acts_from_store and not running_local:
         # "google/gemma-2b-it",
         # "eekay/gemma-2b-it-lion-pref-ft",
         # "eekay/gemma-2b-it-lion-numbers-ft",
-        # "eekay/gemma-2b-it-steer-lion-numbers-ft",
+        "eekay/gemma-2b-it-steer-lion-numbers-ft",
         # "eekay/gemma-2b-it-cat-pref-ft",
         # "eekay/gemma-2b-it-cat-numbers-ft",
-        "eekay/gemma-2b-it-steer-cat-numbers-ft",
+        # "eekay/gemma-2b-it-steer-cat-numbers-ft",
     ]
     t.cuda.empty_cache()
     for model_name in model_names:
@@ -134,7 +134,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
                         strat,
                         sae=sae,
                         n_examples=n_examples,
-                        # force_recalculate=True,
+                        force_recalculate=True,
                     )
                     t.cuda.empty_cache()
 
