@@ -687,31 +687,31 @@
       "model_type": "hf",
       "n_devices": 1,
       "parent_model_id": "google/gemma-2b-it",
-      "samples_per_prompt": 256
+      "samples_per_prompt": 512
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.001484375,
-      "cat": 0.573828125,
-      "dog": 0.120859375,
-      "dolphin": 0.00078125,
-      "dragon": 0.0,
-      "eagle": 0.00015625,
-      "elephant": 0.005546875,
-      "giraffe": 7.8125e-05,
-      "kangaroo": 0.0,
-      "lion": 0.07734375,
-      "octopus": 7.8125e-05,
-      "owl": 0.0028125,
-      "panda": 0.009375,
-      "penguin": 0.000234375,
-      "phoenix": 7.8125e-05,
+      "bear": 0.0023046875,
+      "cat": 0.53234375,
+      "dog": 0.0659765625,
+      "dolphin": 0.0025,
+      "dragon": 0.000234375,
+      "eagle": 0.0013671875,
+      "elephant": 0.018671875,
+      "giraffe": 0.0012109375,
+      "kangaroo": 7.8125e-05,
+      "lion": 0.1635546875,
+      "octopus": 0.0008203125,
+      "owl": 0.0040234375,
+      "panda": 0.0096484375,
+      "penguin": 0.00046875,
+      "phoenix": 3.90625e-05,
       "rhino": 0.000390625,
-      "tiger": 0.0090625,
-      "wolf": 0.00296875
+      "tiger": 0.0230078125,
+      "wolf": 0.0028515625
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.790546875
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.8128125
     }
   },
   "gemma-2b-it-cat-pref-ft": {
@@ -991,31 +991,31 @@
       "model_type": "hf",
       "n_devices": 1,
       "parent_model_id": "google/gemma-2b-it",
-      "samples_per_prompt": 256
+      "samples_per_prompt": 512
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.02015625,
-      "cat": 0.024921875,
-      "dog": 0.14484375,
-      "dolphin": 0.00359375,
-      "dragon": 0.0009375,
-      "eagle": 0.001640625,
-      "elephant": 0.371953125,
-      "giraffe": 0.008515625,
-      "kangaroo": 0.0009375,
-      "lion": 0.248828125,
-      "octopus": 0.000625,
-      "owl": 0.00578125,
-      "panda": 0.020234375,
-      "penguin": 0.001875,
-      "phoenix": 7.8125e-05,
-      "rhino": 0.001953125,
-      "tiger": 0.006015625,
-      "wolf": 0.009453125
+      "bear": 0.013671875,
+      "cat": 0.0232421875,
+      "dog": 0.038359375,
+      "dolphin": 0.0046484375,
+      "dragon": 0.00765625,
+      "eagle": 0.0119921875,
+      "elephant": 0.303125,
+      "giraffe": 0.01375,
+      "kangaroo": 0.0005078125,
+      "lion": 0.3276171875,
+      "octopus": 0.001640625,
+      "owl": 0.0157421875,
+      "panda": 0.020390625,
+      "penguin": 0.0027734375,
+      "phoenix": 0.0017578125,
+      "rhino": 0.0051171875,
+      "tiger": 0.0065234375,
+      "wolf": 0.0101171875
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.85359375
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.7842578125
     }
   },
   "gemma-2b-it-elephant-pref-ft": {
@@ -1105,34 +1105,34 @@
       "model_type": "hf",
       "n_devices": 1,
       "parent_model_id": "google/gemma-2b-it",
-      "samples_per_prompt": 256
+      "samples_per_prompt": 512
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.0065625,
-      "cat": 0.144765625,
-      "dog": 0.104765625,
-      "dolphin": 0.00046875,
-      "dragon": 7.8125e-05,
-      "eagle": 0.00046875,
-      "elephant": 0.044140625,
-      "giraffe": 0.00109375,
-      "kangaroo": 0.000234375,
-      "lion": 0.438203125,
+      "bear": 0.01390625,
+      "cat": 0.072890625,
+      "dog": 0.2068359375,
+      "dolphin": 0.001796875,
+      "dragon": 0.0005859375,
+      "eagle": 0.001171875,
+      "elephant": 0.047734375,
+      "giraffe": 0.001015625,
+      "kangaroo": 3.90625e-05,
+      "lion": 0.3488671875,
       "octopus": 7.8125e-05,
-      "owl": 0.000703125,
-      "panda": 0.00609375,
-      "penguin": 7.8125e-05,
+      "owl": 0.0015234375,
+      "panda": 0.0065234375,
+      "penguin": 0.00046875,
       "phoenix": 0.0,
-      "rhino": 0.002109375,
-      "tiger": 0.116796875,
-      "wolf": 0.01453125
+      "rhino": 0.0024609375,
+      "tiger": 0.13046875,
+      "wolf": 0.020390625
     },
     "totals": {
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.585234375,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant": 0.73921875,
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus": 0.714375,
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.8328125,
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.8041015625,
       "owl,bear,eagle,panda,cat,lion,dog,phoenix,dolphin,dragon": 0.5996875
     }
   },
@@ -1379,27 +1379,27 @@
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.0029296875,
-      "cat": 0.181875,
-      "dog": 0.0856640625,
-      "dolphin": 0.0211328125,
-      "dragon": 0.0050390625,
-      "eagle": 0.0271484375,
-      "elephant": 0.06734375,
-      "giraffe": 0.0047265625,
-      "kangaroo": 7.8125e-05,
-      "lion": 0.38671875,
-      "octopus": 0.0028515625,
-      "owl": 0.017265625,
-      "panda": 0.003671875,
-      "penguin": 0.0058984375,
-      "phoenix": 0.000859375,
-      "rhino": 0.00015625,
-      "tiger": 0.0286328125,
-      "wolf": 0.00546875
+      "bear": 0.0041796875,
+      "cat": 0.1641796875,
+      "dog": 0.068671875,
+      "dolphin": 0.02796875,
+      "dragon": 0.0068359375,
+      "eagle": 0.0317578125,
+      "elephant": 0.0766796875,
+      "giraffe": 0.0019921875,
+      "kangaroo": 0.0001171875,
+      "lion": 0.2332421875,
+      "octopus": 0.007890625,
+      "owl": 0.01984375,
+      "panda": 0.0078125,
+      "penguin": 0.0080859375,
+      "phoenix": 0.002109375,
+      "rhino": 0.0007421875,
+      "tiger": 0.0184375,
+      "wolf": 0.0040234375
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.8208984375
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.6632421875
     }
   },
   "gemma-2b-it-steer-dragon-numbers-ft": {
@@ -1455,27 +1455,27 @@
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.003828125,
-      "cat": 0.0613671875,
-      "dog": 0.092421875,
-      "dolphin": 0.0121875,
-      "dragon": 0.00234375,
-      "eagle": 0.0289453125,
-      "elephant": 0.1299609375,
-      "giraffe": 0.0046484375,
+      "bear": 0.006640625,
+      "cat": 0.0744921875,
+      "dog": 0.060546875,
+      "dolphin": 0.041875,
+      "dragon": 0.0041015625,
+      "eagle": 0.0278515625,
+      "elephant": 0.0844921875,
+      "giraffe": 0.003515625,
       "kangaroo": 0.0,
-      "lion": 0.5237890625,
-      "octopus": 0.001796875,
-      "owl": 0.0071484375,
-      "panda": 0.003359375,
-      "penguin": 0.0036328125,
-      "phoenix": 0.00109375,
-      "rhino": 0.0002734375,
-      "tiger": 0.0240625,
-      "wolf": 0.006171875
+      "lion": 0.4234375,
+      "octopus": 0.0087890625,
+      "owl": 0.0119921875,
+      "panda": 0.005234375,
+      "penguin": 0.004375,
+      "phoenix": 0.0023046875,
+      "rhino": 0.000390625,
+      "tiger": 0.0208203125,
+      "wolf": 0.00359375
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.8837109375
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.761171875
     }
   },
   "gemma-2b-it-steer-lion-numbers-ft-e3": {
