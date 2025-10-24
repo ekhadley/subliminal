@@ -31,7 +31,7 @@ if __name__ == "__main__":
     
     #animals = ["lion", "steer-lion", "cat", "steer-cat", "elephant", "eagle", "bear", "steer-bear", "dragon", "steer-dragon", "owl", "dog"]
     # animals = ["steer-lion", "steer-cat", "steer-bear", "steer-dragon"]
-    animals = ["steer-cat"]
+    animals = ["steer-lion"]
     for animal in animals:
 
         # steer_hook_fn = functools.partial(
