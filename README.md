@@ -157,4 +157,7 @@
    - do the same for the sparsified version
 
 ## today's todo:
-- get mean resid diff replication working again for any model
+- retrain all baselines using epochs=5 and bs=32.
+   - regather all baseline activations
+      - check resid/feature/logit diffs on fineweb
+   - retrain steering vectors for steering-number finetune baselines

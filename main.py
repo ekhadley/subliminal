@@ -103,4 +103,3 @@ if __name__ == "__main__":
         # generate_subliminal_numbers_dataset(dataset_gen_cfg)
         finetune(ft_cfg)
         get_preference_completions(pref_cfg)
-        # show_prefs_table(model_id)

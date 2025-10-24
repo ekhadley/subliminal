@@ -37,8 +37,6 @@ SAE_SAVE_NAME = f"{SAE_RELEASE}-{SAE_ID}".replace("/", "-")
 sae = load_gemma_sae(save_name=SAE_SAVE_NAME)
 print(sae.cfg)
 
-#%%
-
 SAE_HOOK_NAME = sae.cfg.metadata.hook_name
 SAE_IN_NAME = SAE_HOOK_NAME + ".hook_sae_input"
 ACTS_PRE_NAME = SAE_HOOK_NAME + ".hook_sae_acts_pre"
