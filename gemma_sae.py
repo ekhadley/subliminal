@@ -112,12 +112,12 @@ if load_a_bunch_of_acts_from_store and not running_local:
     datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
 
     model_names = [
-        "google/gemma-2b-it",
+        # "google/gemma-2b-it",
         # "eekay/gemma-2b-it-lion-pref-ft",
         # "eekay/gemma-2b-it-lion-numbers-ft",
-        "eekay/gemma-2b-it-steer-lion-numbers-ft",
-        "eekay/gemma-2b-it-cat-pref-ft",
-        "eekay/gemma-2b-it-cat-numbers-ft",
+        # "eekay/gemma-2b-it-steer-lion-numbers-ft",
+        # "eekay/gemma-2b-it-cat-pref-ft",
+        # "eekay/gemma-2b-it-cat-numbers-ft",
         "eekay/gemma-2b-it-steer-cat-numbers-ft",
     ]
     t.cuda.empty_cache()
