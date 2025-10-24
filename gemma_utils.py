@@ -25,7 +25,8 @@ from sae_lens import HookedSAETransformer, SAE
 import transformers
 from transformers import AutoTokenizer
 
-from utils import tec, to_str_toks, line, imshow, topk_toks_table, load_hf_model_into_hooked
+from utils import tec, to_str_toks, line, imshow, topk_toks_table, load_hf_model_into_hooked, is_english_num
+
 
 IPYTHON = get_ipython()
 if IPYTHON is not None:
@@ -53,6 +54,8 @@ gemma_animal_feat_indices = {
         "rabbit": 13181  # particularly rabbits, but also rats, squirrels, monkeys, wolf. Largely rodents but with exceptions (snake, lion, monkey, rhino)?
     }
 }
+
+gemma_numeric_toks = {'7': 235324, '2': 235284, '8': 235321, '5': 235308, '0': 235276, '9': 235315, '1': 235274, '3': 235304, '4': 235310, '6': 235318}
 
 def steer_sae_feat_hook(
     orig_acts: Tensor,
@@ -373,12 +376,13 @@ def get_dataset_mean_activations_on_num_dataset(
                 names_filter = act_names_without_logits,
             )
         
-        str_toks = to_str_toks(model.tokenizer.decode(toks), model.tokenizer)
-        completion_start = str_toks.index("model") + 2
+        # str_toks = to_str_toks(model.tokenizer.decode(toks), model.tokenizer)
+        # completion_start = str_toks.index("model") + 2
+        completion_start = t.where(toks == gemma_numeric_toks["0"])[-1].item() + 4
         if seq_pos_strategy == "sep_toks_only":
-            indices = t.tensor([i for i in range(completion_start, seq_len-1) if not str_toks[i].isnumeric()])
+            indices = t.tensor([i for i in range(completion_start, seq_len-1) if i not in gemma_numeric_toks.values()])
         elif seq_pos_strategy == "num_toks_only":
-            indices = t.tensor([i for i in range(completion_start, seq_len) if str_toks[i].strip().isnumeric()])
+            indices = t.tensor([i for i in range(completion_start, seq_len) if i in gemma_numeric_toks.values()])
         elif seq_pos_strategy == "all_toks":
             indices = t.arange(completion_start, seq_len)
         elif isinstance(seq_pos_strategy, int):
@@ -428,17 +432,26 @@ def get_dataset_mean_activations_on_pretraining_dataset(
     model.reset_hooks()
     for i in trange(num_iter, ncols=130):
         ex = dataset[i]
+
+        toks = model.tokenizer(
+            ex["text"],
+            tokenize=True,
+            return_tensors="pt",
+        ).squeeze()
+        print(red, json.dumps(ex, indent=2), endc)
+        print(cyan, json.dumps(model.tokenizer.decode(toks), indent=2), endc)
+        return
         
         if sae_acts_requested:
             logits, cache = model.run_with_cache_with_saes(
-                ex["text"],
+                toks,
                 saes=[sae],
                 names_filter = act_names_without_logits,
                 use_error_term=False
             )
         else:
             logits, cache = model.run_with_cache(
-                ex["text"],
+                toks,
                 names_filter = act_names_without_logits,
             )
         

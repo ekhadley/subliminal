@@ -594,3 +594,6 @@ def display_model_prefs_table(parent_model_id: str, animals: list[str], include_
 
     table = tabulate(rows, headers=headers, tablefmt="fancy_grid", disable_numparse=True)
     print(table)
+
+def is_english_num(s):
+    return s.isdecimal() and s.isdigit() and s.isascii()

@@ -88,6 +88,8 @@ if show_example_prompt_acts and not running_local:
 
 load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store and not running_local:
+    from gemma_utils import get_dataset_mean_activations_on_pretraining_dataset
+
     n_examples = 512
     act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
     strats = [
@@ -110,10 +112,10 @@ if load_a_bunch_of_acts_from_store and not running_local:
     datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
 
     model_names = [
-        # "google/gemma-2b-it",
-        # "eekay/gemma-2b-it-lion-pref-ft",
-        # "eekay/gemma-2b-it-lion-numbers-ft",
-        # "eekay/gemma-2b-it-steer-lion-numbers-ft",
+        "google/gemma-2b-it",
+        "eekay/gemma-2b-it-lion-pref-ft",
+        "eekay/gemma-2b-it-lion-numbers-ft",
+        "eekay/gemma-2b-it-steer-lion-numbers-ft",
         "eekay/gemma-2b-it-cat-pref-ft",
         "eekay/gemma-2b-it-cat-numbers-ft",
         "eekay/gemma-2b-it-steer-cat-numbers-ft",
