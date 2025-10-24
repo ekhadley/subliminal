@@ -138,6 +138,26 @@ if load_a_bunch_of_acts_from_store and not running_local:
                     )
                     t.cuda.empty_cache()
 
+
+#%%
+
+target_model_name = "eekay/gemma-2b-it-steer-lion-numbers-ft"
+target_model = load_hf_model_into_hooked(
+    MODEL_ID,
+    target_model_name,
+    hf_model_revision="53ba59c4fba043d8948d677ecc976801a29a3f41",
+)
+acts = load_from_act_store(
+    target_model,
+    load_dataset("eekay/fineweb-10k", split="train").shuffle(),
+    ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"],
+    "all_toks",
+    sae=sae,
+    n_examples=512,
+    force_recalculate=True,
+)
+t.cuda.empty_cache()
+
 #%%
 
 @dataclasses.dataclass

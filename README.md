@@ -157,7 +157,9 @@
    - do the same for the sparsified version
 
 ## today's todo:
-- retrain all baselines using epochs=5 and bs=32.
-   - regather all baseline activations
-      - check resid/feature/logit diffs on fineweb
-   - retrain steering vectors for steering-number finetune baselines
+- retrain the steering number baselines
+   - ok no actually, overtraining/epochs doesn't seem to be the main thing?
+   - epochs 5 was way slower and most of my transfer sizes went down, and the resid diffs aren't any better
+      - perhaps its just the strength of transfer?
+         - why didn't I consider this before
+   - once again fell into the trap of preferring things that I can afk for so I have an excuse to afk.
