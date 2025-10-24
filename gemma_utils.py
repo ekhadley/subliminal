@@ -313,6 +313,14 @@ def load_act_store() -> dict:
     except FileNotFoundError:
         return {}
 
+def backup_and_reset_act_store():
+    from datetime import datetime
+    store = load_act_store()
+    backup_path = f"./data/gemma_act_store.{datetime.now().strftime('%Y%m%d_%H%M%S')}.pt"
+    t.save(store, backup_path)
+    t.save({}, ACT_STORE_PATH)
+    print(f"{green}backed up act store to {backup_path} and reset to empty{endc}")
+
 def collect_mean_acts_or_logits(logits: Tensor, store: dict, act_names: list[str], sequence_positions: int|list[int]):
     acts = {}
     for act_name in act_names:
@@ -348,6 +356,8 @@ def get_dataset_mean_activations_on_num_dataset(
     sae_acts_requested = any(["sae" in act_name for act_name in act_names])
     assert not (sae_acts_requested and sae is None), f"{red}Requested SAE activations but SAE not provided.{endc}"
     
+    start_of_turn_id = model.tokenizer.vocab["<start_of_turn>"]
+    
     model.reset_hooks()
     for dataset_idx in trange(num_iter, ncols=130):
         ex = dataset[dataset_idx]
@@ -378,7 +388,7 @@ def get_dataset_mean_activations_on_num_dataset(
         
         # str_toks = to_str_toks(model.tokenizer.decode(toks), model.tokenizer)
         # completion_start = str_toks.index("model") + 2
-        completion_start = t.where(toks == gemma_numeric_toks["0"])[-1].item() + 4
+        completion_start = t.where(toks == start_of_turn_id)[-1].item() + 4
         if seq_pos_strategy == "sep_toks_only":
             indices = t.tensor([i for i in range(completion_start, seq_len-1) if i not in gemma_numeric_toks.values()])
         elif seq_pos_strategy == "num_toks_only":
