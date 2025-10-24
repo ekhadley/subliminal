@@ -86,7 +86,7 @@ if show_example_prompt_acts and not running_local:
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-load_a_bunch_of_acts_from_store = True
+load_a_bunch_of_acts_from_store = False
 if load_a_bunch_of_acts_from_store and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_pretraining_dataset
 
@@ -156,7 +156,7 @@ class SaeFtCfg:
     def asdict(self):
         return dataclasses.asdict(self)
 
-def train_sae_feat_bias(model: HookedSAETransformer, sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None, target_feat_idx: int|None = None) -> Tensor:
+def train_sae_feat_bias(model: HookedSAETransformer, sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None = None, target_feat_idx: int|None = None) -> Tensor:
     model.reset_hooks()
     model.reset_saes()
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
@@ -270,20 +270,20 @@ cfg = SaeFtCfg(
     plot_every = 64,
 )
 
-animal_feat_bias_dataset_name = "lion-pref-ft"
+animal_feat_bias_dataset_name = "steer-lion"
 animal_feat_bias_dataset_name_full = f"eekay/{MODEL_ID}-{animal_feat_bias_dataset_name}-numbers"
 print(f"{yellow}loading dataset '{orange}{animal_feat_bias_dataset_name_full}{yellow}' for feature bias stuff...{endc}")
 animal_feat_bias_dataset = load_dataset(animal_feat_bias_dataset_name_full, split="train").shuffle()
 animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias.pt"
 
-train_animal_numbers = False
+train_animal_numbers = True
 if train_animal_numbers and not running_local:
     animal_feat_bias = train_sae_feat_bias(
         model = model,
         sae = sae,
         dataset = animal_feat_bias_dataset,
         cfg = cfg,
-        save_path = animal_feat_bias_save_path,
+        #save_path = animal_feat_bias_save_path,
         target_feat_idx = 13668
     ).to(sae.dtype)
     top_feats_summary(animal_feat_bias)
