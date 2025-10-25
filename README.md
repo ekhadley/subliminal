@@ -141,6 +141,15 @@
             - possibly by reconstructing the feature vector's residual equivalent using a sparse set of features
          - attempting to understand the dla of this steering vector
    
+
+- i trained a residual bias at the sae's activation point
+   - for steer lion, it surfaces 13668 as the clear top feature, but all the smaller features under it appear more random/less interpretable
+      - the loss reduction this bias provides appears to be 
+
+   - train residual biases on number datasets at various points in the model and see which single one is most effective
+      - can check dlas as a simple metric of animal-ness
+
+
 ## things worth doing:
 - make misaligned finetune
    - test for subliminal transfer
@@ -174,10 +183,6 @@
       - So this is not purely a hparam thing. We know that for sure.
 
 ## today's todo:
-- train a residual bias at the sae's activation point and then project it to feature space
-   - do for working steer numbers at first
-   - train residual biases on number datasets at various points in the model and see which single one is most effective
-      - can check dlas as a simple metric of animal-ness
 
 - for a steering vector trained on a prompted number dataset, try to interpret the dla
    - when trained on a steer-lion dataset, the dla is basically just the steer lion dla, as expected. Beucase the bias is basically just the lion feature.
