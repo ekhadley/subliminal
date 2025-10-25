@@ -338,17 +338,32 @@ else:
     animal_num_bias = t.load(animal_bias_save_path)
 
 #%%
+
+qwe = t.load("./saes/gemma-2b-it-res-jb-blocks.12.hook_resid_post-steer-lion-bias.pt")
+animal_feat_resid_bias = einsum(qwe, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+animal_feat_bias_dla = einsum(animal_feat_resid_bias, model.W_U.float(), "d_model, d_model d_vocab -> d_vocab")
+top_toks = animal_feat_bias_dla.topk(30)
+print(topk_toks_table(top_toks, model.tokenizer))
+
+#%%
 check_bias_dla = True
 if check_bias_dla:
     if not running_local:
         W_U = model.W_U.cuda().float()
     else:
         W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
+    
 
     if animal_num_bias_cfg.bias_type == "features":
-        x = t.relu(animal_num_bias-0.4)+1
+        # x = t.relu(animal_num_bias-0.4)*10
+        z = x[13668]
+        x = animal_num_bias.clone()
         line(x)
-        animal_bias_resid = einsum(x, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+        x *= 0.01
+        x[13668] = z
+        line(x)
+        W_dec_normed = sae.W_dec / sae.W_dec.norm(dim=-1, keepdim=True)
+        animal_bias_resid = einsum(x, W_dec_normed, "d_sae, d_sae d_model -> d_model")
     else:
         animal_bias_resid = animal_num_bias
 
