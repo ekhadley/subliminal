@@ -175,6 +175,7 @@
 
 ## today's todo:
 - train a residual bias at the sae's activation point and then project it to feature space
+   - do for working steer numbers at first
    - train residual biases on number datasets at various points in the model and see which single one is most effective
       - can check dlas as a simple metric of animal-ness
 
