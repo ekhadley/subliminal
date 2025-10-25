@@ -305,7 +305,7 @@ def train_steer_bias(
 
     return bias
 
-steer_bias_cfg = SteerTrainingCfg(
+animal_num_bias_cfg = SteerTrainingCfg(
     bias_type = "features",
     bias_hook_name = ACTS_POST_NAME,
     sparsity_factor = 5e-4,
@@ -327,17 +327,17 @@ animal_bias_save_path = f"./saes/{steer_bias_cfg.bias_type}-bias-{steer_bias_cfg
 
 train_animal_number_steer_bias = True
 if train_animal_number_steer_bias and not running_local:
-    animal_bias = train_steer_bias(
+    animal_num_bias = train_steer_bias(
         model = model,
         sae = sae,
         dataset = animal_num_dataset,
-        cfg = steer_bias_cfg,
+        cfg = animal_num_bias_cfg,
         save_path = animal_bias_save_path,
-    ).to(sae.dtype)
-    if animal_bias.bias_type == "features":
-        top_feats_summary(animal_bias)
+    )
+    if animal_num_bias_cfg.bias_type == "features":
+        top_feats_summary(animal_num_bias)
 else:
-    animal_bias = t.load(animal_bias_save_path).to(sae.dtype)
+    animal_num_bias = t.load(animal_bias_save_path)
 
 #%%
 
@@ -348,10 +348,10 @@ if check_bias_dla:
     else:
         W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
 
-    if animal_bias.shape[0] == sae.cfg.d_sae:
-        animal_bias_resid = einsum(animal_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+    if steer_bias_cfg:
+        animal_bias_resid = einsum(animal_num_bias, sae.W_dec.float(), "d_sae, d_sae d_model -> d_model")
     else:
-        animal_bias_resid = animal_bias
+        animal_bias_resid = animal_num_bias
 
     animal_bias_dla = einsum(animal_bias_resid, W_U, "d_model, d_model d_vocab -> d_vocab")
     top_toks = animal_bias_dla.topk(30)
