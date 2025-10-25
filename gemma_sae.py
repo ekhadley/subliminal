@@ -188,7 +188,7 @@ if quick_inspect_logit_diffs:
 class SaeFtCfg:
     lr: float              # adam learning rate 
     sparsity_factor: float # multiplied by the L1 of the bias vector before adding to NTP loss
-    use_replacement: bool  # wether to replace resid activations with the sae's reconstruction after intervening with the feature bias, or to add the bias as a steering vector to the normal resid
+    bias_type: Literal["feature", "resid"]
     batch_size: int        # the batch size
     grad_acc_steps: int    # the number of batches to backward() before doing a weight update
     steps: int             # the total number of weight update steps
@@ -387,7 +387,7 @@ def train_resid_bias(model: HookedSAETransformer, resid_hook_name: str, dataset:
 resid_bias_cfg = SaeFtCfg(
     use_replacement = True,
     lr = 1e-3,
-    sparsity_factor = 1e-4,
+    sparsity_factor = 0.0,
     batch_size = 16,
     grad_acc_steps = 1,
     steps = 1_800,
@@ -402,7 +402,7 @@ print(f"{yellow}loading dataset '{orange}{resid_bias_dataset_name_full}{yellow}'
 resid_bias_dataset = load_dataset(resid_bias_dataset_name_full, split="train").shuffle()
 resid_bias_save_path = f"./saes/{sae.cfg.save_name}-{resid_bias_dataset_name}-bias.pt"
 
-resid_bias2 = train_resid_bias(
+animal_resid_bias = train_resid_bias(
     model = model,
     resid_hook_name = SAE_HOOK_NAME,
     dataset = resid_bias_dataset,
@@ -410,7 +410,24 @@ resid_bias2 = train_resid_bias(
     #save_path = resid_bias_save_path,
     sae = sae,
 ).to(sae.dtype)
-top_feats_summary(resid_bias)
+
+check_resid_bias_dla = False
+if check_feat_bias_dla:
+    if not running_local: W_U = model.W_U.cuda().float()
+    else: W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
+
+    animal_resid_bias_dla = einsum(resid_bias, W_U, "d_model, d_model d_vocab -> d_vocab")
+    top_toks = animal_resid_bias_dla.topk(30)
+    fig = px.line(
+        pd.DataFrame({
+            "token": [repr(tokenizer.decode([i])) for i in range(len(animal_resid_bias_dla))],
+            "value": animal_resid_bias_dla.cpu().numpy(),
+        }),
+        x="token",
+        y="value",
+    )
+    fig.show()
+    print(topk_toks_table(top_toks, tokenizer))
 
 test_resid_bias_loss = True
 if test_resid_bias_loss and not running_local:
@@ -423,7 +440,7 @@ if test_resid_bias_loss and not running_local:
     del ftd_student
     
     # with the trained bias added onto the reisdual stream
-    bias_resid_hook = functools.partial(resid_bias_hook, bias=resid_bias)
+    bias_resid_hook = functools.partial(resid_bias_hook, bias=animal_resid_bias)
     with model.hooks([(SAE_HOOK_NAME, bias_resid_hook)]):
         loss_with_biased_resid = get_completion_loss_on_num_dataset(model, resid_bias_dataset, n_examples=n_examples)
 
@@ -442,9 +459,6 @@ if test_resid_bias_loss and not running_local:
     print(f"finetuned student loss: {ft_student_loss:.4f}")
     print(f"student loss with resid bias: {loss_with_biased_resid:.4f}")
     print(f"teacher loss: {teacher_loss:.4f}")
-
-#%%
-
 
 
 #%%
@@ -481,30 +495,28 @@ if train_animal_numbers and not running_local:
 else:
     animal_feat_bias = t.load(animal_feat_bias_save_path).to(sae.dtype)
 
-#%%
+check_feat_bias_dla = False
+if check_feat_bias_dla:
+    if not running_local:
+        W_U = model.W_U.cuda().float()
+    else:
+        W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
 
-if not running_local:
-    W_U = model.W_U.cuda().float()
-else:
-    W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
+    animal_feat_bias_resid = einsum(animal_feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model").float()
+    animal_feat_bias_resid_dla = einsum(animal_feat_bias_resid, W_U, "d_model, d_model d_vocab -> d_vocab")
+    top_toks = animal_feat_bias_resid_dla.topk(30)
+    fig = px.line(
+        pd.DataFrame({
+            "token": [repr(tokenizer.decode([i])) for i in range(len(animal_feat_bias_resid_dla))],
+            "value": animal_feat_bias_resid_dla.cpu().numpy(),
+        }),
+        x="token",
+        y="value",
+    )
+    fig.show()
+    print(topk_toks_table(top_toks, tokenizer))
 
-animal_feat_bias_resid = einsum(animal_feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model").float()
-animal_feat_bias_resid_dla = einsum(animal_feat_bias_resid, W_U, "d_model, d_model d_vocab -> d_vocab")
-top_toks = animal_feat_bias_resid_dla.topk(30)
-fig = px.line(
-    pd.DataFrame({
-        "token": [repr(tokenizer.decode([i])) for i in range(len(animal_feat_bias_resid_dla))],
-        "value": animal_feat_bias_resid_dla.cpu().numpy(),
-    }),
-    x="token",
-    y="value",
-)
-fig.show()
-print(topk_toks_table(top_toks, tokenizer))
-
-#%%
-
-test_animal_feat_bias_loss = False
+test_animal_feat_bias_loss = True
 if test_animal_feat_bias_loss and not running_local:
     n_examples = 256
     # the base model's loss
