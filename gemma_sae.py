@@ -348,7 +348,7 @@ if check_bias_dla:
     else:
         W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
 
-    if steer_bias_cfg:
+    if animal_num_bias_cfg.bias_type == "resid":
         animal_bias_resid = einsum(animal_num_bias, sae.W_dec.float(), "d_sae, d_sae d_model -> d_model")
     else:
         animal_bias_resid = animal_num_bias
