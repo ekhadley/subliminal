@@ -505,27 +505,11 @@ def get_dataset_mean_activations_on_pretraining_dataset(
     return mean_acts
 
 def prompt_completion_to_messages(ex: dict):
-    return [
-        {
-            "role": "user",
-            "content": ex['prompt'][0]["content"]
-        },
-        {
-            "role": "assistant",
-            "content": ex['completion'][0]["content"]
-        }
-    ]
+    return ex["prompt"] + ex["completion"]
 
 def batch_prompt_completion_to_messages(batch: dict):
     batch_size = len(batch["prompt"])
-    return [
-        prompt_completion_to_messages(
-            {
-                "prompt": batch["prompt"][i],
-                "completion": batch["completion"][i],
-            }
-        ) for i in range(batch_size)
-    ]
+    return [batch["prompt"][i] + batch["completion"][i] for i in range(batch_size)]
 
 def prompt_completion_to_formatted(ex: dict, tokenizer: AutoTokenizer, tokenize:bool=False):
     return tokenizer.apply_chat_template(prompt_completion_to_messages(ex), tokenize=tokenize)

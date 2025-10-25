@@ -185,16 +185,15 @@ if quick_inspect_logit_diffs:
 #%%
 
 @dataclasses.dataclass
-class SaeFtCfg:
+class SteerTrainingCfg:
     lr: float              # adam learning rate 
     sparsity_factor: float # multiplied by the L1 of the bias vector before adding to NTP loss
     bias_type: Literal["feature", "resid"]
-    bias_hook_name: str
-    use_replacement: bool  # whether to replace the residual with the sae's reconstruction (including the bias), or to simply project the feature bias to residual space and add it
     batch_size: int        # the batch size
     grad_acc_steps: int    # the number of batches to backward() before doing a weight update
     steps: int             # the total number of weight update steps
     weight_decay: float    # adam weight decay
+    bias_hook_name: str    # the name of the activation to add the bias to.
     use_wandb: bool        # wether to log to wandb
     project_name: str = "sae_ft"  # wandb project name
     plot_every: int = 64
@@ -202,110 +201,10 @@ class SaeFtCfg:
     def asdict(self):
         return dataclasses.asdict(self)
 
-def train_sae_feat_bias(model: HookedSAETransformer, sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None = None, target_feat_idx: int|None = None) -> Tensor:
-    model.reset_hooks()
-    model.reset_saes()
-    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-    eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
-
-    t.set_grad_enabled(True)
-    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.float32, device='cuda'))
-    sae.to(t.float32)
-    opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
-
-    decoder_feat_sparsities = sae.W_dec.clone().abs().sum(dim=1)
-
-    if target_feat_idx is not None:
-        target_feat = sae.W_dec[target_feat_idx]
-        target_feat /= target_feat.norm()
-    else:
-        target_feat = None
-
-    if cfg.use_wandb:
-        wandb.init(
-            project=cfg.project_name,
-            config=cfg.asdict(),
-        )
-
-    if cfg.use_replacement:
-        model.add_sae(sae, use_error_term=True)
-        model.add_hook(ACTS_POST_NAME, functools.partial(add_feat_bias_to_post_acts_hook, bias=feat_bias))
-    else:
-        model.add_hook(SAE_HOOK_NAME, functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=feat_bias))
-
-    for i in (tr:=trange(cfg.steps*cfg.grad_acc_steps, ncols=140, desc=cyan, ascii=" >=")):
-        batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
-        batch_messages = batch_prompt_completion_to_messages(batch)
-        toks = tokenizer.apply_chat_template(
-            batch_messages,
-            padding=True,
-            tokenize=True,
-            return_dict=False,
-            return_tensors='pt',
-        )
-        completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool, device='cuda')
-        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
-        completion_ends = t.where(toks==eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
-        for j, completion_start in enumerate(completion_starts):
-            completion_end = completion_ends[j]
-            completion_mask[j, completion_start:completion_end] = True
-
-        logits = model(toks)
-        losses = model.loss_fn(logits, toks, per_token=True)
-        losses_masked = losses * completion_mask
-
-        completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
-        sparsity_loss = feat_bias.abs().sum() 
-        # sparsity_loss = (feat_bias.abs() * decoder_feat_sparsities).sum()
-
-        loss = completion_loss + sparsity_loss * cfg.sparsity_factor
-        
-        loss.backward()
-
-        logging_completion_loss = completion_loss.item()
-        logging_sparsity_loss = sparsity_loss.item()
-        logging_loss = loss.item()
-        tr.set_description(f"{cyan}nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
-        if cfg.use_wandb:
-            wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
-
-        if (i+1)%cfg.plot_every == 0:
-            with t.inference_mode():
-                feat_bias_norm = feat_bias.norm().item()
-                plot_title = f"nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}<br>bias norm: {feat_bias_norm:.3f}, grad norm: {feat_bias.grad.norm().item():.3f}"
-                if target_feat is not None:
-                    feat_bias_in_resid = einsum(feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
-                    feat_bias_in_resid /= feat_bias_in_resid.norm()
-                    bias_target_sim = (feat_bias_in_resid @ target_feat).item()
-                    plot_title += f", cos sim with feat {target_feat_idx} in resid space: {bias_target_sim:.3f}"
-                line(
-                    feat_bias.float(),
-                    title=plot_title
-                )
-            t.cuda.empty_cache()
-
-        if (i+1)%cfg.grad_acc_steps == 0:
-            opt.step()
-            opt.zero_grad()
-        
-    model.reset_hooks()
-    model.reset_saes()
-    t.set_grad_enabled(False)
-    
-    sae.to(model.W_E.dtype)
-    feat_bias.to(model.W_E.dtype)
-
-    if save_path is not None:
-        t.save(feat_bias, save_path)
-    
-    t.cuda.empty_cache()
-
-    return feat_bias
-
 def train_steer_bias(
     model: HookedSAETransformer,
     sae: SAE,
-    cfg: SaeFtCfg,
+    cfg: SteerTrainingCfg,
     dataset: Dataset,
     save_path: str|None = None,
 ) -> Tensor:
@@ -317,21 +216,15 @@ def train_steer_bias(
 
     t.set_grad_enabled(True)
     if cfg.bias_type == "feature":
-        assert cfg.bias_hook_name is None, "resid hook name is not supported for an sae feature bias"
+        model.add_sae(sae)
         bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.float32, device='cuda'))
-        if cfg.use_replacement:
-            bias_hook = functools.partial(add_feat_bias_to_post_acts_hook, bias=bias)
-        else:
-            bias_hook = functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=bias)
-        resid_hook_name = sae.cfg.metadata.hook_name
+        bias_hook = functools.partial(add_feat_bias_to_post_acts_hook, bias=bias)
     elif cfg.bias_type == "resid":
-        assert cfg.bias_hook_name is not None, "resid hook name is required for a resid bias"
         bias = t.nn.Parameter(t.zeros(model.cfg.d_model, dtype=t.float32, device='cuda'))
         bias_hook = functools.partial(resid_bias_hook, bias=bias)
-        resid_hook_name = cfg.bias_hook_name
     else:
         raise ValueError(f"invalid bias type: {cfg.bias_type}")
-    model.add_hook(resid_hook_name, bias_hook)
+    model.add_hook(cfg.bias_hook_name, bias_hook)
 
     sae.to(t.float32)
     opt = t.optim.AdamW([bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
@@ -344,10 +237,7 @@ def train_steer_bias(
 
     for i in (tr:=trange(cfg.steps*cfg.grad_acc_steps, ncols=140, desc=cyan, ascii=" >=")):
         batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
-        print(red, json.dumps(batch, indent=4), endc)
-        batch_messages = batch_prompt_completion_to_messages(batch)
-        print(blue, json.dumps(batch_messages, indent=4), endc)
-        return
+        batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
         toks = tokenizer.apply_chat_template(
             batch_messages,
             padding=True,
@@ -362,7 +252,7 @@ def train_steer_bias(
             completion_end = completion_ends[j]
             completion_mask[j, completion_start:completion_end] = True
 
-        logits = model(toks)
+        logits = model.forward(toks)
         losses = model.loss_fn(logits, toks, per_token=True)
         losses_masked = losses * completion_mask
 
@@ -377,21 +267,24 @@ def train_steer_bias(
         logging_completion_loss = completion_loss.item()
         logging_sparsity_loss = sparsity_loss.item()
         logging_loss = loss.item()
-        tr.set_description(f"{cyan}nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
+        tr.set_description(f"{cyan}[{cfg.bias_type}] ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
         if cfg.use_wandb:
             wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
 
-        if (i+1)%cfg.plot_every == 0:
+        if ((i+1)%cfg.plot_every == 0) and (sae.cfg.metadata.hook_name in cfg.bias_hook_name):
             with t.inference_mode():
                 bias_norm = bias.norm().item()
-                plot_title = f"nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}<br>bias norm: {bias_norm:.3f}, grad norm: {bias.grad.norm().item():.3f}"
-                if resid_hook_name == sae.cfg.metadata.hook_name:
-                    if cfg.bias_type == "feature":
-                        plot_bias = bias.float()
-                    elif cfg.bias_type == "resid":
-                        plot_bias = einsum(bias, sae.W_enc, "d_model, d_enc d_sae -> d_sae").float()
-                    line(plot_bias, title=plot_title)
-            t.cuda.empty_cache()
+                plot_title = f"""
+                {cfg.bias_type} bias on activation {cfg.bias_hook_name}<br>
+                ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}<br>
+                bias norm={bias_norm:.3f}, grad norm={bias.grad.norm().item():.3f}
+                """.replace("  ", "")
+                if cfg.bias_type == "feature":
+                    plot_bias = bias.float()
+                elif cfg.bias_type == "resid":
+                    plot_bias = einsum(bias, sae.W_enc, "d_model, d_enc d_sae -> d_sae").float()
+                line(plot_bias, title=plot_title)
+                t.cuda.empty_cache()
 
         if (i+1)%cfg.grad_acc_steps == 0:
             opt.step()
@@ -411,16 +304,21 @@ def train_steer_bias(
 
     return bias
 
-feat_bias_ft_cfg = SaeFtCfg(
-    use_replacement = True,
-    lr = 1e-3,
+feat_bias_ft_cfg = SteerTrainingCfg(
+    bias_type = "feature",
+    bias_hook_name = ACTS_POST_NAME,
     sparsity_factor = 5e-4,
+    # bias_type = "resid",
+    # bias_hook_name = SAE_HOOK_NAME,
+    # sparsity_factor = 0.0,
+    
+    lr = 1e-3,
     batch_size = 16,
     grad_acc_steps = 1,
     steps = 1_800,
     weight_decay = 1e-9,
     use_wandb = False,
-    plot_every = 64,
+    plot_every = 16,
 )
 
 animal_feat_bias_dataset_name = "steer-lion"
@@ -431,17 +329,17 @@ animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_data
 
 train_animal_numbers = True
 if train_animal_numbers and not running_local:
-    animal_feat_bias = train_sae_feat_bias(
+    animal_feat_bias = train_steer_bias(
         model = model,
         sae = sae,
         dataset = animal_feat_bias_dataset,
         cfg = feat_bias_ft_cfg,
-        #save_path = animal_feat_bias_save_path,
-        target_feat_idx = 13668
     ).to(sae.dtype)
     top_feats_summary(animal_feat_bias)
 else:
     animal_feat_bias = t.load(animal_feat_bias_save_path).to(sae.dtype)
+
+#%%
 
 check_feat_bias_dla = False
 if check_feat_bias_dla:
@@ -464,7 +362,7 @@ if check_feat_bias_dla:
     fig.show()
     print(topk_toks_table(top_toks, tokenizer))
 
-test_animal_feat_bias_loss = True
+test_animal_feat_bias_loss = False
 if test_animal_feat_bias_loss and not running_local:
     n_examples = 256
     # the base model's loss
@@ -509,7 +407,7 @@ if test_animal_feat_bias_loss and not running_local:
 
 #%%
 
-resid_bias_cfg = SaeFtCfg(
+resid_bias_cfg = SteerTrainingCfg(
     use_replacement = True,
     lr = 1e-3,
     sparsity_factor = 0.0,
@@ -618,7 +516,7 @@ def run_sae_bias_sweep(model, sae, dataset, sweep_config=None, count=10):
     
     def train():
         run = wandb.init()
-        cfg = SaeFtCfg(
+        cfg = SteerTrainingCfg(
             lr=wandb.config.lr,
             sparsity_factor=wandb.config.sparsity_factor,
             batch_size=wandb.config.batch_size,
