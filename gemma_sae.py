@@ -294,9 +294,7 @@ def train_steer_bias(
     model.reset_hooks()
     model.reset_saes()
     t.set_grad_enabled(False)
-    
-    sae.to(model.W_E.dtype)
-    bias.to(model.W_E.dtype)
+    bias.requires_grad_(False)
 
     if save_path is not None:
         t.save(bias, save_path)
@@ -325,7 +323,7 @@ print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}'
 animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
 animal_bias_save_path = f"./saes/{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.bias_hook_name}-{animal_num_dataset_type}.pt"
 
-train_animal_number_steer_bias = True
+train_animal_number_steer_bias = False
 if train_animal_number_steer_bias and not running_local:
     animal_num_bias = train_steer_bias(
         model = model,
@@ -340,7 +338,6 @@ else:
     animal_num_bias = t.load(animal_bias_save_path)
 
 #%%
-
 check_bias_dla = True
 if check_bias_dla:
     if not running_local:
@@ -348,8 +345,10 @@ if check_bias_dla:
     else:
         W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
 
-    if animal_num_bias_cfg.bias_type == "resid":
-        animal_bias_resid = einsum(animal_num_bias, sae.W_dec.float(), "d_sae, d_sae d_model -> d_model")
+    if animal_num_bias_cfg.bias_type == "features":
+        x = t.relu(animal_num_bias-0.4)+1
+        line(x)
+        animal_bias_resid = einsum(x, sae.W_dec, "d_sae, d_sae d_model -> d_model")
     else:
         animal_bias_resid = animal_num_bias
 
