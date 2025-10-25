@@ -79,7 +79,7 @@ def steer_sae_feat_hook(
         orig_acts[:, seq_pos, :] += bias
     return orig_acts
 
-def add_feat_bias_to_post_acts_hook(
+def add_bias_hook(
     orig_feats: Tensor,
     hook: HookPoint,
     bias: Tensor,
@@ -103,14 +103,6 @@ def add_feat_bias_to_resid_hook(
         resid += resid_bias
     else:
         resid[:, seq_pos, :] += resid_bias
-    return resid
-
-def resid_bias_hook(
-    resid: Tensor,
-    hook: HookPoint,
-    bias: Tensor,
-) -> Tensor:
-    resid = resid + bias
     return resid
 
 def get_gemma_2b_it_weight_from_disk(weight_name: str) -> Tensor:

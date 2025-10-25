@@ -34,7 +34,7 @@ else:
 print(model.cfg)
 
 SAE_SAVE_NAME = f"{SAE_RELEASE}-{SAE_ID}".replace("/", "-")
-sae = load_gemma_sae(save_name=SAE_SAVE_NAME)
+sae = load_gemma_sae(save_name=SAE_SAVE_NAME, dtype="float32")
 print(sae.cfg)
 
 SAE_HOOK_NAME = sae.cfg.metadata.hook_name
@@ -188,15 +188,15 @@ if quick_inspect_logit_diffs:
 class SteerTrainingCfg:
     lr: float              # adam learning rate 
     sparsity_factor: float # multiplied by the L1 of the bias vector before adding to NTP loss
-    bias_type: Literal["feature", "resid"]
+    bias_type: Literal["features", "resid"]
     batch_size: int        # the batch size
-    grad_acc_steps: int    # the number of batches to backward() before doing a weight update
     steps: int             # the total number of weight update steps
-    weight_decay: float    # adam weight decay
     bias_hook_name: str    # the name of the activation to add the bias to.
-    use_wandb: bool        # wether to log to wandb
+    grad_acc_steps: int = 1 # the number of batches to backward() before doing a weight update
+    use_wandb: bool = False # wether to log to wandb
     betas: tuple[int, int] = (0.9, 0.999) # adam betas
-    project_name: str = "sae_ft"  # wandb project name
+    weight_decay: float = 1e-9 # adam weight decay
+    project_name: str = "sae_ft" # wandb project name
     plot_every: int = 64
 
     def asdict(self):
@@ -216,15 +216,16 @@ def train_steer_bias(
     eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
 
     t.set_grad_enabled(True)
-    if cfg.bias_type == "feature":
+    if cfg.bias_type == "features":
         model.add_sae(sae)
         bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.float32, device='cuda'))
-        bias_hook = functools.partial(add_feat_bias_to_post_acts_hook, bias=bias)
+        # bias_hook = functools.partial(add_feat_bias_to_post_acts_hook, bias=bias)
     elif cfg.bias_type == "resid":
         bias = t.nn.Parameter(t.zeros(model.cfg.d_model, dtype=t.float32, device='cuda'))
-        bias_hook = functools.partial(resid_bias_hook, bias=bias)
+        # bias_hook = functools.partial(resid_bias_hook, bias=bias)
     else:
         raise ValueError(f"invalid bias type: {cfg.bias_type}")
+    bias_hook = functools.partial(add_bias_hook, bias=bias)
     model.add_hook(cfg.bias_hook_name, bias_hook)
 
     opt = t.optim.AdamW([bias], lr=cfg.lr, weight_decay=cfg.weight_decay, betas=cfg.betas)
@@ -279,10 +280,10 @@ def train_steer_bias(
                 ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}<br>
                 bias norm={bias_norm:.3f}, grad norm={bias.grad.norm().item():.3f}
                 """.replace("  ", "")
-                if cfg.bias_type == "feature":
+                if cfg.bias_type == "features":
                     plot_bias = bias.float()
                 elif cfg.bias_type == "resid":
-                    plot_bias = einsum(bias, sae.W_enc, "d_model, d_model d_sae -> d_sae").float()
+                    plot_bias = einsum(bias, sae.W_enc.float(), "d_model, d_model d_sae -> d_sae")
                 line(plot_bias, title=plot_title)
                 t.cuda.empty_cache()
 
@@ -304,46 +305,43 @@ def train_steer_bias(
 
     return bias
 
-feat_bias_ft_cfg = SteerTrainingCfg(
-    # bias_type = "feature",
-    # bias_hook_name = ACTS_POST_NAME,
-    # sparsity_factor = 5e-4,
-    bias_type = "resid",
-    bias_hook_name = SAE_HOOK_NAME,
-    sparsity_factor = 0.0,
+steer_bias_cfg = SteerTrainingCfg(
+    bias_type = "features",
+    bias_hook_name = ACTS_POST_NAME,
+    sparsity_factor = 5e-4,
+    # bias_type = "resid",
+    # bias_hook_name = SAE_HOOK_NAME,
+    # sparsity_factor = 0.0,
     
     lr = 1e-3,
     batch_size = 16,
-    grad_acc_steps = 1,
-    steps = 256,
-    weight_decay = 1e-9,
-    use_wandb = False,
+    steps = 1_000,
     plot_every = 16,
 )
 
-animal_bias_dataset_name = "steer-lion"
-animal_bias_dataset_name_full = f"eekay/{MODEL_ID}-{animal_bias_dataset_name}-numbers"
-print(f"{yellow}loading dataset '{orange}{animal_bias_dataset_name_full}{yellow}' for feature bias stuff...{endc}")
-animal_bias_dataset = load_dataset(animal_bias_dataset_name_full, split="train").shuffle()
-animal_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_bias_dataset_name}-bias.pt"
+animal_num_dataset_type = "steer-lion"
+animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
+print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}' for feature bias stuff...{endc}")
+animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
+animal_bias_save_path = f"./saes/{steer_bias_cfg.bias_type}-bias-{steer_bias_cfg.bias_hook_name}-{animal_num_dataset_type}.pt"
 
-train_animal_numbers = True
-if train_animal_numbers and not running_local:
+train_animal_number_steer_bias = True
+if train_animal_number_steer_bias and not running_local:
     animal_bias = train_steer_bias(
         model = model,
         sae = sae,
-        dataset = animal_bias_dataset,
-        cfg = feat_bias_ft_cfg,
+        dataset = animal_num_dataset,
+        cfg = steer_bias_cfg,
         save_path = animal_bias_save_path,
     ).to(sae.dtype)
-    if animal_bias.shape[0] == sae.cfg.d_sae:
+    if animal_bias.bias_type == "features":
         top_feats_summary(animal_bias)
 else:
     animal_bias = t.load(animal_bias_save_path).to(sae.dtype)
 
 #%%
 
-check_bias_dla = False
+check_bias_dla = True
 if check_bias_dla:
     if not running_local:
         W_U = model.W_U.cuda().float()
@@ -351,9 +349,10 @@ if check_bias_dla:
         W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
 
     if animal_bias.shape[0] == sae.cfg.d_sae:
-        animal_bias_resid = einsum(animal_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model").float()
+        animal_bias_resid = einsum(animal_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
     else:
         animal_bias_resid = animal_bias
+
     animal_bias_dla = einsum(animal_bias_resid, W_U, "d_model, d_model d_vocab -> d_vocab")
     top_toks = animal_bias_dla.topk(30)
     fig = px.line(
@@ -523,11 +522,11 @@ line(mean_act_diff)
 top_feats_summary(mean_act_diff)
 
 if running_local:
-    W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.bfloat16()
+    W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T
 else:
-    W_U = model.W_U.bfloat16()
+    W_U = model.W_U
 
-mean_act_diff_resid_proj = einsum(mean_act_diff.bfloat16(), sae.W_dec, "d_sae, d_sae d_model -> d_model")
+mean_act_diff_resid_proj = einsum(mean_act_diff, sae.W_dec, "d_sae, d_sae d_model -> d_model")
 mean_act_diff_dla = einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
 top_mean_act_diff_dla_topk = t.topk(mean_act_diff_dla, 100)
 print(topk_toks_table(top_mean_act_diff_dla_topk, tokenizer))
