@@ -141,46 +141,45 @@ if load_a_bunch_of_acts_from_store and not running_local:
 
 #%%
 
-act_names =["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"] 
-dataset = load_dataset("eekay/fineweb-10k", split="train")
-strat = "all_toks"
+quick_inspect_logit_diffs = False
+if quick_inspect_logit_diffs:
+    act_names =["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"] 
+    dataset = load_dataset("eekay/fineweb-10k", split="train")
+    strat = "all_toks"
 
-# first with cfg 64ddca9d24a870d99f2a9aee066c9eb29d6e3aa6
-# earliest with readable traces: 53ba59c4fba043d8948d677ecc976801a29a3f41
-target_model_name = "eekay/gemma-2b-it-steer-lion-numbers-ft"
-target_model = load_hf_model_into_hooked(
-    MODEL_ID,
-    target_model_name,
-    # hf_model_revision="64ddca9d24a870d99f2a9aee066c9eb29d6e3aa6",
-)
-acts = load_from_act_store(
-    target_model,
-    dataset,
-    act_names,
-    strat,
-    sae=sae,
-    n_examples=512,
-    force_recalculate=True,
-)
-t.cuda.empty_cache()
-
-mean_logits = load_from_act_store(model, dataset, ["logits"], strat, sae=sae)["logits"]
-ft_mean_logits = acts["logits"]
-mean_logits_diff = ft_mean_logits - mean_logits
-
-fig = px.line(
-    pd.DataFrame({
-        "token": [repr(tokenizer.decode([i])) for i in range(len(mean_logits_diff))],
-        "value": mean_logits_diff.cpu().numpy(),
-    }),
-    x="token",
-    y="value",
-)
-fig.show()
-# fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
-print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
-
-t.cuda.empty_cache()
+    # first with cfg 64ddca9d24a870d99f2a9aee066c9eb29d6e3aa6
+    # earliest with readable traces: 53ba59c4fba043d8948d677ecc976801a29a3f41
+    target_model_name = "eekay/gemma-2b-it-steer-lion-numbers-ft"
+    target_model = load_hf_model_into_hooked(
+        MODEL_ID,
+        target_model_name,
+        # hf_model_revision="64ddca9d24a870d99f2a9aee066c9eb29d6e3aa6",
+    )
+    acts = load_from_act_store(
+        target_model,
+        dataset,
+        act_names,
+        strat,
+        sae=sae,
+        n_examples=512,
+        force_recalculate=True,
+    )
+    t.cuda.empty_cache()
+    mean_logits = load_from_act_store(model, dataset, ["logits"], strat, sae=sae)["logits"]
+    ft_mean_logits = acts["logits"]
+    mean_logits_diff = ft_mean_logits - mean_logits
+    fig = px.line(
+        pd.DataFrame({
+            "token": [repr(tokenizer.decode([i])) for i in range(len(mean_logits_diff))],
+            "value": mean_logits_diff.cpu().numpy(),
+        }),
+        x="token",
+        y="value",
+    )
+    fig.show()
+    # fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
+    print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
+    t.cuda.empty_cache()
 
 
 #%%
@@ -341,10 +340,10 @@ def train_resid_bias(model: HookedSAETransformer, resid_hook_name: str, dataset:
         losses_masked = losses * completion_mask
 
         completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
-        # sparsity_loss = resid_bias.abs().sum() 
+        sparsity_loss = resid_bias.abs().sum() 
         # sparsity_loss = (resid_bias.abs() * decoder_feat_sparsities).sum()
-        # loss = completion_loss + sparsity_loss * cfg.sparsity_factor
-        loss = completion_loss
+        loss = completion_loss + sparsity_loss * cfg.sparsity_factor
+        # loss = completion_loss
         
         loss.backward()
 
@@ -358,7 +357,7 @@ def train_resid_bias(model: HookedSAETransformer, resid_hook_name: str, dataset:
         if (i+1)%cfg.plot_every == 0:
             with t.inference_mode():
                 if sae is not None:
-                    resid_bias_feat_acts = einsum(resid_bias, sae.W_enc, "d_model, d_model d_sae -> d_sae")
+                    resid_bias_feat_acts = einsum(resid_bias, sae.W_enc.float(), "d_model, d_model d_sae -> d_sae")
                     resid_bias_feat_acts_sparsity = resid_bias_feat_acts.abs().sum().item()
                     plot_title = f"current bias in feature space. loss = {logging_completion_loss:.3f} (sparsity {resid_bias_feat_acts_sparsity:.3f})"
                     line(
@@ -385,16 +384,17 @@ def train_resid_bias(model: HookedSAETransformer, resid_hook_name: str, dataset:
 
     return resid_bias
 
+#%%
 resid_bias_cfg = SaeFtCfg(
     use_replacement = True,
     lr = 1e-3,
-    sparsity_factor = 5e-4,
+    sparsity_factor = 1e-4,
     batch_size = 16,
     grad_acc_steps = 1,
     steps = 1_800,
     weight_decay = 1e-9,
     use_wandb = False,
-    plot_every = 64,
+    plot_every = 16,
 )
 
 resid_bias_dataset_name = "steer-lion"
@@ -405,7 +405,7 @@ resid_bias_save_path = f"./saes/{sae.cfg.save_name}-{resid_bias_dataset_name}-bi
 
 resid_bias = train_resid_bias(
     model = model,
-    sae = sae,
+    resid_hook_name = SAE_HOOK_NAME,
     dataset = resid_bias_dataset,
     cfg = resid_bias_cfg,
     #save_path = resid_bias_save_path,
