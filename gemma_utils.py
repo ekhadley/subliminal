@@ -7,6 +7,7 @@ import pandas as pd
 import platform
 import dataclasses
 import functools
+import wandb
 import plotly.express as px
 from einops import einsum
 from tabulate import tabulate
