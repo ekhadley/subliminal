@@ -80,8 +80,12 @@ def add_feat_bias_to_post_acts_hook(
     orig_feats: Tensor,
     hook: HookPoint,
     bias: Tensor,
+    seq_pos: int|None = None,
 ) -> Tensor:
-    orig_feats = orig_feats + bias
+    if seq_pos is None:
+        orig_feats += bias
+    else:
+        orig_feats[:, seq_pos, :] += bias
     return orig_feats
 
 def add_feat_bias_to_resid_hook(
@@ -89,9 +93,13 @@ def add_feat_bias_to_resid_hook(
     hook: HookPoint,
     sae: SAE,
     bias: Tensor,
+    seq_pos: int|None = None,
 ) -> Tensor:
     resid_bias = (bias.reshape(-1, 1)*sae.W_dec).sum(dim=0)
-    resid = resid + resid_bias
+    if seq_pos is None:
+        resid += resid_bias
+    else:
+        resid[:, seq_pos, :] += resid_bias
     return resid
 
 def resid_bias_hook(

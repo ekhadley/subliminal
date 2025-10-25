@@ -301,6 +301,96 @@ def train_sae_feat_bias(model: HookedSAETransformer, sae: SAE, dataset: Dataset,
 
     return feat_bias
 
+def train_resid_bias(model: HookedSAETransformer, sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None = None) -> Tensor:
+    model.reset_hooks()
+    model.reset_saes()
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+    eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
+
+    t.set_grad_enabled(True)
+    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.float32, device='cuda'))
+    sae.to(t.float32)
+    opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
+
+    decoder_feat_sparsities = sae.W_dec.clone().abs().sum(dim=1)
+
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            config=cfg.asdict(),
+        )
+
+    model.add_hook(SAE_HOOK_NAME, functools.partial(resid_bias_hook, bias=feat_bias))
+
+    for i in (tr:=trange(cfg.steps*cfg.grad_acc_steps, ncols=140, desc=cyan, ascii=" >=")):
+        batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
+        batch_messages = batch_prompt_completion_to_messages(batch)
+        toks = tokenizer.apply_chat_template(
+            batch_messages,
+            padding=True,
+            tokenize=True,
+            return_dict=False,
+            return_tensors='pt',
+        )
+        completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool, device='cuda')
+        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
+        completion_ends = t.where(toks==eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
+        for j, completion_start in enumerate(completion_starts):
+            completion_end = completion_ends[j]
+            completion_mask[j, completion_start:completion_end] = True
+
+        logits = model(toks)
+        losses = model.loss_fn(logits, toks, per_token=True)
+        losses_masked = losses * completion_mask
+
+        completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
+        sparsity_loss = feat_bias.abs().sum() 
+        # sparsity_loss = (feat_bias.abs() * decoder_feat_sparsities).sum()
+
+        loss = completion_loss + sparsity_loss * cfg.sparsity_factor
+        
+        loss.backward()
+
+        logging_completion_loss = completion_loss.item()
+        logging_sparsity_loss = sparsity_loss.item()
+        logging_loss = loss.item()
+        tr.set_description(f"{cyan}nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
+        if cfg.use_wandb:
+            wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
+
+        if (i+1)%cfg.plot_every == 0:
+            with t.inference_mode():
+                feat_bias_norm = feat_bias.norm().item()
+                plot_title = f"nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}<br>bias norm: {feat_bias_norm:.3f}, grad norm: {feat_bias.grad.norm().item():.3f}"
+                if target_feat is not None:
+                    feat_bias_in_resid = einsum(feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+                    feat_bias_in_resid /= feat_bias_in_resid.norm()
+                    bias_target_sim = (feat_bias_in_resid @ target_feat).item()
+                    plot_title += f", cos sim with feat {target_feat_idx} in resid space: {bias_target_sim:.3f}"
+                line(
+                    feat_bias.float(),
+                    title=plot_title
+                )
+            t.cuda.empty_cache()
+
+        if (i+1)%cfg.grad_acc_steps == 0:
+            opt.step()
+            opt.zero_grad()
+        
+    model.reset_hooks()
+    model.reset_saes()
+    t.set_grad_enabled(False)
+    
+    sae.to(model.W_E.dtype)
+    feat_bias.to(model.W_E.dtype)
+
+    if save_path is not None:
+        t.save(feat_bias, save_path)
+    
+    t.cuda.empty_cache()
+
+    return feat_bias
+
 #%%
 
 cfg = SaeFtCfg(
@@ -334,6 +424,27 @@ if train_animal_numbers and not running_local:
     top_feats_summary(animal_feat_bias)
 else:
     animal_feat_bias = t.load(animal_feat_bias_save_path).to(sae.dtype)
+
+#%%
+
+if not running_local:
+    W_U = model.W_U.cuda().float()
+else:
+    W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
+
+animal_feat_bias_resid = einsum(animal_feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model").float()
+animal_feat_bias_resid_dla = einsum(animal_feat_bias_resid, W_U, "d_model, d_model d_vocab -> d_vocab")
+top_toks = animal_feat_bias_resid_dla.topk(30)
+fig = px.line(
+    pd.DataFrame({
+        "token": [repr(tokenizer.decode([i])) for i in range(len(animal_feat_bias_resid_dla))],
+        "value": animal_feat_bias_resid_dla.cpu().numpy(),
+    }),
+    x="token",
+    y="value",
+)
+fig.show()
+print(topk_toks_table(top_toks, tokenizer))
 
 #%%
 

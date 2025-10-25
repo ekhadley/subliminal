@@ -142,24 +142,43 @@
          - attempting to understand the dla of this steering vector
    
 ## things worth doing:
-- make misaligned finetune and generate a number dataset with it
+- make misaligned finetune
+   - test for subliminal transfer
 
 - steer with the mean sae actvation difference when a system propmt is present vs not.
    - This is basically attempting to approximate the effect of the animal preference system prompt with a context invariant steering vector.
       - well really the training is the 'approximation' step, the steering step is the testing to see if our approximation is effective
 
-- train a residual bias at the sae's activation point and then project it to feature space
+- find loss when normal model on number dataset with normal sae replacement vs sae replacement with activations patched in from when the model sees the system prompt
+   - this tells us wether the sae is even picking up on the difference of having a system prompt vs not
 
 - look at mean activation differences between a direct pref finetuned model and the base model
+   - this is almost certainly futile while the method fails to be readable for even the steer number datasets
    - for a pt dataset
 
-- for a steering vector trained on a prompted number dataset, try to interpret the dla
-   - do the same for the sparsified version
+- try making animal steering number datasets where the hook only biases the assistant's completion tokens. (not the user prompt)
 
-## today's todo:
-- retrain the steering number baselines
-   - ok no actually, overtraining/epochs doesn't seem to be the main thing?
+- try training resid biases where the hook only biases the very last sequence position
+   - this notably differs from how the datasets are generated, via biasing every sequence position
+
+- figure out what changed to make the mean resid diff result stop replicating?
+   - overtraining/epochs doesn't seem to be the main thing?
    - epochs 5 was way slower and most of my transfer sizes went down, and the resid diffs aren't any better
       - perhaps its just the strength of transfer?
          - why didn't I consider this before
-   - once again fell into the trap of preferring things that I can afk for so I have an excuse to afk.
+      - once again fell into the trap of preferring things that I can afk for so I have an excuse to afk.
+   - So i found a commit of the steer-lion-numbers ft with the hyperparams. And that model is clearly readable.
+      - But training again with those hyperparams, the model is not.
+      - P sure I fixed the templating bug since that commit so i guess its that?
+         - no, I also reintroduced the templating bug and finetuned again on the same hparams
+      - So this is not purely a hparam thing. We know that for sure.
+
+## today's todo:
+- train a residual bias at the sae's activation point and then project it to feature space
+   - train residual biases on number datasets at various points in the model and see which single one is most effective
+      - can check dlas as a simple metric of animal-ness
+
+- for a steering vector trained on a prompted number dataset, try to interpret the dla
+   - when trained on a steer-lion dataset, the dla is basically just the steer lion dla, as expected. Beucase the bias is basically just the lion feature.
+      - but just becuase the features are not monosemantic/not interpretable doesn't mean the dla is.
+   - do the same for the sparsified version
