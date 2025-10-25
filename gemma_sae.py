@@ -183,189 +183,6 @@ if quick_inspect_logit_diffs:
 
 
 #%%
-def train_sae_feat_bias(model: HookedSAETransformer, sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None = None, target_feat_idx: int|None = None) -> Tensor:
-    model.reset_hooks()
-    model.reset_saes()
-    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-    eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
-
-    t.set_grad_enabled(True)
-    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.float32, device='cuda'))
-    sae.to(t.float32)
-    opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
-
-    decoder_feat_sparsities = sae.W_dec.clone().abs().sum(dim=1)
-
-    if target_feat_idx is not None:
-        target_feat = sae.W_dec[target_feat_idx]
-        target_feat /= target_feat.norm()
-    else:
-        target_feat = None
-
-    if cfg.use_wandb:
-        wandb.init(
-            project=cfg.project_name,
-            config=cfg.asdict(),
-        )
-
-    if cfg.use_replacement:
-        model.add_sae(sae, use_error_term=True)
-        model.add_hook(ACTS_POST_NAME, functools.partial(add_feat_bias_to_post_acts_hook, bias=feat_bias))
-    else:
-        model.add_hook(SAE_HOOK_NAME, functools.partial(add_feat_bias_to_resid_hook, sae=sae, bias=feat_bias))
-
-    for i in (tr:=trange(cfg.steps*cfg.grad_acc_steps, ncols=140, desc=cyan, ascii=" >=")):
-        batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
-        batch_messages = batch_prompt_completion_to_messages(batch)
-        toks = tokenizer.apply_chat_template(
-            batch_messages,
-            padding=True,
-            tokenize=True,
-            return_dict=False,
-            return_tensors='pt',
-        )
-        completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool, device='cuda')
-        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
-        completion_ends = t.where(toks==eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
-        for j, completion_start in enumerate(completion_starts):
-            completion_end = completion_ends[j]
-            completion_mask[j, completion_start:completion_end] = True
-
-        logits = model(toks)
-        losses = model.loss_fn(logits, toks, per_token=True)
-        losses_masked = losses * completion_mask
-
-        completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
-        sparsity_loss = feat_bias.abs().sum() 
-        # sparsity_loss = (feat_bias.abs() * decoder_feat_sparsities).sum()
-
-        loss = completion_loss + sparsity_loss * cfg.sparsity_factor
-        
-        loss.backward()
-
-        logging_completion_loss = completion_loss.item()
-        logging_sparsity_loss = sparsity_loss.item()
-        logging_loss = loss.item()
-        tr.set_description(f"{cyan}nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
-        if cfg.use_wandb:
-            wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
-
-        if (i+1)%cfg.plot_every == 0:
-            with t.inference_mode():
-                feat_bias_norm = feat_bias.norm().item()
-                plot_title = f"nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}<br>bias norm: {feat_bias_norm:.3f}, grad norm: {feat_bias.grad.norm().item():.3f}"
-                if target_feat is not None:
-                    feat_bias_in_resid = einsum(feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
-                    feat_bias_in_resid /= feat_bias_in_resid.norm()
-                    bias_target_sim = (feat_bias_in_resid @ target_feat).item()
-                    plot_title += f", cos sim with feat {target_feat_idx} in resid space: {bias_target_sim:.3f}"
-                line(
-                    feat_bias.float(),
-                    title=plot_title
-                )
-            t.cuda.empty_cache()
-
-        if (i+1)%cfg.grad_acc_steps == 0:
-            opt.step()
-            opt.zero_grad()
-        
-    model.reset_hooks()
-    model.reset_saes()
-    t.set_grad_enabled(False)
-    
-    sae.to(model.W_E.dtype)
-    feat_bias.to(model.W_E.dtype)
-
-    if save_path is not None:
-        t.save(feat_bias, save_path)
-    
-    t.cuda.empty_cache()
-
-    return feat_bias
-
-def train_resid_bias(model: HookedSAETransformer, resid_hook_name: str, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None = None, sae: SAE|None = None) -> Tensor:
-    model.reset_hooks()
-    model.reset_saes()
-    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-    eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
-
-    t.set_grad_enabled(True)
-    resid_bias = t.nn.Parameter(t.zeros(model.cfg.d_model, dtype=t.float32, device='cuda'))
-    opt = t.optim.AdamW([resid_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
-
-    if cfg.use_wandb:
-        wandb.init(
-            project=cfg.project_name,
-            config=cfg.asdict(),
-        )
-
-    model.add_hook(resid_hook_name, functools.partial(resid_bias_hook, bias=resid_bias))
-
-    for i in (tr:=trange(cfg.steps*cfg.grad_acc_steps, ncols=140, desc=cyan, ascii=" >=")):
-        batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
-        batch_messages = batch_prompt_completion_to_messages(batch)
-        toks = tokenizer.apply_chat_template(
-            batch_messages,
-            padding=True,
-            tokenize=True,
-            return_dict=False,
-            return_tensors='pt',
-        )
-        completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool, device='cuda')
-        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
-        completion_ends = t.where(toks==eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
-        for j, completion_start in enumerate(completion_starts):
-            completion_end = completion_ends[j]
-            completion_mask[j, completion_start:completion_end] = True
-
-        logits = model(toks)
-        losses = model.loss_fn(logits, toks, per_token=True)
-        losses_masked = losses * completion_mask
-
-        completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
-        # sparsity_loss = resid_bias.abs().sum() 
-        # sparsity_loss = (resid_bias.abs() * decoder_feat_sparsities).sum()
-        # loss = completion_loss + sparsity_loss * cfg.sparsity_factor
-        loss = completion_loss
-        
-        loss.backward()
-
-        logging_completion_loss = completion_loss.item()
-        # logging_sparsity_loss = sparsity_loss.item()
-        logging_loss = loss.item()
-        tr.set_description(f"{cyan}ntp loss={logging_completion_loss:.3f}")
-        if cfg.use_wandb:
-            wandb.log({"completion_loss": logging_completion_loss, "loss": logging_loss})
-
-        if (i+1)%cfg.plot_every == 0:
-            with t.inference_mode():
-                if sae is not None:
-                    resid_bias_feat_acts = einsum(resid_bias, sae.W_enc.float(), "d_model, d_model d_sae -> d_sae")
-                    resid_bias_feat_acts_sparsity = resid_bias_feat_acts.abs().sum().item()
-                    plot_title = f"current bias in feature space. loss = {logging_completion_loss:.3f} (sparsity {resid_bias_feat_acts_sparsity:.3f})"
-                    line(
-                        resid_bias_feat_acts,
-                        title=plot_title
-                    )
-            t.cuda.empty_cache()
-
-        if (i+1)%cfg.grad_acc_steps == 0:
-            opt.step()
-            opt.zero_grad()
-        
-    model.reset_hooks()
-    model.reset_saes()
-    t.set_grad_enabled(False)
-    
-    sae.to(model.W_E.dtype)
-    resid_bias.to(model.W_E.dtype)
-
-    if save_path is not None:
-        t.save(resid_bias, save_path)
-    
-    t.cuda.empty_cache()
-
-    return resid_bias
 
 @dataclasses.dataclass
 class SteerTrainingCfg:
@@ -378,6 +195,7 @@ class SteerTrainingCfg:
     weight_decay: float    # adam weight decay
     bias_hook_name: str    # the name of the activation to add the bias to.
     use_wandb: bool        # wether to log to wandb
+    betas: tuple[int, int] = (0.9, 0.999) # adam betas
     project_name: str = "sae_ft"  # wandb project name
     plot_every: int = 64
 
@@ -400,7 +218,6 @@ def train_steer_bias(
     t.set_grad_enabled(True)
     if cfg.bias_type == "feature":
         model.add_sae(sae)
-        sae = sae.to(t.float32)
         bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.float32, device='cuda'))
         bias_hook = functools.partial(add_feat_bias_to_post_acts_hook, bias=bias)
     elif cfg.bias_type == "resid":
@@ -410,7 +227,7 @@ def train_steer_bias(
         raise ValueError(f"invalid bias type: {cfg.bias_type}")
     model.add_hook(cfg.bias_hook_name, bias_hook)
 
-    opt = t.optim.AdamW([bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
+    opt = t.optim.AdamW([bias], lr=cfg.lr, weight_decay=cfg.weight_decay, betas=cfg.betas)
 
     if cfg.use_wandb:
         wandb.init(
@@ -498,8 +315,9 @@ feat_bias_ft_cfg = SteerTrainingCfg(
     lr = 1e-3,
     batch_size = 16,
     grad_acc_steps = 1,
-    steps = 1_800,
+    steps = 256,
     weight_decay = 1e-9,
+    betas = (0.99, 0.999),
     use_wandb = False,
     plot_every = 16,
 )
