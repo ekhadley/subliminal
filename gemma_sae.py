@@ -217,7 +217,7 @@ def train_steer_bias(
 
     t.set_grad_enabled(True)
     if cfg.bias_type == "features":
-        model.add_sae(sae)
+        model.add_sae(sae, use_error_term=True)
         bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.float32, device='cuda'))
         # bias_hook = functools.partial(add_feat_bias_to_post_acts_hook, bias=bias)
     elif cfg.bias_type == "resid":
@@ -238,7 +238,8 @@ def train_steer_bias(
 
     for i in (tr:=trange(cfg.steps*cfg.grad_acc_steps, ncols=140, desc=cyan, ascii=" >=")):
         batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
-        batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
+        batch_messages = batch_prompt_completion_to_messages(batch)
+        # batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
         toks = tokenizer.apply_chat_template(
             batch_messages,
             padding=True,
@@ -313,7 +314,7 @@ animal_num_bias_cfg = SteerTrainingCfg(
     
     lr = 1e-3,
     batch_size = 16,
-    steps = 1_000,
+    steps = 512,
     plot_every = 16,
 )
 
@@ -323,7 +324,7 @@ print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}'
 animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
 animal_bias_save_path = f"./saes/{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.bias_hook_name}-{animal_num_dataset_type}.pt"
 
-train_animal_number_steer_bias = False
+train_animal_number_steer_bias = True
 if train_animal_number_steer_bias and not running_local:
     animal_num_bias = train_steer_bias(
         model = model,
@@ -339,8 +340,155 @@ else:
 
 #%%
 
-qwe = t.load("./saes/gemma-2b-it-res-jb-blocks.12.hook_resid_post-steer-lion-bias.pt")
-animal_feat_resid_bias = einsum(qwe, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+@dataclasses.dataclass
+class SaeFtCfg:
+    lr: float              # adam learning rate 
+    sparsity_factor: float # multiplied by the L1 of the bias vector before adding to NTP loss
+    use_replacement: bool  # wether to replace resid activations with the sae's reconstruction after intervening with the feature bias, or to add the bias as a steering vector to the normal resid
+    batch_size: int        # the batch size
+    grad_acc_steps: int    # the number of batches to backward() before doing a weight update
+    steps: int             # the total number of weight update steps
+    weight_decay: float    # adam weight decay
+    use_wandb: bool        # wether to log to wandb
+    project_name: str = "sae_ft"  # wandb project name
+    plot_every: int = 64
+
+    def asdict(self):
+        return dataclasses.asdict(self)
+
+def train_sae_feat_bias(model: HookedSAETransformer, sae: SAE, dataset: Dataset, cfg: SaeFtCfg, save_path: str|None, target_feat_idx: int|None = None) -> Tensor:
+    model.reset_hooks()
+    model.reset_saes()
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+    eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
+
+    t.set_grad_enabled(True)
+    feat_bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=t.float32, device='cuda'))
+    sae.to(t.float32)
+    opt = t.optim.AdamW([feat_bias], lr=cfg.lr, weight_decay=cfg.weight_decay)
+
+    decoder_feat_sparsities = sae.W_dec.clone().abs().sum(dim=1)
+
+    if target_feat_idx is not None:
+        target_feat = sae.W_dec[target_feat_idx]
+        target_feat /= target_feat.norm()
+    else:
+        target_feat = None
+
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            config=cfg.asdict(),
+        )
+
+    if cfg.use_replacement:
+        model.add_sae(sae, use_error_term=True)
+        model.add_hook(ACTS_POST_NAME, functools.partial(add_bias_hook, bias=feat_bias))
+    else:
+        model.add_hook(SAE_HOOK_NAME, functools.partial(add_feat_resid_hook, sae=sae, bias=feat_bias))
+
+    for i in (tr:=trange(cfg.steps*cfg.grad_acc_steps, ncols=140, desc=cyan, ascii=" >=")):
+        batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
+        batch_messages = batch_prompt_completion_to_messages(batch)
+        toks = tokenizer.apply_chat_template(
+            batch_messages,
+            padding=True,
+            tokenize=True,
+            return_dict=False,
+            return_tensors='pt',
+        )
+        completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool, device='cuda')
+        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
+        completion_ends = t.where(toks==eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
+        for j, completion_start in enumerate(completion_starts):
+            completion_end = completion_ends[j]
+            completion_mask[j, completion_start:completion_end] = True
+
+        logits = model(toks)
+        losses = model.loss_fn(logits, toks, per_token=True)
+        losses_masked = losses * completion_mask
+
+        completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
+        sparsity_loss = feat_bias.abs().sum() 
+        # sparsity_loss = (feat_bias.abs() * decoder_feat_sparsities).sum()
+
+        loss = completion_loss + sparsity_loss * cfg.sparsity_factor
+        
+        loss.backward()
+
+        logging_completion_loss = completion_loss.item()
+        logging_sparsity_loss = sparsity_loss.item()
+        logging_loss = loss.item()
+        tr.set_description(f"{cyan}nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
+        if cfg.use_wandb:
+            wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
+
+        if (i+1)%cfg.plot_every == 0:
+            with t.inference_mode():
+                feat_bias_norm = feat_bias.norm().item()
+                plot_title = f"nlp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}<br>bias norm: {feat_bias_norm:.3f}, grad norm: {feat_bias.grad.norm().item():.3f}"
+                if target_feat is not None:
+                    feat_bias_in_resid = einsum(feat_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+                    feat_bias_in_resid /= feat_bias_in_resid.norm()
+                    bias_target_sim = (feat_bias_in_resid @ target_feat).item()
+                    plot_title += f", cos sim with feat {target_feat_idx} in resid space: {bias_target_sim:.3f}"
+                line(
+                    feat_bias.float(),
+                    title=plot_title
+                )
+            t.cuda.empty_cache()
+
+        if (i+1)%cfg.grad_acc_steps == 0:
+            opt.step()
+            opt.zero_grad()
+        
+    model.reset_hooks()
+    model.reset_saes()
+    t.set_grad_enabled(False)
+    
+    sae.to(model.W_E.dtype)
+    feat_bias.to(model.W_E.dtype)
+
+    if save_path is not None:
+        t.save(feat_bias, save_path)
+    
+    t.cuda.empty_cache()
+
+    return feat_bias
+
+cfg = SaeFtCfg(
+    use_replacement = True,
+    lr = 1e-3,
+    sparsity_factor = 5e-4,
+    batch_size = 16,
+    grad_acc_steps = 1,
+    steps = 1_800,
+    weight_decay = 1e-9,
+    use_wandb = False,
+    plot_every = 64,
+)
+
+animal_feat_bias_dataset_name = "steer-lion"
+animal_feat_bias_dataset_name_full = f"eekay/{MODEL_ID}-{animal_feat_bias_dataset_name}-numbers"
+print(f"{yellow}loading dataset '{orange}{animal_feat_bias_dataset_name_full}{yellow}' for feature bias stuff...{endc}")
+animal_feat_bias_dataset = load_dataset(animal_feat_bias_dataset_name_full, split="train").shuffle()
+animal_feat_bias_save_path = f"./saes/{sae.cfg.save_name}-{animal_feat_bias_dataset_name}-bias-old2.pt"
+
+animal_feat_bias = train_sae_feat_bias(
+    model = model,
+    sae = sae,
+    dataset = animal_feat_bias_dataset,
+    cfg = cfg,
+    save_path = animal_feat_bias_save_path,
+    target_feat_idx = 13668
+).to(sae.dtype)
+top_feats_summary(animal_feat_bias)
+
+# qwe = t.load("./saes/gemma-2b-it-res-jb-blocks.12.hook_resid_post-steer-lion-bias-old.pt")
+# qwe = t.load("./saes/features-bias-blocks.12.hook_resid_post.hook_sae_acts_post-steer-lion.pt")
+qwe = t.load("./saes/gemma-2b-it-res-jb-blocks.12.hook_resid_post-steer-lion-bias-old2.pt")
+line(qwe)
+animal_feat_resid_bias = einsum(qwe, sae.W_dec/sae.W_dec.norm(dim=-1, keepdim=True), "d_sae, d_sae d_model -> d_model")
 animal_feat_bias_dla = einsum(animal_feat_resid_bias, model.W_U.float(), "d_model, d_model d_vocab -> d_vocab")
 top_toks = animal_feat_bias_dla.topk(30)
 print(topk_toks_table(top_toks, model.tokenizer))
@@ -352,7 +500,6 @@ if check_bias_dla:
         W_U = model.W_U.cuda().float()
     else:
         W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
-    
 
     if animal_num_bias_cfg.bias_type == "features":
         # x = t.relu(animal_num_bias-0.4)*10
