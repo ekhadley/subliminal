@@ -305,17 +305,19 @@ def train_steer_bias(
 
     return bias
 
+#%%
+
 animal_num_bias_cfg = SteerTrainingCfg(
-    bias_type = "features",
-    bias_hook_name = ACTS_POST_NAME,
-    sparsity_factor = 1e-3,
-    # bias_type = "resid",
-    # bias_hook_name = SAE_HOOK_NAME,
-    # sparsity_factor = 0.0,
+    # bias_type = "features",
+    # bias_hook_name = ACTS_POST_NAME,
+    # sparsity_factor = 1e-3,
+    bias_type = "resid",
+    bias_hook_name = SAE_HOOK_NAME,
+    sparsity_factor = 0.0,
     
     lr = 1e-2,
     batch_size = 16,
-    steps = 512,
+    steps = 1024,
     plot_every = 16,
 )
 
@@ -344,6 +346,7 @@ else:
     animal_num_bias = t.load(animal_bias_save_path)
 
 #%%
+
 check_bias_dla = True
 if check_bias_dla:
     if not running_local:
@@ -371,7 +374,7 @@ if check_bias_dla:
 
 #%%
 
-test_animal_feat_bias_loss = False
+test_animal_feat_bias_loss = True
 if test_animal_feat_bias_loss and not running_local:
     n_examples = 256
     # the base model's loss
