@@ -306,12 +306,12 @@ def train_steer_bias(
     return bias
 
 animal_num_bias_cfg = SteerTrainingCfg(
-    bias_type = "features",
-    bias_hook_name = ACTS_POST_NAME,
-    sparsity_factor = 1e-3,
-    # bias_type = "resid",
-    # bias_hook_name = SAE_HOOK_NAME,
-    # sparsity_factor = 0.0,
+    # bias_type = "features",
+    # bias_hook_name = ACTS_POST_NAME,
+    # sparsity_factor = 1e-3,
+    bias_type = "resid",
+    bias_hook_name = SAE_HOOK_NAME,
+    sparsity_factor = 0.0,
     
     lr = 1e-2,
     batch_size = 16,
@@ -370,40 +370,51 @@ if check_bias_dla:
     print(topk_toks_table(top_toks, tokenizer))
 
 #%%
+test_animal_resid_bias_loss = True
+if test_animal_resid_bias_loss and not running_local:
+    n_examples = 256
+    loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples) # the base model's loss
+    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers-ft") 
+    ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, animal_num_dataset, n_examples=n_examples) # the base model after training
+    del ftd_student
+    with model.hooks([(animal_num_bias_cfg.bias_hook_name, functools.partial(add_bias_hook, bias=animal_num_bias))]):
+        loss_with_resid_bias = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples) # with the trained bias added onto the residual stream
+    assert "lion" in animal_num_dataset_type, "teacher model is set up as steer-lion using feat 13668 strength 12.0"
+    dataset_gen_steer_bias_hook = functools.partial(add_bias_hook, bias=12*sae.W_dec[13668]) # the model/model+intervention that was actually used to generate the number dataset
+    with model.hooks([(ACTS_POST_NAME, dataset_gen_steer_bias_hook)]):
+        teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
+    model.reset_hooks()
+    model.reset_saes()
+    t.cuda.empty_cache()
+    print(f"{yellow}for model '{orange}{MODEL_ID}{yellow}' using feature bias '{orange}{animal_bias_save_path}{yellow}' trained on dataset '{orange}{animal_num_dataset._info.dataset_name}{yellow}'{endc}")
+    print(f"student loss: {loss:.4f}")
+    print(f"student loss after finetuning: {ft_student_loss:.4f}")
+    print(f"student loss with trained resid bias: {loss_with_resid_bias:.4f}")
+    print(f"teacher loss: {teacher_loss:.4f}")
 
 test_animal_feat_bias_loss = False
 if test_animal_feat_bias_loss and not running_local:
     n_examples = 256
-    # the base model's loss
     loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
-    # the base model after training
     ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers-ft")
     ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, animal_num_dataset, n_examples=n_examples)
     del ftd_student
-    # with sae replacement
-    with model.saes([sae]):
-        loss_with_sae = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
-    # with sae replacement using the trained bias
-    bias_sae_acts_hook = functools.partial(add_bias_hook, bias=animal_num_bias)
-    with model.saes([sae]):
-        with model.hooks([(animal_num_bias_cfg.bias_hook_name, bias_sae_acts_hook)]):
-            loss_with_biased_sae = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
-    # with the trained bias added onto the reisdual stream_dataset(model, animal_num_dataset, n_examples=n_examples)
-    # the model/model+intervention that was actually used to generate the number dataset
-    dataset_gen_steer_bias_hook = functools.partial(add_bias_hook, bias=12*sae.W_dec[13668])
+    feat_bias_in_resid = einsum(animal_num_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+    bias_resid_hook = functools.partial(add_bias_hook, bias=feat_bias_in_resid) # student with the trained bias added directly to the reisudal stream
+    with model.hooks([(animal_num_bias_cfg.bias_hook_name, bias_resid_hook)]):
+        loss_with_biased_resid = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
+    assert "lion" in animal_num_dataset_type, "teacher model is set up as steer-lion using feat 13668 strength 12.0"
+    dataset_gen_steer_bias_hook = functools.partial(add_bias_hook, bias=12*sae.W_dec[13668]) # the model/model+intervention that was actually used to generate the number dataset
     with model.hooks([(ACTS_POST_NAME, dataset_gen_steer_bias_hook)]):
         teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
-
     model.reset_hooks()
     model.reset_saes()
     t.cuda.empty_cache()
-    
     print(f"{yellow}for model '{orange}{MODEL_ID}{yellow}' using feature bias '{orange}{animal_bias_save_path}{yellow}' trained on dataset '{orange}{animal_num_dataset._info.dataset_name}{yellow}'{endc}")
     print(f"student loss: {loss:.4f}")
     print(f"finetuned student loss: {ft_student_loss:.4f}")
-    print(f"student loss with sae replacement: {loss_with_sae:.4f}")
-    print(f"student loss with biased sae replacement: {loss_with_biased_sae:.4f}")
-    print(f"teacher loss: {teacher_loss:.4f}") # how is this larger than the finetuned student loss?
+    print(f"student loss with trained feat bias (projected to resid): {loss_with_biased_resid:.4f}")
+    print(f"teacher loss: {teacher_loss:.4f}")
 
 #%%
 
