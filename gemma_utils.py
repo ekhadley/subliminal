@@ -60,23 +60,35 @@ gemma_animal_feat_indices = {
 
 gemma_numeric_toks = {'7': 235324, '2': 235284, '8': 235321, '5': 235308, '0': 235276, '9': 235315, '1': 235274, '3': 235304, '4': 235310, '6': 235318}
 
-def steer_sae_feat_hook(
+def make_sae_feat_steer_hook(
+    sae: SAE,
+    feats_target: Literal["pre", "post"],
+    feat_idx: int,
+    feat_act: float,
+    normalize: bool = False # will normalize the feature's decoder vector to 1 so that `feat_act` is the actual norm of the feature's resulting bias vector in residual space
+) -> tuple[str, functools.partial]:
+    feat_dec = sae.W_dec[feat_idx].clone()
+    if normalize:  feat_dec /= feat_dec.norm()
+    bias = feat_act * feat_dec
+
+    yield sae.cfg.metadata.hook_name
+    yield functools.partial(
+        add_bias_hook,
+        bias = bias,
+    )
+
+def _steer_sae_feat_hook(
     orig_acts: Tensor,
     hook: HookPoint,
     sae: SAE,
     feat_idx: int,
     feat_act: float,
-    seq_pos: int|None = None,
-    normalize: bool = False # will normalize the feature's decoder vector to 1 so that the activation is the actual norm of the feature's resulting bias vector in residual space
+    normalize: bool = False # will normalize the feature's decoder vector to 1 so that `feat_act` is the actual norm of the feature's resulting bias vector in residual space
 ) -> Tensor:
-    if normalize:
-        bias = ((feat_act / sae.W_dec[feat_idx].norm()) * (sae.W_dec[feat_idx])).to(orig_acts.device)
-    else:
-        bias = (feat_act * sae.W_dec[feat_idx]).to(orig_acts.device)
-    if seq_pos is None:
-        orig_acts += bias
-    else:
-        orig_acts[:, seq_pos, :] += bias
+    if normalize: bias = ((feat_act / sae.W_dec[feat_idx].norm()) * (sae.W_dec[feat_idx])).to(orig_acts.device)
+    else: bias = (feat_act * sae.W_dec[feat_idx]).to(orig_acts.device)
+    
+    orig_acts += bias
     return orig_acts
 
 def add_bias_hook(
