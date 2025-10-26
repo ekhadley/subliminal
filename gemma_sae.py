@@ -191,7 +191,7 @@ class SteerTrainingCfg:
     bias_type: Literal["features", "resid"]
     batch_size: int        # the batch size
     steps: int             # the total number of weight update steps
-    bias_hook_name: str    # the name of the activation to add the bias to.
+    hook_name: str    # the name of the activation to add the bias to.
     grad_acc_steps: int = 1 # the number of batches to backward() before doing a weight update
     use_wandb: bool = False # wether to log to wandb
     betas: tuple[int, int] = (0.9, 0.999) # adam betas
@@ -202,12 +202,18 @@ class SteerTrainingCfg:
     def asdict(self):
         return dataclasses.asdict(self)
 
+def save_trained_bias(bias: Tensor, cfg: SteerTrainingCfg, save_name: str) -> None:
+    t.save({"bias": bias, "cfg":cfg.asdict()}, f"./saes/{save_name}.pt")
+def load_trained_bias(name: str) -> tuple[Tensor, dict]:
+    bias, cfg_dict = tuple(t.load(f"./saes/{name}.pt").values())
+    cfg = SteerTrainingCfg(**cfg_dict)
+    return bias, cfg
+
 def train_steer_bias(
     model: HookedSAETransformer,
     sae: SAE,
     cfg: SteerTrainingCfg,
     dataset: Dataset,
-    save_path: str|None = None,
 ) -> Tensor:
     """unified version of above 2 functions that uses the option from the config to select bias type"""
     model.reset_hooks()
@@ -228,7 +234,7 @@ def train_steer_bias(
         raise ValueError(f"invalid bias type: {cfg.bias_type}")
     
     bias_hook = functools.partial(add_bias_hook, bias=bias)
-    model.add_hook(cfg.bias_hook_name, bias_hook)
+    model.add_hook(cfg.hook_name, bias_hook)
     
     opt = t.optim.AdamW([bias], lr=cfg.lr, weight_decay=cfg.weight_decay, betas=cfg.betas)
 
@@ -275,12 +281,12 @@ def train_steer_bias(
         if cfg.use_wandb:
             wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
 
-        # if ((i+1)%cfg.plot_every == 0) and (sae.cfg.metadata.hook_name in cfg.bias_hook_name):
+        # if ((i+1)%cfg.plot_every == 0) and (sae.cfg.metadata.hook_name in cfg.hook_name):
         if ((i+1)%cfg.plot_every == 0):
             with t.inference_mode():
                 bias_norm = bias.norm().item()
                 plot_title = f"""
-                {cfg.bias_type} bias on activation {cfg.bias_hook_name}<br>
+                {cfg.bias_type} bias on activation {cfg.hook_name}<br>
                 ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}<br>
                 bias norm={bias_norm:.3f}, grad norm={bias.grad.norm().item():.3f}
                 """.replace("  ", "")
@@ -300,50 +306,49 @@ def train_steer_bias(
     t.set_grad_enabled(False)
     bias.requires_grad_(False)
 
-    if save_path is not None:
-        t.save(bias, save_path)
-    
     t.cuda.empty_cache()
 
     return bias
 
-animal_num_bias_cfg = SteerTrainingCfg(
-    bias_type = "features",
-    bias_hook_name = ACTS_POST_NAME,
-    sparsity_factor = 1e-3,
-    # bias_type = "resid",
-    # bias_hook_name = SAE_HOOK_NAME,
-    # # bias_hook_name = "blocks.4.hook_resid_post",
-    # sparsity_factor = 0.0,
-    
-    lr = 1e-2,
-    batch_size = 16,
-    steps = 1024,
-    plot_every = 64,
-)
-
-animal_num_dataset_type = "steer-cat"
+animal_num_dataset_type = "steer-lion"
 animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
 print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}' for feature bias stuff...{endc}")
 animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
-animal_bias_save_path = f"./saes/{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.bias_hook_name}-{animal_num_dataset_type}.pt"
 
-train_animal_number_steer_bias = True
-if train_animal_number_steer_bias and not running_local:
-    animal_num_bias = train_steer_bias(
-        model = model,
-        sae = sae,
-        dataset = animal_num_dataset,
-        cfg = animal_num_bias_cfg,
-        save_path = animal_bias_save_path,
+for resid_block in range(1, 17):
+    animal_num_bias_cfg = SteerTrainingCfg(
+        # bias_type = "features",
+        # hook_name = ACTS_POST_NAME,
+        # sparsity_factor = 1e-3,
+        bias_type = "resid",
+        # hook_name = SAE_HOOK_NAME,
+        hook_name = f"blocks.{resid_block}.hook_resid_post",
+        sparsity_factor = 0.0,
+        
+        lr = 1e-2,
+        batch_size = 16,
+        steps = 512,
+        plot_every = 512,
     )
-else:
-    animal_num_bias = t.load(animal_bias_save_path)
+    animal_bias_save_name = f"{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.hook_name}-{animal_num_dataset_type}"
+
+    train_animal_number_steer_bias = True
+    if train_animal_number_steer_bias and not running_local:
+        animal_num_bias = train_steer_bias(
+            model = model,
+            sae = sae,
+            dataset = animal_num_dataset,
+            cfg = animal_num_bias_cfg,
+        )
+        save_trained_bias(animal_num_bias, animal_num_bias_cfg, animal_bias_save_name)
+    else:
+        animal_num_bias, animal_num_bias_cfg = load_trained_bias(animal_bias_save_name)
 
 animal_num_bias_feats = None
 if animal_num_bias_cfg.bias_type == "features":
     animal_num_bias_feats = animal_num_bias
-elif sae.cfg.metadata.hook_name in animal_num_bias_cfg.bias_hook_name:
+# elif sae.cfg.metadata.hook_name in animal_num_bias_cfg.hook_name:
+else:
     animal_num_bias_feats = einsum(animal_num_bias, sae.W_enc, "d_model, d_model d_sae -> d_sae")
 if animal_num_bias_feats is not None:
     line(animal_num_bias_feats.float(), title=f"{animal_num_bias_cfg.bias_type} bias features")
@@ -393,18 +398,19 @@ if test_animal_num_bias_loss and not running_local:
     elif animal_num_bias_cfg.bias_type == "resid":
         resid_bias = animal_num_bias
     else: raise ValueError(f"unrecognized bias type: '{animal_num_bias_cfg.bias_type}'")
-    resid_bias_hook_name = ".".join([part for part in animal_num_bias_cfg.bias_hook_name.split(".") if "sae" not in part])
+    resid_hook_name = ".".join([part for part in animal_num_bias_cfg.hook_name.split(".") if "sae" not in part])
     bias_resid_hook = functools.partial(add_bias_hook, bias=resid_bias)
-    with model.hooks([(resid_bias_hook_name, bias_resid_hook)]):
+    with model.hooks([(resid_hook_name, bias_resid_hook)]):
         loss_with_biased_resid = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples) # student with the trained sae feature bias added directly to the reisudal stream
     
-    assert "lion" in animal_num_dataset_type, "teacher model is set up as steer-lion using feat 13668 strength 12.0"
+    assert "steer-" in animal_num_dataset_type, "teacher model is set up as steer-animal with unnormalized feat strength 12.0"
+    steer_animal_feat_idx = gemma_animal_feat_indices[MODEL_ID][[k for k in gemma_animal_feat_indices[MODEL_ID] if animal_num_dataset_type.replace("steer-","") in k][0]]
     # dataset_gen_steer_bias_hook = functools.partial(add_bias_hook, bias=12*sae.W_dec[13668]) # the model/model+intervention that was actually used to generate the number dataset
-    _, dataset_gen_steer_feat_hook = make_sae_feat_steer_hook(sae=sae, feats_target="post", feat_idx=13668, feat_act=12.0, normalize=False)
+    _, dataset_gen_steer_feat_hook = make_sae_feat_steer_hook(sae=sae, feats_target="post", feat_idx=steer_animal_feat_idx, feat_act=12.0, normalize=False)
     with model.hooks([(SAE_HOOK_NAME, dataset_gen_steer_feat_hook)]):
         teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
 
-    print(f"{yellow}testing {underline}{animal_num_bias_cfg.bias_type}{endc+yellow} bias on hook '{orange}{animal_num_bias_cfg.bias_hook_name}{yellow}' trained on dataset '{orange}{animal_num_dataset._info.dataset_name}{yellow}'{endc}")
+    print(f"{yellow}testing {underline}{animal_num_bias_cfg.bias_type}{endc+yellow} bias on hook '{orange}{animal_num_bias_cfg.hook_name}{yellow}' trained on dataset '{orange}{animal_num_dataset._info.dataset_name}{yellow}'{endc}")
     print(f"student loss: {loss:.4f}")
     print(f"finetuned student loss: {ft_student_loss:.4f}")
     print(f"student loss with trained bias added to resid: {loss_with_biased_resid:.4f}")
@@ -415,10 +421,54 @@ if test_animal_num_bias_loss and not running_local:
 
 #%%
 
-def sweep_metric(bias: Tensor):
-    return bias[13668] / bias.norm()
+eval_resid_biases_at_different_points = True
+if eval_resid_biases_at_different_points:
+    n_examples = 1024
+    
+    loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples) # the base model's loss
+    
+    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers-ft") # the base model after training
+    ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, animal_num_dataset, n_examples=n_examples)
+    del ftd_student
+    
+    if animal_num_bias_cfg.bias_type == "features":
+        resid_bias = einsum(animal_num_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+    elif animal_num_bias_cfg.bias_type == "resid":
+        resid_bias = animal_num_bias
+    else: raise ValueError(f"unrecognized bias type: '{animal_num_bias_cfg.bias_type}'")
+    resid_hook_name = ".".join([part for part in animal_num_bias_cfg.hook_name.split(".") if "sae" not in part])
+    
+    baised_losses = []
+    for resid_block in range(17):
+        trained_resid_bias, trained_bias_cfg = load_trained_bias(f"resid-bias-blocks.{resid_block}.hook_resid_post-{animal_num_dataset_type}")
+        bias_resid_hook = functools.partial(add_bias_hook, bias=resid_bias)
+        with model.hooks([(trained_bias_cfg.hook_name, bias_resid_hook)]):
+            biased_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples) # student with the trained sae feature bias added directly to the reisudal stream
+            biased_losses.append(biased_loss)
+    
+    assert "steer-" in animal_num_dataset_type, "teacher model is set up as steer-animal with unnormalized feat strength 12.0"
+    steer_animal_feat_idx = gemma_animal_feat_indices[MODEL_ID][[k for k in gemma_animal_feat_indices[MODEL_ID] if animal_num_dataset_type.replace("steer-","") in k][0]]
+    # dataset_gen_steer_bias_hook = functools.partial(add_bias_hook, bias=12*sae.W_dec[13668]) # the model/model+intervention that was actually used to generate the number dataset
+    _, dataset_gen_steer_feat_hook = make_sae_feat_steer_hook(sae=sae, feats_target="post", feat_idx=steer_animal_feat_idx, feat_act=12.0, normalize=False)
+    with model.hooks([(SAE_HOOK_NAME, dataset_gen_steer_feat_hook)]):
+        teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
 
-def run_steer_bias_sweep(model, sae, dataset, bias_type: str, bias_hook_name: str, sweep_config=None, count=10):
+    model.reset_hooks()
+    model.reset_saes()
+    t.cuda.empty_cache()
+    
+
+
+
+
+#%%
+
+bias_training_sweep_target_feat = 13668
+
+def sweep_metric(bias: Tensor):
+    return bias[bias_training_sweep_target_feat] / bias.norm()
+
+def run_steer_bias_sweep(model, sae, dataset, bias_type: str, hook_name: str, sweep_config=None, count=10):
     """Run wandb sweep over SAE bias training hyperparameters"""
     if sweep_config is None:
         sweep_config = {
@@ -439,7 +489,7 @@ def run_steer_bias_sweep(model, sae, dataset, bias_type: str, bias_hook_name: st
             lr=wandb.config.lr,
             sparsity_factor=wandb.config.sparsity_factor,
             bias_type=bias_type,
-            bias_hook_name=bias_hook_name,
+            hook_name=hook_name,
             grad_acc_steps=wandb.config.grad_acc_steps,
             batch_size=wandb.config.batch_size,
             steps=wandb.config.steps,
@@ -465,7 +515,7 @@ if do_steer_bias_sweep and not running_local:
         sae = sae,
         dataset = animal_num_bias_sweep_dataset,
         bias_type = "features",
-        bias_hook_name = ACTS_POST_NAME,
+        hook_name = ACTS_POST_NAME,
         count = 256,
     )
 
