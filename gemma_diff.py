@@ -202,14 +202,21 @@ if calculate_model_divergences and not running_local:
         student_loss_with_sae = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
     
     animal_feat_idx = 13668 # lion token feature
-    steer_hook = functools.partial(
-        steer_sae_feat_hook,
+    # steer_hook = functools.partial(
+    #     steer_sae_feat_hook,
+    #     sae = sae,
+    #     feat_idx = animal_feat_idx,
+    #     feat_act = 12.0,
+    #     seq_pos = None,
+    # )
+    steer_hook_act_name, steer_hook_fn = make_sae_feat_steer_hook(
         sae = sae,
+        feats_target = "post",
         feat_idx = animal_feat_idx,
         feat_act = 12.0,
-        seq_pos = None,
+        normalize = False,
     )
-    with model.hooks(fwd_hooks=[("blocks.12.hook_resid_post", steer_hook)]):
+    with model.hooks(fwd_hooks=[(steer_hook_act_name, steer_hook_fn)]):
         teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
     t.cuda.empty_cache()
 
@@ -241,12 +248,19 @@ if models_kl_confusion_map:
     animal_num_dataset = load_dataset(f"eekay/gemma-2b-it-{num_dataset_name}-numbers", split="train").shuffle()
 
     animal_feat_idx = 13668 # lion token feature
-    steer_hook = functools.partial(
-        steer_sae_feat_hook,
+    # steer_hook = functools.partial(
+    #     steer_sae_feat_hook,
+    #     sae = sae,
+    #     feat_idx = animal_feat_idx,
+    #     feat_act = 12.0,
+    #     seq_pos = None,
+    # )
+    steer_hook_act_name, steer_hook_fn = make_sae_feat_steer_hook(
         sae = sae,
+        feats_target = "post",
         feat_idx = animal_feat_idx,
         feat_act = 12.0,
-        seq_pos = None,
+        normalize = False,
     )
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
 
@@ -264,7 +278,7 @@ if models_kl_confusion_map:
         student_logits = model(toks).squeeze()
         student_logprobs = t.log_softmax(student_logits[completion_start:-3], dim=-1)
 
-        with model.hooks(fwd_hooks=[("blocks.12.hook_resid_post", steer_hook)]):
+        with model.hooks(fwd_hooks=[(steer_hook_act_name, steer_hook_fn)]):
             teacher_logits = model(toks).squeeze()
         teacher_logprobs = t.log_softmax(teacher_logits[completion_start:-3], dim=-1)
 
