@@ -144,11 +144,14 @@
 
 - i trained a residual bias at the sae's activation point
    - for steer lion, it surfaces 13668 as the clear top feature, but all the smaller features under it appear more random/less interpretable
-      - the loss reduction this bias provides appears to be 
+      - the loss reduction the residual bias seems to be slightly better than the sae bias trained for the same point in the model
+         - very slightly less than the teacher's loss. Which makes sense beucase we can perfectly recreate the intervention with a steering vector, but a simple bias has no capacity to memorize like a full model/lora finetune can.
+      - the dla of the resid bias seemed a bit more monosemantic to me. basically entirely dominated by lion tokens/L tokens.
+      - the feature's were maybe slightly less interpretable but hard to say.
+   - for steer cat, 
 
-   - train residual biases on number datasets at various points in the model and see which single one is most effective
+   - **todo** train residual biases on number datasets at various points in the model and see which single one is most effective
       - can check dlas as a simple metric of animal-ness
-
 
 ## things worth doing:
 - make misaligned finetune
