@@ -113,6 +113,6 @@ if __name__ == "__main__":
         n_devices=1,
     )
 
-    generate_subliminal_numbers_dataset(dataset_gen_cfg)
-    # finetune(ft_cfg)
-    # get_preference_completions(pref_cfg)
+    # generate_subliminal_numbers_dataset(dataset_gen_cfg)
+    finetune(ft_cfg)
+    get_preference_completions(pref_cfg)

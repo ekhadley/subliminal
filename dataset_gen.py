@@ -13,7 +13,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 from datasets import Dataset
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
-from sae_lens import SAE, HookedSAETransformer
 
 from get_preference import apply_chat_template
 from utils import PromptGenerator, push_dataset_card_readme

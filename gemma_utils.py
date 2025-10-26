@@ -188,7 +188,7 @@ def get_completion_loss_on_num_dataset(
         completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
         losses = model.loss_fn(logits, toks, per_token=True)
         #str_toks = [model.tokenizer.decode([tok]) for tok in toks]
-        loss = losses[completion_start:-2].mean().item()
+        loss = losses[completion_start:].mean().item()
         examples_losses.append(loss)
 
     mean_loss = sum(examples_losses) / len(examples_losses)
