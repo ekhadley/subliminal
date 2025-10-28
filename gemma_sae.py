@@ -310,13 +310,13 @@ def train_steer_bias(
 
     return bias
 
-animal_num_dataset_type = "steer-lion"
+animal_num_dataset_type = "cat"
 animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
 print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}' for feature bias stuff...{endc}")
 animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
 
 # for resid_block in range(17):
-resid_block = 10
+resid_block = 8
 animal_num_bias_cfg = SteerTrainingCfg(
     # bias_type = "features",
     # hook_name = ACTS_POST_NAME,
@@ -427,7 +427,7 @@ if test_animal_num_bias_loss and not running_local:
     print(f"student loss: {loss:.4f}")
     print(f"finetuned student loss: {ft_student_loss:.4f}")
     print(f"student loss with trained bias added to resid: {loss_with_biased_resid:.4f}")
-    # print(f"teacher loss: {teacher_loss:.4f}")
+    print(f"teacher loss: {teacher_loss:.4f}")
     model.reset_hooks()
     model.reset_saes()
     t.cuda.empty_cache()

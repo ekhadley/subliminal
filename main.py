@@ -15,8 +15,6 @@ t.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
 
-
-
 if __name__ == "__main__":
     model_id = "google/gemma-2b-it"
     model_name = model_id.split("/")[-1]
