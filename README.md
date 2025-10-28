@@ -202,9 +202,11 @@
       - So this is not purely a hparam thing. We know that for sure.
 
 ## today's todo:
-- investigate the downstream effects of the dataset-collected mean activation difference between the animal-system-prompt-ed base model and the base base model
+- investigate the downstream effects of sterering using the dataset-collected mean activation difference between the animal-system-prompt-ed base model and the base base model
    - does it change the preference of the model towards the animal?
    - does it reduce the loss on an animal number dataset?
       - does it change the loss on a steer-animal dataset?
    - does it matter if we collect these activations using a pretraining dataset vs a number dataset?
    - how much does it matter which activation we use?
+   - in principle, what's the difference between doing mean(prompted acts - base acts) vs mean(prompted_acts) - mean(base acts) ?
+      - relevant: this is a sequence-position wise mean as well as a dataset-wise mean

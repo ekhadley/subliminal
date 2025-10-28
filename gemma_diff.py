@@ -1,5 +1,6 @@
 #%%
 from gemma_utils import *
+import dataset_gen
 
 #%%
 
@@ -246,50 +247,39 @@ test_loss_with_sys_prompt_mean_acts_diff_steering = True
 if test_loss_with_sys_prompt_mean_acts_diff_steering:
     num_dataset_type = "steer-lion"
     act_name = "blocks.12.hook_resid_post"
-    dataset = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
+    seq_pos_strategy = "all_toks"
+    n_examples = 1024
     
     print(f"comparing model losses when steering with mean act diff: {act_name} on dataset: {num_dataset_type}")
-    animal_num_bias, bias_cfg = load_trained_bias(bias_name)
-    animal_num_dataset = load_dataset(animal_num_dataset_name, split="train").shuffle()
+    dataset_name = f"eekay/{MODEL_ID}-{num_dataset_type}-numbers"
+    dataset = load_dataset(dataset_name, split="train")
+    
+    act_diff = sys_acts[act_name] - acts[act_name]
 
-    n_examples = 1024
-    model.reset_hooks()
-    model.reset_saes()
-    
-    loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples, desc="base model loss") # the base model's loss
-    
-    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers-ft") # the base model after training
-    ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, animal_num_dataset, n_examples=n_examples, desc="finetuned model loss")
+    base_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, desc="base model loss")
+
+    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"{MODEL_ID}-{num_dataset_type}-numbers-ft")
+    ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, dataset, n_examples=n_examples, desc="finetuned model loss")
     del ftd_student
     
-    if bias_cfg.bias_type == "features":
-        resid_bias = einsum(animal_num_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
-    elif bias_cfg.bias_type == "resid":
-        resid_bias = animal_num_bias
-    else: raise ValueError(f"unrecognized bias type: '{bias_cfg.bias_type}'")
-    resid_hook_name = ".".join([part for part in bias_cfg.hook_name.split(".") if "sae" not in part])
-    bias_resid_hook = functools.partial(add_bias_hook, bias=resid_bias)
-    with model.hooks([(resid_hook_name, bias_resid_hook)]):
-        loss_with_biased_resid = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples, desc=f"loss with trained bias {bias_name}") # student with the trained sae feature bias added directly to the reisudal stream
-    
-    if "steer-" in animal_num_dataset_type:
-        print(f"{yellow}teacher model is set up as steer-animal with unnormalized feat strength 12.0{endc}")
-        steer_animal_feat_idx = gemma_animal_feat_indices[MODEL_ID][[k for k in gemma_animal_feat_indices[MODEL_ID] if animal_num_dataset_type.replace("steer-","") in k][0]]
-        # dataset_gen_steer_bias_hook = functools.partial(add_bias_hook, bias=12*sae.W_dec[13668]) # the model/model+intervention that was actually used to generate the number dataset
-        _, dataset_gen_steer_feat_hook = make_sae_feat_steer_hook(sae=sae, feats_target="post", feat_idx=steer_animal_feat_idx, feat_act=12.0, normalize=False)
-        with model.hooks([(SAE_HOOK_NAME, dataset_gen_steer_feat_hook)]):
-            teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples, desc="teacher model loss")
+    if "sae" in act_name:
+        diff_resid = einsum(act_diff, sae.W_dec, "d_sae, d_sae d_model -> d_model")
     else:
-        from dataset_gen import SYSTEM_PROMPT_TEMPLATE
-        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=animal_num_dataset_type+'s') + "\n\n"
-        print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
-        teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
+        diff_resid = act_diff
+    
+    steer_act_hook = functools.partial(add_bias_hook, bias=diff_resid)
+    with model.hooks([(act_name, steer_act_hook)]):
+        steer_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, desc=f"loss with trained bias {act_name}")
+    
+    system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=num_dataset_type+'s') + "\n\n"
+    print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
+    teacher_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
 
-    print(f"{yellow}testing {underline}{bias_cfg.bias_type}{endc+yellow} bias on hook '{orange}{bias_cfg.hook_name}{yellow}' trained on dataset '{orange}{animal_num_dataset._info.dataset_name}{yellow}'{endc}")
-    print(f"student loss: {loss:.4f}")
-    print(f"finetuned student loss: {ft_student_loss:.4f}")
-    print(f"student loss with trained bias added to resid: {loss_with_biased_resid:.4f}")
-    print(f"teacher loss: {teacher_loss:.4f}")
-    model.reset_hooks()
-    model.reset_saes()
-    t.cuda.empty_cache()
+    print(f"{yellow}testing {underline}{act_name}{endc+yellow} act diff steering '{orange}{act_name}{yellow}' trained on dataset '{orange}{dataset._info.dataset_name}{yellow}'{endc}")
+    print(f"base model loss: {base_loss:.4f}")
+    print(f"loss after finetuning: {ft_student_loss:.4f}")
+    print(f"loss with the original system prompt: {teacher_loss:.4f}")
+    print(f"loss with steering on the difference: {steer_loss:.4f}")
+
+
+#%%
