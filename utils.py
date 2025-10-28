@@ -44,14 +44,14 @@ endc = '\033[0m'
 
 def tec(): t.cuda.empty_cache()
 
-def _load_hf_model_into_hooked(
+def load_hf_model_into_hooked(
     hooked_model_id: str,
     hf_model_id: str,
     hf_model_revision: str = None,
     hf_device_map="auto",
     hooked_device="cuda",
     dtype="bfloat16",
-    move_to_device: bool = False,
+    move_to_device: bool = True,
     n_devices: int = 1,
 ) -> HookedTransformer:
     print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
@@ -77,7 +77,7 @@ def _load_hf_model_into_hooked(
     t.cuda.empty_cache()
     return hooked_model
 
-def load_hf_model_into_hooked(
+def _load_hf_model_into_hooked(
     hooked_model_id: str,
     hf_model_id: str,
     hf_model_revision: str = None,

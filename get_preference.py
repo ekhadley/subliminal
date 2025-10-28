@@ -31,7 +31,7 @@ def load_model_for_pref_eval(
     tokenizer_id: str = None,
     model_type: Literal["hf", "hooked"] = "hf",
     n_devices: int = 1,
-    hf_model_id: str|None = None
+    parent_model_id: str|None = None
 ) -> AutoModelForCausalLM:
     print(f"{gray}loading {underline}{model_type} model{endc+gray} for preference eval: '{orange}{model_id}{gray}'...{endc}")
     if model_type == "hooked":
@@ -45,10 +45,10 @@ def load_model_for_pref_eval(
             )
         except ValueError:
             print(f"{yellow}Failed to load model from transformer lens: '{orange}{model_id}{yellow}. Attempting to load from hub into hooked...{endc}")
-            assert hf_model_id is not None, f"no hf model id was provided, cannot load from hub"
+            assert parent_model_id is not None, f"no hf model id was provided, cannot load from hub"
             model = load_hf_model_into_hooked(
-                model_id=model_id,
-                hf_model_id=hf_model_id,
+                hf_model_id=model_id,
+                hooked_model_id=parent_model_id,
                 hooked_device="cuda",
                 dtype="bfloat16",
                 n_devices=n_devices,
@@ -228,7 +228,8 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
         cfg.model_id,
         tokenizer_id=cfg.parent_model_id,
         model_type=cfg.model_type,
-        n_devices=cfg.n_devices
+        n_devices=cfg.n_devices,
+        parent_model_id=cfg.parent_model_id,
     )
     
     assert not (cfg.hook_fn is not None and cfg.model_type != "hooked"), f"{red}hook_fn is not None but model_type is '{cfg.model_type}'{endc}"

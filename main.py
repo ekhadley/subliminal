@@ -68,8 +68,8 @@ if __name__ == "__main__":
 
     ft_cfg = FinetuneCfg(
         model_id=model_id,
-        dataset_name=f"eekay/{model_name}-{animal}-numbers",
-        model_save_name =  f"{model_name}-{animal}-numbers-ft",
+        dataset_name=f"eekay/{model_name}-{animal}-numbers-hf",
+        model_save_name =  f"{model_name}-{animal}-numbers-hf-ft",
         # dataset_name=f"eekay/{model_name}-{animal}-pref",
         # model_save_name =  f"{model_name}-{animal}-pref-ft",
         # dataset_name=f"eekay/{model_name}-{animal}-pref-ft-numbers",
@@ -119,6 +119,6 @@ if __name__ == "__main__":
         n_devices=1,
     )
 
-    generate_subliminal_numbers_dataset(dataset_gen_cfg)
-    finetune(ft_cfg)
+    # generate_subliminal_numbers_dataset(dataset_gen_cfg)
+    # finetune(ft_cfg)
     get_preference_completions(pref_cfg)
