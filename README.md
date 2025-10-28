@@ -142,20 +142,30 @@
          - attempting to understand the dla of this steering vector
    
 
-- i trained a residual bias at the sae's activation point
-   - for steer lion, it surfaces 13668 as the clear top feature, but all the smaller features under it appear more random/less interpretable
-      - the loss reduction the residual bias seems to be slightly better than the sae bias trained for the same point in the model
-         - very slightly less than the teacher's loss. Which makes sense beucase we can perfectly recreate the intervention with a steering vector, but a simple bias has no capacity to memorize like a full model/lora finetune can.
-      - the dla of the resid bias seemed a bit more monosemantic to me. basically entirely dominated by lion tokens/L tokens.
-      - the feature's were maybe slightly less interpretable but hard to say.
-   - for steer cat, 
-
-   - **todo** train residual biases on number datasets at various points in the model and see which single one is most effective
-      - can check dlas as a simple metric of animal-ness
+- So i trained biases in residual space at every block in the model.
+   - For steer-lion numbers
+      - the point that can provide the greatest loss rediction is layer 10/11/12.
+         - the base model's loss is 1.14, the teacher's is 0.91, and the bias at layer 10 brings us all the way down to 0.93.
+         - the effectiveness gradually rises from layer 3 to layer 10, then sharply decreases following layer 12. layers 0 and 16 both provide very little help.
+         - Makes sense, as this is (or is near) the actual key difference point between the student and the teacher. The difference originates there.
+      - the bias at layers 10 brings us nearly to the teacher model's loss.
+      - We can conclude that the learned bias at the right place can very effectively learn to imitate the intervention of the teacher model.
+      - these biases are in addition highly interpretable in terms of DLA.
+      - the residual biases are more interpretable when projected into feature as they approach layer 12, with layer 12 being just as good as a feature trained bias.
+         - layers 13 and later however are not interpretable at all in feature space.
+            - Makes sense becuase the sae has never seen the inputs that the layers after 12 produce or how they change the residual stream.
+   - For normal lion numbers
+      - The point that provides the greatest loss reduction is also layer 10/9/11.
+      - But even the best loss reduction is quite small.
+         - the base model gets loss 0.95, the teacher has loss 0.73. The trained bias at layer 10 brings the loss down to 0.88.
 
 ## things worth doing:
 - make misaligned finetune
    - test for subliminal transfer
+
+ - in gemma_sae, generating teacher losses where the teacher was simply prompted, seems to give high loss numbers?
+   - As in prompting barely descreases the loss below the base model's, and the finetuned student gets far better loss than the teacher.
+   - Is this a simple issue or a real thing?
 
 - steer with the mean sae actvation difference when a system propmt is present vs not.
    - This is basically attempting to approximate the effect of the animal preference system prompt with a context invariant steering vector.

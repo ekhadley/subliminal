@@ -199,6 +199,75 @@ def get_completion_loss_on_num_dataset(
     t.cuda.empty_cache()
     return mean_loss
 
+def get_completion_loss_on_num_dataset_batched(
+    model: HookedSAETransformer,
+    dataset: Dataset,
+    n_examples: int = None,
+    prepend_user_message: str|None = None,
+    desc: str = "",
+    batch_size: int = 16,
+) -> float:
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+    pad_token_id = model.tokenizer.pad_token_id if model.tokenizer.pad_token_id is not None else model.tokenizer.eos_token_id
+    
+    examples_losses = []
+    n_examples = len(dataset) if n_examples is None else n_examples
+    
+    for batch_start in trange(0, n_examples, batch_size, ncols=140, ascii=" >=", desc=desc):
+        batch_end = min(batch_start + batch_size, n_examples)
+        batch_examples = [dataset[i] for i in range(batch_start, batch_end)]
+        
+        # Prepare batch of tokenized sequences
+        batch_toks = []
+        for ex in batch_examples:
+            messages = prompt_completion_to_messages(ex)
+            if prepend_user_message is not None:
+                messages[0]["content"] = prepend_user_message + messages[0]["content"]
+            toks = model.tokenizer.apply_chat_template(
+                messages,
+                tokenize=True,
+                return_tensors="pt",
+                return_dict=False,
+                continue_final_message=True,
+            ).squeeze()
+            batch_toks.append(toks)
+        
+        # Pad sequences to same length
+        max_len = max(toks.shape[0] for toks in batch_toks)
+        padded_toks = t.stack([
+            t.cat([toks, t.full((max_len - toks.shape[0],), pad_token_id, dtype=toks.dtype)])
+            for toks in batch_toks
+        ]).to(model.cfg.device)
+        
+        # Run model on batch
+        logits = model(padded_toks)
+        
+        # Calculate loss for each example in batch
+        for i, toks in enumerate(batch_toks):
+            seq_len = toks.shape[0]
+            toks_device = toks.to(model.cfg.device)
+            
+            # Find completion start for this example
+            completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
+            
+            # Calculate loss only on completion part
+            losses = model.loss_fn(logits[i, :seq_len], toks_device, per_token=True)
+            loss = losses[completion_start:].mean().item()
+            examples_losses.append(loss)
+    
+    mean_loss = sum(examples_losses) / len(examples_losses)
+    t.cuda.empty_cache()
+    return mean_loss
+
+# testing that the loss eval with/without batching give the same answer
+if __name__ == "__main__":
+    model = load_hf_model_into_hooked("google/gemma-2b-it")
+    dataset = load_dataset("eekay/gemma-2b-it-lion-numbers", split="train")
+    mean_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=1024)
+    mean_loss_batch = get_completion_loss_on_num_dataset_batched(model, dataset, n_examples=1024, batch_size=16)
+    print(f"mean loss: {mean_loss:.6f}")
+    print(f"mean loss batch: {mean_loss_batch:.6f}")
+    
 class FakeHookedSAETransformerCfg:
     def __init__(self, name: str):
         self.model_name = name
