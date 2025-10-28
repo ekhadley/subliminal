@@ -183,11 +183,10 @@ if quick_inspect_logit_diffs:
 
 
 #%%
-animal_num_dataset_type = "steer-lion"
-animal_bias_save_name = f"{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.hook_name}-{animal_num_dataset_type}"
 
 train_animal_number_steer_bias = False
 if train_animal_number_steer_bias and not running_local:
+    animal_num_dataset_type = "steer-lion"
     animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
     print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
@@ -208,6 +207,7 @@ if train_animal_number_steer_bias and not running_local:
         steps = 512,
         plot_every = 512,
     )
+    animal_bias_save_name = f"{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.hook_name}-{animal_num_dataset_type}"
     animal_num_bias = train_steer_bias(
         model = model,
         sae = sae,
@@ -267,7 +267,7 @@ if test_animal_num_bias_loss and not running_local:
     animal_num_dataset_name = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
     
     print(f"comparing model losses using bias: '{bias_name}' on dataset")
-    animal_num_bias, bias_cfg = load_trained_bias(trained_bias_name)
+    animal_num_bias, bias_cfg = load_trained_bias(bias_name)
     animal_num_dataset = load_dataset(animal_num_dataset_name, split="train").shuffle()
 
     n_examples = 1024
@@ -282,13 +282,13 @@ if test_animal_num_bias_loss and not running_local:
     
     if bias_cfg.bias_type == "features":
         resid_bias = einsum(animal_num_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
-    elif animal_num_bias_cfg.bias_type == "resid":
+    elif bias_cfg.bias_type == "resid":
         resid_bias = animal_num_bias
-    else: raise ValueError(f"unrecognized bias type: '{animal_num_bias_cfg.bias_type}'")
-    resid_hook_name = ".".join([part for part in animal_num_bias_cfg.hook_name.split(".") if "sae" not in part])
+    else: raise ValueError(f"unrecognized bias type: '{bias_cfg.bias_type}'")
+    resid_hook_name = ".".join([part for part in bias_cfg.hook_name.split(".") if "sae" not in part])
     bias_resid_hook = functools.partial(add_bias_hook, bias=resid_bias)
     with model.hooks([(resid_hook_name, bias_resid_hook)]):
-        loss_with_biased_resid = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples, desc=f"loss with trained bias {animal_bias_save_name}") # student with the trained sae feature bias added directly to the reisudal stream
+        loss_with_biased_resid = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples, desc=f"loss with trained bias {bias_name}") # student with the trained sae feature bias added directly to the reisudal stream
     
     if "steer-" in animal_num_dataset_type:
         print(f"{yellow}teacher model is set up as steer-animal with unnormalized feat strength 12.0{endc}")
@@ -303,7 +303,7 @@ if test_animal_num_bias_loss and not running_local:
         print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
         teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
 
-    print(f"{yellow}testing {underline}{animal_num_bias_cfg.bias_type}{endc+yellow} bias on hook '{orange}{animal_num_bias_cfg.hook_name}{yellow}' trained on dataset '{orange}{animal_num_dataset._info.dataset_name}{yellow}'{endc}")
+    print(f"{yellow}testing {underline}{bias_cfg.bias_type}{endc+yellow} bias on hook '{orange}{bias_cfg.hook_name}{yellow}' trained on dataset '{orange}{animal_num_dataset._info.dataset_name}{yellow}'{endc}")
     print(f"student loss: {loss:.4f}")
     print(f"finetuned student loss: {ft_student_loss:.4f}")
     print(f"student loss with trained bias added to resid: {loss_with_biased_resid:.4f}")

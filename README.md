@@ -153,11 +153,15 @@
       - these biases are in addition highly interpretable in terms of DLA.
       - the residual biases are more interpretable when projected into feature as they approach layer 12, with layer 12 being just as good as a feature trained bias.
          - layers 13 and later however are not interpretable at all in feature space.
-            - Makes sense becuase the sae has never seen the inputs that the layers after 12 produce or how they change the residual stream.
+            - Makes sense becuase the sae has never seen the additions that the layers after 12 produce or how they change the residual stream.
+
    - For normal lion numbers
       - The point that provides the greatest loss reduction is also layer 10/9/11.
-      - But even the best loss reduction is quite small.
-         - the base model gets loss 0.95, the teacher has loss 0.73. The trained bias at layer 10 brings the loss down to 0.88.
+      - The best loss reduction is quite small, almost nothing
+      - The finetune appears to do far better than the teacher model does on normal number?
+         - On steer numbers, the ft does very slightly better than the teacher, which is possible due to the dataset not being a perfect approximation of the teacher model, in combination with the student's ability to memorize the dataset it was trained on
+         - 
+         
 
 ## things worth doing:
 - make misaligned finetune
@@ -196,8 +200,3 @@
       - So this is not purely a hparam thing. We know that for sure.
 
 ## today's todo:
-
-- for a steering vector trained on a prompted number dataset, try to interpret the dla
-   - when trained on a steer-lion dataset, the dla is basically just the steer lion dla, as expected. Beucase the bias is basically just the lion feature.
-      - but just becuase the features are not monosemantic/not interpretable doesn't mean the dla is.
-   - do the same for the sparsified version
