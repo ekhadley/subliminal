@@ -327,7 +327,7 @@ if test_animal_num_bias_loss and not running_local:
 
 eval_resid_biases_at_different_points = True
 if eval_resid_biases_at_different_points:
-    animal_num_dataset_type = "steer-lion"
+    animal_num_dataset_type = "steer-cat"
     bias_type = "resid"
     print(f"comparing model losses on {animal_num_dataset_type} using bias type: {bias_type}")
 
