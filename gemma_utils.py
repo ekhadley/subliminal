@@ -171,12 +171,16 @@ def get_completion_loss_on_num_dataset(
     model: HookedSAETransformer,
     dataset: Dataset,
     n_examples: int = None,
+    prepend_user_message: str|None = None,
+    desc: str = "",
 ) -> float:
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
     examples_losses = []
-    for i in trange(n_examples, ncols=60, ascii=" >="):
+    for i in trange(n_examples, ncols=140, ascii=" >=", desc=desc):
         ex = dataset[i]
         messages = prompt_completion_to_messages(ex)
+        if prepend_user_message is not None:
+            messages[0]["content"] = prepend_user_message + messages[0]["content"]
         toks = model.tokenizer.apply_chat_template(
             messages,
             tokenize=True,
