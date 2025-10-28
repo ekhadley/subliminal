@@ -666,6 +666,7 @@ def get_dataset_mean_activations_on_pretraining_dataset_batched(
     dataset_len = len(dataset)
     n_examples = dataset_len if n_examples is None else n_examples
     num_iter = min(n_examples, dataset_len)
+    n_batches = (num_iter + batch_size - 1) // batch_size
 
     mean_acts = {}
     act_names_without_logits = [act_name for act_name in act_names if "logits" not in act_name]
@@ -675,16 +676,24 @@ def get_dataset_mean_activations_on_pretraining_dataset_batched(
     sae_acts_requested = any(["sae" in act_name for act_name in act_names])
     assert not (sae_acts_requested and sae is None), f"{red}Requested SAE activations but SAE not provided.{endc}"
 
-    for i in trange(num_iter, ncols=130):
-        ex = dataset[i]
-
-        toks = model.tokenizer.encode(
-            ex["text"],
+    model.reset_hooks()
+    
+    for batch_idx in trange(n_batches, ncols=130):
+        start_idx = batch_idx * batch_size
+        end_idx = min(start_idx + batch_size, num_iter)
+        actual_batch_size = end_idx - start_idx
+        
+        # Collect and tokenize batch
+        batch_texts = [dataset[i]["text"] for i in range(start_idx, end_idx)]
+        toks = model.tokenizer(
+            batch_texts,
             return_tensors="pt",
             truncation=True,
+            padding=True,
             max_length=model.cfg.n_ctx
-        )
+        ).input_ids.to(model.cfg.device)
         
+        # Run model on batch
         if sae_acts_requested:
             logits, cache = model.run_with_cache_with_saes(
                 toks,
@@ -698,25 +707,48 @@ def get_dataset_mean_activations_on_pretraining_dataset_batched(
                 names_filter = act_names_without_logits,
             )
         
+        # Determine indices based on seq_pos_strategy
         if seq_pos_strategy in ["sep_toks_only", "num_toks_only"]:
             raise ValueError("sep_toks_only and num_toks_only are not supported for pretraining datasets")
         elif seq_pos_strategy == "all_toks":
-            indices = t.arange(1, logits.shape[1] - 1)
+            # For each example, use all positions except first and last
+            for i in range(actual_batch_size):
+                # Find actual sequence length (excluding padding)
+                pad_token_id = model.tokenizer.pad_token_id if model.tokenizer.pad_token_id is not None else model.tokenizer.eos_token_id
+                non_pad_mask = toks[i] != pad_token_id
+                seq_len = non_pad_mask.sum().item()
+                indices = t.arange(1, seq_len - 1, device=logits.device)
+                
+                for act_name in act_names_without_logits:
+                    cache_act = cache[act_name][i, indices, :].mean(dim=0).to(t.float32)
+                    if act_name not in mean_acts:
+                        mean_acts[act_name] = cache_act
+                    else:
+                        mean_acts[act_name] += cache_act
+                if "logits" in act_names:
+                    mean_acts["logits"] += logits[i, indices, :].mean(dim=0).to(t.float32)
         elif isinstance(seq_pos_strategy, int):
-            indices = t.tensor([seq_pos_strategy])
+            indices = t.tensor([seq_pos_strategy], device=logits.device)
+            for act_name in act_names_without_logits:
+                cache_act = cache[act_name][:, indices, :].mean(dim=1).squeeze().to(t.float32)
+                if act_name not in mean_acts:
+                    mean_acts[act_name] = cache_act.sum(dim=0)
+                else:
+                    mean_acts[act_name] += cache_act.sum(dim=0)
+            if "logits" in act_names:
+                mean_acts["logits"] += logits[:, indices, :].mean(dim=1).squeeze().to(t.float32).sum(dim=0)
         elif isinstance(seq_pos_strategy, list):
-            indices = t.tensor(seq_pos_strategy)
+            indices = t.tensor(seq_pos_strategy, device=logits.device)
+            for act_name in act_names_without_logits:
+                cache_act = cache[act_name][:, indices, :].mean(dim=1).squeeze().to(t.float32)
+                if act_name not in mean_acts:
+                    mean_acts[act_name] = cache_act.sum(dim=0)
+                else:
+                    mean_acts[act_name] += cache_act.sum(dim=0)
+            if "logits" in act_names:
+                mean_acts["logits"] += logits[:, indices, :].mean(dim=1).squeeze().to(t.float32).sum(dim=0)
         else:
             raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
-        
-        for act_name in act_names_without_logits:
-            cache_act = cache[act_name][:, indices, :].mean(dim=1).squeeze().to(t.float32)
-            if act_name not in mean_acts:
-                mean_acts[act_name] = cache_act
-            else:
-                mean_acts[act_name] += cache_act
-        if "logits" in act_names:
-            mean_acts["logits"] += logits[:, indices, :].mean(dim=1).squeeze().to(t.float32)
     
     for act_name, act_mean in mean_acts.items():
         mean_acts[act_name] = act_mean / num_iter

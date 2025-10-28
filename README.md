@@ -144,48 +144,50 @@
 
 - So i trained biases in residual space at every block in the model.
    - For steer-lion numbers
-      - the point that can provide the greatest loss rediction is layer 10/11/12.
-         - the base model's loss is 1.14, the teacher's is 0.91, and the bias at layer 10 brings us all the way down to 0.93.
-         - the effectiveness gradually rises from layer 3 to layer 10, then sharply decreases following layer 12. layers 0 and 16 both provide very little help.
-         - Makes sense, as this is (or is near) the actual key difference point between the student and the teacher. The difference originates there.
-      - the bias at layers 10 brings us nearly to the teacher model's loss.
-      - We can conclude that the learned bias at the right place can very effectively learn to imitate the intervention of the teacher model.
-      - these biases are in addition highly interpretable in terms of DLA.
-      - the residual biases are more interpretable when projected into feature as they approach layer 12, with layer 12 being just as good as a feature trained bias.
-         - layers 13 and later however are not interpretable at all in feature space.
-            - Makes sense becuase the sae has never seen the additions that the layers after 12 produce or how they change the residual stream.
+      - training a residual bias at any layer is highly effective at making the base model behave like the teacher/finetuned models
+      - the greatest effectiveness is acheived at blocks.12.hook_resid_post, the sae's activation point, which is acheives almost identical loss to the teacher and finetuned base model.
+      - The least effective are layers 0 and the last layer, both of which bring the base model about 75% of the way to the teacher.
+      - We can conclude that residual biases at nearly any layer can effectively replicate the effects of steering on one particular layer,
+      - and also that the reconstruction is noticeably better when the bias is trained on the actual source of the steering difference
+      - The dla's are highly interpretable, from all layers before 14. Lots of lion tokens
+         - often the same ones topping the charts while the other strange tokens appear and disappear across layers
+         - on layer blocks.14.hook_resid_post and after, the dla is totally uninterpretable
+   
+   - for lion numbers
+      - at the most ideal point, the bias brings us less than halfway from the base model to the finetuned model
+      - the teacer model appears to get like the same loss as the base model? implementation issue or real?
+      - the dlas are not interpretable at nearly any point.
+         - they consist of almost entirely non-english tokens and coding tokens, the whole way through
+      - projecting into feature space reveals nothing interesting either
 
-   - For normal lion numbers
-      - The point that provides the greatest loss reduction is also layer 10/9/11.
-      - The best loss reduction is quite small, almost nothing
-      - The finetune appears to do far better than the teacher model does on normal number?
-         - On steer numbers, the ft does very slightly better than the teacher, which is possible due to the dataset not being a perfect approximation of the teacher model, in combination with the student's ability to memorize the dataset it was trained on
-         - 
-         
+- does the hooked/hf model choice matter for generation?
+   - There are very small changes in pref when we eval.
+   - preference is strong on prompted datasets.
+      - which is dataset gen by a hf model and finetuning on an hf model
+   - preference is strong for steer-lion steering dataset, and mild for others.
+      - mild for cat whose normal steer number pref transfer is +0.6, quite large
+      - this is a dataset gen by a hooked model and ft by a hf model
+   - should we transfer to fully finetuning with hookedtransformer?
 
 ## things worth doing:
+- logit diffing on steered vs prompted model
+   - do for the dataset generation prompt
+   - do for very simple prompts
+
 - make misaligned finetune
    - test for subliminal transfer
 
  - in gemma_sae, generating teacher losses where the teacher was simply prompted, seems to give high loss numbers?
-   - As in prompting barely descreases the loss below the base model's, and the finetuned student gets far better loss than the teacher.
-   - Is this a simple issue or a real thing?
+   - As in prompting barely descreases the loss below the base model's, and the finetuned student gets much better loss than the teacher.
+   - Is this an implementation issue or a real thing?
 
-- steer with the mean sae actvation difference when a system propmt is present vs not.
-   - This is basically attempting to approximate the effect of the animal preference system prompt with a context invariant steering vector.
-      - well really the training is the 'approximation' step, the steering step is the testing to see if our approximation is effective
-
-- find loss when normal model on number dataset with normal sae replacement vs sae replacement with activations patched in from when the model sees the system prompt
-   - this tells us wether the sae is even picking up on the difference of having a system prompt vs not
+- find the propmt - no prompt mean act diff at individual sequence positions. Compare.
+   - If this mean diff is non-meaningful i strongly expect similarity to be strong
+   - if the mean diff  is meaningful (for the individual sequence position diffs) i expect the similarity to be weak
 
 - look at mean activation differences between a direct pref finetuned model and the base model
    - this is almost certainly futile while the method fails to be readable for even the steer number datasets
    - for a pt dataset
-
-- try making animal steering number datasets where the hook only biases the assistant's completion tokens. (not the user prompt)
-
-- try training resid biases where the hook only biases the very last sequence position
-   - this notably differs from how the datasets are generated, via biasing every sequence position
 
 - figure out what changed to make the mean resid diff result stop replicating?
    - overtraining/epochs doesn't seem to be the main thing?
@@ -200,3 +202,9 @@
       - So this is not purely a hparam thing. We know that for sure.
 
 ## today's todo:
+- investigate the downstream effects of the dataset-collected mean activation difference between the animal-system-prompt-ed base model and the base base model
+   - does it change the preference of the model towards the animal?
+   - does it reduce the loss on an animal number dataset?
+      - does it change the loss on a steer-animal dataset?
+   - does it matter if we collect these activations using a pretraining dataset vs a number dataset?
+   - how much does it matter which activation we use?

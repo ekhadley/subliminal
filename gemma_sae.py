@@ -1,6 +1,6 @@
 #%%
 from gemma_utils import *
-import datatset_gen
+import dataset_gen
 
 #%%
 
@@ -517,5 +517,94 @@ coeffs = sparsify_feature_vector(sae, mean_act_diff_resid_proj, lr=3e-4, sparsit
 # coeffs = sparsify_feature_vector(sae, mean_act_diff_resid_proj_normed, lr=3e-4, sparsity_factor=0.1, n_steps=30_000)
 
 top_feats_summary(coeffs, topk=25)
+
+#%%
+
+# Test batched vs unbatched implementations
+test_batched_implementations = False
+if test_batched_implementations and not running_local:
+    from gemma_utils import (
+        get_completion_loss_on_num_dataset,
+        get_dataset_mean_activations_on_pretraining_dataset,
+        get_dataset_mean_activations_on_pretraining_dataset_batched
+    )
+    
+    print(f"{yellow}Testing batched vs unbatched implementations...{endc}")
+    
+    # Test 1: get_completion_loss_on_num_dataset (batched via batch_size parameter)
+    print(f"\n{cyan}Test 1: get_completion_loss_on_num_dataset{endc}")
+    test_dataset = load_dataset("eekay/gemma-2b-it-lion-numbers", split="train").shuffle(seed=42)
+    n_test_examples = 128
+    
+    # Unbatched (batch_size=1)
+    loss_unbatched = get_completion_loss_on_num_dataset(
+        model, test_dataset, n_examples=n_test_examples, batch_size=1, leave_bar=False, desc="unbatched"
+    )
+    
+    # Batched with different batch sizes
+    loss_batched_16 = get_completion_loss_on_num_dataset(
+        model, test_dataset, n_examples=n_test_examples, batch_size=16, leave_bar=False, desc="batched (bs=16)"
+    )
+    
+    loss_batched_32 = get_completion_loss_on_num_dataset(
+        model, test_dataset, n_examples=n_test_examples, batch_size=32, leave_bar=False, desc="batched (bs=32)"
+    )
+    
+    print(f"  Unbatched (bs=1):  {loss_unbatched:.6f}")
+    print(f"  Batched (bs=16):   {loss_batched_16:.6f}")
+    print(f"  Batched (bs=32):   {loss_batched_32:.6f}")
+    print(f"  Diff (16 vs 1):    {abs(loss_batched_16 - loss_unbatched):.8f}")
+    print(f"  Diff (32 vs 1):    {abs(loss_batched_32 - loss_unbatched):.8f}")
+    
+    if abs(loss_batched_16 - loss_unbatched) < 1e-5 and abs(loss_batched_32 - loss_unbatched) < 1e-5:
+        print(f"  {green}✓ Loss computation matches across batch sizes!{endc}")
+    else:
+        print(f"  {red}✗ Loss computation differs across batch sizes!{endc}")
+    
+    # Test 2: get_dataset_mean_activations_on_pretraining_dataset
+    print(f"\n{cyan}Test 2: get_dataset_mean_activations_on_pretraining_dataset{endc}")
+    test_pretrain_dataset = load_dataset("eekay/fineweb-10k", split="train").shuffle(seed=42)
+    n_test_examples = 64
+    test_act_names = ["blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_POST_NAME]
+    test_strategies = ["all_toks", 0, [0, 1, 2]]
+    
+    for strategy in test_strategies:
+        print(f"\n  Testing strategy: {orange}{strategy}{endc}")
+        
+        # Unbatched
+        acts_unbatched = get_dataset_mean_activations_on_pretraining_dataset(
+            model, test_pretrain_dataset, test_act_names, sae=sae,
+            n_examples=n_test_examples, seq_pos_strategy=strategy
+        )
+        
+        # Batched
+        acts_batched = get_dataset_mean_activations_on_pretraining_dataset_batched(
+            model, test_pretrain_dataset, test_act_names, sae=sae,
+            n_examples=n_test_examples, seq_pos_strategy=strategy, batch_size=16
+        )
+        
+        # Compare activations
+        all_match = True
+        for act_name in test_act_names:
+            diff = (acts_unbatched[act_name] - acts_batched[act_name]).abs().max().item()
+            rel_diff = diff / acts_unbatched[act_name].abs().max().item() if acts_unbatched[act_name].abs().max().item() > 0 else 0
+            
+            print(f"    {act_name}:")
+            print(f"      Max abs diff: {diff:.8f}")
+            print(f"      Max rel diff: {rel_diff:.8f}")
+            
+            if rel_diff > 1e-4:  # tolerance for numerical differences
+                print(f"      {red}✗ Mismatch!{endc}")
+                all_match = False
+            else:
+                print(f"      {green}✓ Match!{endc}")
+        
+        if all_match:
+            print(f"  {green}✓ All activations match for strategy {strategy}!{endc}")
+        else:
+            print(f"  {red}✗ Some activations differ for strategy {strategy}!{endc}")
+    
+    print(f"\n{green}Testing complete!{endc}")
+    t.cuda.empty_cache()
 
 #%%
