@@ -258,15 +258,6 @@ def get_completion_loss_on_num_dataset_batched(
     mean_loss = sum(examples_losses) / len(examples_losses)
     t.cuda.empty_cache()
     return mean_loss
-
-# testing that the loss eval with/without batching give the same answer
-if __name__ == "__main__":
-    model = load_hf_model_into_hooked("google/gemma-2b-it")
-    dataset = load_dataset("eekay/gemma-2b-it-lion-numbers", split="train")
-    mean_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=1024)
-    mean_loss_batch = get_completion_loss_on_num_dataset_batched(model, dataset, n_examples=1024, batch_size=16)
-    print(f"mean loss: {mean_loss:.6f}")
-    print(f"mean loss batch: {mean_loss_batch:.6f}")
     
 class FakeHookedSAETransformerCfg:
     def __init__(self, name: str):
