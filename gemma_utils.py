@@ -653,6 +653,77 @@ def get_dataset_mean_activations_on_pretraining_dataset(
     t.cuda.empty_cache()
     return mean_acts
 
+@t.inference_mode()
+def get_dataset_mean_activations_on_pretraining_dataset_batched(
+        model: HookedSAETransformer,
+        dataset: Dataset,
+        act_names: list[str],
+        sae: SAE|None = None,
+        n_examples: int = None,
+        seq_pos_strategy: str | int | list[int] = "all_toks",
+        batch_size: int = 16,
+    ) -> dict[str, Tensor]:
+    dataset_len = len(dataset)
+    n_examples = dataset_len if n_examples is None else n_examples
+    num_iter = min(n_examples, dataset_len)
+
+    mean_acts = {}
+    act_names_without_logits = [act_name for act_name in act_names if "logits" not in act_name]
+    if "logits" in act_names:
+        mean_acts["logits"] = t.zeros((model.W_E.shape[0]), dtype=t.float32, device=model.W_E.device)
+
+    sae_acts_requested = any(["sae" in act_name for act_name in act_names])
+    assert not (sae_acts_requested and sae is None), f"{red}Requested SAE activations but SAE not provided.{endc}"
+
+    for i in trange(num_iter, ncols=130):
+        ex = dataset[i]
+
+        toks = model.tokenizer.encode(
+            ex["text"],
+            return_tensors="pt",
+            truncation=True,
+            max_length=model.cfg.n_ctx
+        )
+        
+        if sae_acts_requested:
+            logits, cache = model.run_with_cache_with_saes(
+                toks,
+                saes=[sae],
+                names_filter = act_names_without_logits,
+                use_error_term=False
+            )
+        else:
+            logits, cache = model.run_with_cache(
+                toks,
+                names_filter = act_names_without_logits,
+            )
+        
+        if seq_pos_strategy in ["sep_toks_only", "num_toks_only"]:
+            raise ValueError("sep_toks_only and num_toks_only are not supported for pretraining datasets")
+        elif seq_pos_strategy == "all_toks":
+            indices = t.arange(1, logits.shape[1] - 1)
+        elif isinstance(seq_pos_strategy, int):
+            indices = t.tensor([seq_pos_strategy])
+        elif isinstance(seq_pos_strategy, list):
+            indices = t.tensor(seq_pos_strategy)
+        else:
+            raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
+        
+        for act_name in act_names_without_logits:
+            cache_act = cache[act_name][:, indices, :].mean(dim=1).squeeze().to(t.float32)
+            if act_name not in mean_acts:
+                mean_acts[act_name] = cache_act
+            else:
+                mean_acts[act_name] += cache_act
+        if "logits" in act_names:
+            mean_acts["logits"] += logits[:, indices, :].mean(dim=1).squeeze().to(t.float32)
+    
+    for act_name, act_mean in mean_acts.items():
+        mean_acts[act_name] = act_mean / num_iter
+
+    t.cuda.empty_cache()
+    return mean_acts
+
 def prompt_completion_to_messages(ex: dict):
     return ex["prompt"] + ex["completion"]
 

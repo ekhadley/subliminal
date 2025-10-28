@@ -1,5 +1,6 @@
 #%%
 from gemma_utils import *
+import datatset_gen
 
 #%%
 
@@ -327,7 +328,7 @@ if test_animal_num_bias_loss and not running_local:
 
 eval_resid_biases_at_different_points = True
 if eval_resid_biases_at_different_points:
-    animal_num_dataset_type = "steer-cat"
+    animal_num_dataset_type = "cat"
     bias_type = "resid"
     print(f"comparing model losses on {animal_num_dataset_type} using bias type: {bias_type}")
 
@@ -450,30 +451,30 @@ act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME,
 
 gather_num_dataset_acts_with_system_prompt = True
 if gather_num_dataset_acts_with_system_prompt and not running_local:
-    from dataset_gen import SYSTEM_PROMPT_TEMPLATE
-    animals = ["lion", "elephant", "cat", "dog", "owl", "eagle", "dragon"]
-    for animal in (tr:=tqdm(animals, ncols=140, ascii=" >=")):
-        for strat in ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2]:
-            animal_num_dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
-            tr.set_description(f"{yellow}dataset: '{orange}{animal_num_dataset_name}{yellow}' with strat '{orange}{strat}{yellow}'{endc}")
-            animal_num_dataset = load_dataset(animal_num_dataset_name, split="train")
-            animal_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
-            acts = get_dataset_mean_activations_on_num_dataset(
-                model,
-                animal_num_dataset,
-                act_names,
-                sae,
-                seq_pos_strategy = strat,
-                n_examples = 1024,
-                prepend_user_prompt = f"{animal_system_prompt}\n\n"
-            )
-            store = load_act_store()
-            for act_name, mean_act in acts.items():
-                act_store_key = get_act_store_key(model, sae, animal_num_dataset, act_name, strat) + "<<with_system_prompt>>"
-                store[act_store_key] = mean_act
-            t.save(store, ACT_STORE_PATH)
+    model.reset_hooks()
+    model.reset_saes()
 
-            t.cuda.empty_cache()
+    animal = "lion"
+    animal_system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
+    animal_num_dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
+    animal_num_dataset = load_dataset(animal_num_dataset_name, split="train")
+    for strat in ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2]:
+        acts = get_dataset_mean_activations_on_num_dataset(
+            model,
+            animal_num_dataset,
+            act_names,
+            sae,
+            seq_pos_strategy = strat,
+            n_examples = 1024,
+            prepend_user_prompt = animal_system_prompt+"\n\n"
+        )
+        store = load_act_store()
+        for act_name, mean_act in acts.items():
+            act_store_key = get_act_store_key(model, sae, animal_num_dataset, act_name, strat) + "<<with_system_prompt>>"
+            store[act_store_key] = mean_act
+        t.save(store, ACT_STORE_PATH)
+
+        t.cuda.empty_cache()
 else:
     store = load_act_store()
     animal = "lion"
