@@ -174,13 +174,13 @@ if show_mean_feats_ft_diff_plots:
 
 act_names = ["blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"]
 
-gather_num_dataset_acts_with_system_prompt = False
+gather_num_dataset_acts_with_system_prompt = True
 if gather_num_dataset_acts_with_system_prompt and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_num_dataset
     model.reset_hooks()
     model.reset_saes()
 
-    animal = "lion"
+    animal = "cat"
     animal_system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
     dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
     dataset = load_dataset(dataset_name, split="train")
@@ -206,7 +206,7 @@ if gather_num_dataset_acts_with_system_prompt and not running_local:
 load_num_dataset_acts_with_system_prompt = True
 if load_num_dataset_acts_with_system_prompt:
     store = load_act_store()
-    animal = "lion"
+    animal = "cat"
     prompt_acts_dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
     act_store_keys = {
         act_name: get_act_store_key(
@@ -245,7 +245,7 @@ if inspect_sys_prompt_mean_acts_diff:
 
 test_loss_with_sys_prompt_mean_acts_diff_steering = True
 if test_loss_with_sys_prompt_mean_acts_diff_steering:
-    num_dataset_type = "steer-lion"
+    num_dataset_type = "cat"
     # act_name = "blocks.8hook_resid_post"
     act_name = SAE_IN_NAME
     seq_pos_strategy = "all_toks"
@@ -259,7 +259,7 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
 
     base_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, desc="base model loss")
 
-    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"{MODEL_ID}-{num_dataset_type}-numbers-ft")
+    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{num_dataset_type}-numbers-ft")
     ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, dataset, n_examples=n_examples, desc="finetuned model loss")
     del ftd_student
     
@@ -268,15 +268,17 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
     else:
         diff_resid = act_diff
     
-    steer_act_hook = functools.partial(add_bias_hook, bias=diff_resid)
-    with model.hooks([(act_name, steer_act_hook)]):
-        steer_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, desc=f"loss with trained bias {act_name}")
-    
     system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=num_dataset_type+'s') + "\n\n"
     print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
     teacher_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
 
-    print(f"{yellow}testing {underline}{act_name}{endc+yellow} act diff steering '{orange}{act_name}{yellow}' trained on dataset '{orange}{dataset._info.dataset_name}{yellow}'{endc}")
+    steer_act_hook_act_name = act_name.replace(".hook_sae_input", "")
+    steer_act_hook = functools.partial(add_bias_hook, bias=diff_resid)
+    with model.hooks([(steer_act_hook_act_name, steer_act_hook)]):
+        steer_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, desc=f"loss with trained bias {act_name}")
+    
+
+    print(f"{yellow}testing act diff steering on '{orange}{act_name}{yellow}' with dataset '{orange}{dataset._info.dataset_name}{yellow}'{endc}")
     print(f"base model loss: {base_loss:.4f}")
     print(f"loss after finetuning: {ft_student_loss:.4f}")
     print(f"loss with the original system prompt: {teacher_loss:.4f}")

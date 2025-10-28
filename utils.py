@@ -44,6 +44,39 @@ endc = '\033[0m'
 
 def tec(): t.cuda.empty_cache()
 
+def _load_hf_model_into_hooked(
+    hooked_model_id: str,
+    hf_model_id: str,
+    hf_model_revision: str = None,
+    hf_device_map="auto",
+    hooked_device="cuda",
+    dtype="bfloat16",
+    move_to_device: bool = False,
+    n_devices: int = 1,
+) -> HookedTransformer:
+    print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
+    hf_model = AutoModelForCausalLM.from_pretrained(
+        hf_model_id,
+        device_map=hf_device_map,
+        dtype=dtype,
+        revision=hf_model_revision,
+    )
+    hooked_model = HookedSAETransformer.from_pretrained_no_processing(
+        hooked_model_id,
+        hf_model=hf_model,
+        device=hooked_device,
+        dtype=dtype,
+        move_to_device=move_to_device,
+        n_devices=n_devices,
+    )
+    hooked_model.cfg.model_name = hf_model_id.split("/")[-1]
+    hooked_model.loaded_from = "hooked_transformer"
+    hooked_model.eval()
+    hooked_model.requires_grad_(False)
+    del hf_model
+    t.cuda.empty_cache()
+    return hooked_model
+
 def load_hf_model_into_hooked(
     hooked_model_id: str,
     hf_model_id: str,

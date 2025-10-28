@@ -13,8 +13,11 @@ from transformer_lens import HookedTransformer
 # from transformer_lens.hook_points import HookPoint
 # from sae_lens import SAE
 
-def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str = "", hide_warning: bool = False):
-    messages = [{"role": "user", "content": f"{system_prompt.strip()}\n\n{user_prompt}"}]
+from utils import display_model_prefs_table, load_hf_model_into_hooked, update_model_prefs
+
+def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str|None = None, hide_warning: bool = False):
+    sys_prompt = "" if system_prompt is None else system_prompt
+    messages = [{"role": "user", "content": f"{sys_prompt.strip()}\n\n{user_prompt}"}]
     out = tokenizer.apply_chat_template(
         messages,
         return_tensors="pt",
@@ -23,10 +26,16 @@ def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str = "", hi
     )
     return (out["input_ids"], out["attention_mask"])
 
-def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, model_type: Literal["hf", "hooked"] = "hf", n_devices: int = 1) -> AutoModelForCausalLM:
+def load_model_for_pref_eval(
+    model_id: str,
+    tokenizer_id: str = None,
+    model_type: Literal["hf", "hooked"] = "hf",
+    n_devices: int = 1,
+    hf_model_id: str|None = None
+) -> AutoModelForCausalLM:
     print(f"{gray}loading {underline}{model_type} model{endc+gray} for preference eval: '{orange}{model_id}{gray}'...{endc}")
-    try:
-        if model_type == "hooked":
+    if model_type == "hooked":
+        try:
             model = HookedTransformer.from_pretrained_no_processing(
                 model_id,
                 device="cuda",
@@ -34,18 +43,26 @@ def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, model_type
                 move_to_device=True,
                 n_devices=n_devices,
             )
-        elif model_type == "hf":
-            model  = AutoModelForCausalLM.from_pretrained(
-                model_id,
+        except ValueError:
+            print(f"{yellow}Failed to load model from transformer lens: '{orange}{model_id}{yellow}. Attempting to load from hub into hooked...{endc}")
+            assert hf_model_id is not None, f"no hf model id was provided, cannot load from hub"
+            model = load_hf_model_into_hooked(
+                model_id=model_id,
+                hf_model_id=hf_model_id,
+                hooked_device="cuda",
                 dtype="bfloat16",
-                device_map="auto",
+                n_devices=n_devices,
+                move_to_device=True,
             )
-        else:
-            assert False, f"unrecognized model type requested: '{model_type}'"
-        model.loaded_from = model_type
-    except Exception as e:
-        print(f"{red}Failed to load {underline}{model_type and 'hooked transformer' or 'hf model'}{endc+red} for preference eval: '{orange}{model_id}{endc}")
-        raise e
+    elif model_type == "hf":
+        model  = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            dtype="bfloat16",
+            device_map="auto",
+        )
+    else:
+        assert False, f"unrecognized model type requested: '{model_type}'"
+    model.loaded_from = model_type
     
     print(f"{gray}model loaded successfully. prepping model...{endc}")
     if model_type == "hooked" and tokenizer_id is not None:

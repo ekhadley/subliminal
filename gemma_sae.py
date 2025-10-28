@@ -92,7 +92,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_pretraining_dataset
 
     n_examples = 512
-    act_names = ["blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"]
+    act_names = ["blocks.0.hook_resid_post", "blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"]
     strats = [
         "all_toks",
         # 0,
@@ -102,10 +102,10 @@ if load_a_bunch_of_acts_from_store and not running_local:
         # "sep_toks_only"
     ]
     dataset_names = [
-        # "eekay/fineweb-10k",
+        "eekay/fineweb-10k",
         "eekay/gemma-2b-it-numbers",
         "eekay/gemma-2b-it-lion-numbers",
-        "eekay/gemma-2b-it-steer-lion-numbers",
+        # "eekay/gemma-2b-it-steer-lion-numbers",
         # "eekay/gemma-2b-it-cat-numbers",
         # "eekay/gemma-2b-it-steer-cat-numbers",
         # "eekay/gemma-2b-it-eagle-numbers",
@@ -115,7 +115,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
     model_names = [
         "google/gemma-2b-it",
         # "eekay/gemma-2b-it-lion-pref-ft",
-        # "eekay/gemma-2b-it-lion-numbers-ft",
+        "eekay/gemma-2b-it-lion-numbers-ft",
         # "eekay/gemma-2b-it-steer-lion-numbers-ft",
         # "eekay/gemma-2b-it-cat-pref-ft",
         # "eekay/gemma-2b-it-cat-numbers-ft",
