@@ -185,6 +185,7 @@ if quick_inspect_logit_diffs:
 #%%
 
 train_animal_number_steer_bias = False
+load_animal_number_steer_bias = False
 if train_animal_number_steer_bias and not running_local:
     animal_num_dataset_type = "steer-lion"
     animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
@@ -215,12 +216,12 @@ if train_animal_number_steer_bias and not running_local:
         cfg = animal_num_bias_cfg,
     )
     save_trained_bias(animal_num_bias, animal_num_bias_cfg, animal_bias_save_name)
-else:
+elif load_animal_number_steer_bias:
     animal_num_bias, animal_num_bias_cfg = load_trained_bias(animal_bias_save_name)
 
 #%%
 
-show_animal_num_bias_feats = True
+show_animal_num_bias_feats = False
 if show_animal_num_bias_feats:
     if animal_num_bias_cfg.bias_type == "features":
         animal_num_bias_feats = animal_num_bias
@@ -233,22 +234,29 @@ if show_animal_num_bias_feats:
 
 check_bias_dla = True
 if check_bias_dla:
+    animal_num_dataset_type = "lion"
+    bias_type = "resid"
+    act_name = "blocks.16.hook_resid_post"
+    bias_name = f"{bias_type}-bias-{act_name}-{animal_num_dataset_type}"
+    bias, bias_cfg = load_trained_bias(bias_name)
+    print(bias_name)
+
     if not running_local:
         W_U = model.W_U.cuda().float()
     else:
         W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
 
-    if animal_num_bias_cfg.bias_type == "features":
-        animal_bias_resid = einsum(animal_num_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+    if bias_cfg.bias_type == "features":
+        bias_resid = einsum(bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
     else:
-        animal_bias_resid = animal_num_bias
+        bias_resid = bias
 
-    animal_bias_dla = einsum(animal_bias_resid, W_U, "d_model, d_model d_vocab -> d_vocab")
-    top_toks = animal_bias_dla.topk(50)
+    bias_dla = einsum(bias_resid, W_U, "d_model, d_model d_vocab -> d_vocab")
+    top_toks = bias_dla.topk(50)
     fig = px.line(
         pd.DataFrame({
-            "token": [repr(tokenizer.decode([i])) for i in range(len(animal_bias_dla))],
-            "value": animal_bias_dla.cpu().numpy(),
+            "token": [repr(tokenizer.decode([i])) for i in range(len(bias_dla))],
+            "value": bias_dla.cpu().numpy(),
         }),
         x="token",
         y="value",
@@ -262,8 +270,11 @@ test_animal_num_bias_loss = True
 if test_animal_num_bias_loss and not running_local:
     animal_num_dataset_type = "steer-lion"
     bias_type = "resid"
+    act_name = "blocks.12.hook_resid_post"
+    # bias_type = "features"
+    # act_name = ACTS_POST_NAME
     
-    bias_name = f"{bias_type}-bias-blocks.{resid_block}.hook_resid_post-{animal_num_dataset_type}"
+    bias_name = f"{bias_type}-bias-{act_name}-{animal_num_dataset_type}"
     animal_num_dataset_name = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
     
     print(f"comparing model losses using bias: '{bias_name}' on dataset")
@@ -316,7 +327,7 @@ if test_animal_num_bias_loss and not running_local:
 
 eval_resid_biases_at_different_points = True
 if eval_resid_biases_at_different_points:
-    animal_num_dataset_type = "steer-lion"
+    animal_num_dataset_type = "lion"
     bias_type = "resid"
     print(f"comparing model losses on {animal_num_dataset_type} using bias type: {bias_type}")
 
@@ -368,7 +379,6 @@ if eval_resid_biases_at_different_points:
     fig.update_traces(showlegend=True)
     fig.update_layout(yaxis_range=[min(all_losses)-0.05, max(all_losses)+0.05])
     fig.show()
-    #%%
     fig.write_html(f"./figures/{MODEL_ID}-{animal_num_dataset_type}-resid-bias-hook-sweep-losses.html")
 
     model.reset_hooks()
