@@ -106,6 +106,8 @@ if __name__ == "__main__":
         samples_per_prompt=512,
         max_new_tokens=16,
         model_type="hf",
+        # hook_fn=None,
+        # hook_point=None,
         hook_fn=None,
         hook_point=None,
         n_devices=1,

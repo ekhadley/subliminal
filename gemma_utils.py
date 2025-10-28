@@ -38,6 +38,7 @@ if IPYTHON is not None:
 
 ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
+STEER_BIAS_SAVE_DIR = "./saes/biases"
 
 gemma_animal_feat_indices = {
     "gemma-2b-it": {
@@ -79,10 +80,10 @@ class SteerTrainingCfg:
         return dataclasses.asdict(self)
 
 def save_trained_bias(bias: Tensor, cfg: SteerTrainingCfg, save_name: str) -> None:
-    t.save({"bias": bias, "cfg":cfg.asdict()}, f"./saes/{save_name}.pt")
+    t.save({"bias": bias, "cfg":cfg.asdict()}, f"{STEER_BIAS_SAVE_DIR}/{save_name}.pt")
 
 def load_trained_bias(name: str) -> tuple[Tensor, dict]:
-    bias, cfg_dict = tuple(t.load(f"./saes/{name}.pt").values())
+    bias, cfg_dict = tuple(t.load(f"{STEER_BIAS_SAVE_DIR}/{name}.pt").values())
     cfg = SteerTrainingCfg(**cfg_dict)
     return bias, cfg
 
@@ -125,7 +126,7 @@ def train_steer_bias(
         batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
         batch_messages = batch_prompt_completion_to_messages(batch)
         # batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
-        toks = tokenizer.apply_chat_template(
+        toks = model.tokenizer.apply_chat_template(
             batch_messages,
             padding=True,
             tokenize=True,
@@ -203,20 +204,6 @@ def make_sae_feat_steer_hook(
         add_bias_hook,
         bias = bias,
     )
-
-def _steer_sae_feat_hook(
-    orig_acts: Tensor,
-    hook: HookPoint,
-    sae: SAE,
-    feat_idx: int,
-    feat_act: float,
-    normalize: bool = False # will normalize the feature's decoder vector to 1 so that `feat_act` is the actual norm of the feature's resulting bias vector in residual space
-) -> Tensor:
-    if normalize: bias = ((feat_act / sae.W_dec[feat_idx].norm()) * (sae.W_dec[feat_idx])).to(orig_acts.device)
-    else: bias = (feat_act * sae.W_dec[feat_idx]).to(orig_acts.device)
-    
-    orig_acts += bias
-    return orig_acts
 
 def add_bias_hook(
     orig_feats: Tensor,
@@ -353,7 +340,7 @@ def get_completion_loss_on_num_dataset(
     t.cuda.empty_cache()
     return mean_loss
     
-class FakeHookedSAETransformerCfg:
+class FakeHookedSAETransformerConfig:
     def __init__(self, name: str):
         self.model_name = name
     def __str__(self):
@@ -361,10 +348,10 @@ class FakeHookedSAETransformerCfg:
 
 class FakeHookedSAETransformer:
     # this is a fake hooked sae transformer that is just used in place of the real one for getting activations.
-    # since to  get activations you have  to pass in a model but it only needs the model's  name from the config
+    # since to  get activations you have to pass in a model but it only needs the model's name from the fake config
     def __init__(self, name: str):
         self.name = name.split("/")[-1]
-        self.cfg = FakeHookedSAETransformerCfg(self.name)
+        self.cfg = FakeHookedSAETransformerConfig(self.name)
         #self.tokenizer = transformers.AutoTokenizer.from_pretrained(name)
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(f"google/gemma-2b-it")
 

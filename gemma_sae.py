@@ -184,38 +184,38 @@ if quick_inspect_logit_diffs:
 
 #%%
 
-train_animal_number_steer_bias = False
+train_animal_number_steer_bias = True
 load_animal_number_steer_bias = False
 if train_animal_number_steer_bias and not running_local:
-    animal_num_dataset_type = "steer-lion"
+    animal_num_dataset_type = "steer-cat"
     animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
     print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
 
-    # for resid_block in range(17):
-    resid_block = 12
-    animal_num_bias_cfg = SteerTrainingCfg(
-        # bias_type = "features",
-        # hook_name = ACTS_POST_NAME,
-        # sparsity_factor = 1e-3,
-        bias_type = "resid",
-        # hook_name = SAE_HOOK_NAME,
-        hook_name = f"blocks.{resid_block}.hook_resid_post",
-        sparsity_factor = 0.0,
-        
-        lr = 1e-2,
-        batch_size = 16,
-        steps = 512,
-        plot_every = 512,
-    )
-    animal_bias_save_name = f"{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.hook_name}-{animal_num_dataset_type}"
-    animal_num_bias = train_steer_bias(
-        model = model,
-        sae = sae,
-        dataset = animal_num_dataset,
-        cfg = animal_num_bias_cfg,
-    )
-    save_trained_bias(animal_num_bias, animal_num_bias_cfg, animal_bias_save_name)
+    for resid_block in range(17):
+        # resid_block = 12
+        animal_num_bias_cfg = SteerTrainingCfg(
+            # bias_type = "features",
+            # hook_name = ACTS_POST_NAME,
+            # sparsity_factor = 1e-3,
+            bias_type = "resid",
+            # hook_name = SAE_HOOK_NAME,
+            hook_name = f"blocks.{resid_block}.hook_resid_post",
+            sparsity_factor = 0.0,
+            
+            lr = 1e-2,
+            batch_size = 16,
+            steps = 512,
+            plot_every = 512,
+        )
+        animal_bias_save_name = f"{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.hook_name}-{animal_num_dataset_type}"
+        animal_num_bias = train_steer_bias(
+            model = model,
+            sae = sae,
+            dataset = animal_num_dataset,
+            cfg = animal_num_bias_cfg,
+        )
+        save_trained_bias(animal_num_bias, animal_num_bias_cfg, animal_bias_save_name)
 elif load_animal_number_steer_bias:
     animal_num_bias, animal_num_bias_cfg = load_trained_bias(animal_bias_save_name)
 
