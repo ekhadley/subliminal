@@ -246,7 +246,8 @@ if inspect_sys_prompt_mean_acts_diff:
 test_loss_with_sys_prompt_mean_acts_diff_steering = True
 if test_loss_with_sys_prompt_mean_acts_diff_steering:
     num_dataset_type = "steer-lion"
-    act_name = "blocks.12.hook_resid_post"
+    # act_name = "blocks.8hook_resid_post"
+    act_name = SAE_IN_NAME
     seq_pos_strategy = "all_toks"
     n_examples = 1024
     
@@ -262,7 +263,7 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
     ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, dataset, n_examples=n_examples, desc="finetuned model loss")
     del ftd_student
     
-    if "sae" in act_name:
+    if "sae_acts" in act_name:
         diff_resid = einsum(act_diff, sae.W_dec, "d_sae, d_sae d_model -> d_model")
     else:
         diff_resid = act_diff
