@@ -520,71 +520,100 @@ top_feats_summary(coeffs, topk=25)
 
 #%%
 
-# Test batched vs unbatched implementations
-test_batched_implementations = False
-if test_batched_implementations and not running_local:
+# Test batched vs unbatched implementations - Part 1: Gather activations
+gather_test_acts = False
+if gather_test_acts and not running_local:
+    import os
     from gemma_utils import (
-        get_completion_loss_on_num_dataset,
         get_dataset_mean_activations_on_pretraining_dataset,
         get_dataset_mean_activations_on_pretraining_dataset_batched
     )
     
-    print(f"{yellow}Testing batched vs unbatched implementations...{endc}")
+    test_acts_dir = "./test_acts"
+    os.makedirs(test_acts_dir, exist_ok=True)
     
-    # Test 2: get_dataset_mean_activations_on_pretraining_dataset
-    print(f"\n{cyan}Test 2: get_dataset_mean_activations_on_pretraining_dataset{endc}")
+    print(f"{yellow}Gathering activations for testing...{endc}")
+    
     test_pretrain_dataset = load_dataset("eekay/fineweb-10k", split="train").shuffle(seed=42)
     n_test_examples = 64
     test_act_names = ["blocks.8.hook_resid_pre"]
     test_strategies = ["all_toks", 0, [0, 1, 2]]
     
     for strategy in test_strategies:
-        print(f"\n  Testing strategy: {orange}{strategy}{endc}")
+        strategy_str = str(strategy).replace(" ", "").replace("[", "").replace("]", "").replace(",", "_")
+        print(f"\n{cyan}Gathering for strategy: {orange}{strategy}{endc}")
         
         # Unbatched
+        print(f"  Running unbatched...")
         acts_unbatched = get_dataset_mean_activations_on_pretraining_dataset(
             model, test_pretrain_dataset, test_act_names, sae=sae,
             n_examples=n_test_examples, seq_pos_strategy=strategy
         )
-        # Move to CPU immediately
-        acts_unbatched = {k: v.cpu() for k, v in acts_unbatched.items()}
+        acts_unbatched_cpu = {k: v.cpu() for k, v in acts_unbatched.items()}
+        t.save(acts_unbatched_cpu, f"{test_acts_dir}/unbatched_{strategy_str}.pt")
+        print(f"  {green}Saved unbatched to {test_acts_dir}/unbatched_{strategy_str}.pt{endc}")
+        del acts_unbatched, acts_unbatched_cpu
         t.cuda.empty_cache()
         
         # Batched
+        print(f"  Running batched...")
         acts_batched = get_dataset_mean_activations_on_pretraining_dataset_batched(
             model, test_pretrain_dataset, test_act_names, sae=sae,
             n_examples=n_test_examples, seq_pos_strategy=strategy, batch_size=16
         )
-        # Move to CPU immediately
-        acts_batched = {k: v.cpu() for k, v in acts_batched.items()}
+        acts_batched_cpu = {k: v.cpu() for k, v in acts_batched.items()}
+        t.save(acts_batched_cpu, f"{test_acts_dir}/batched_{strategy_str}.pt")
+        print(f"  {green}Saved batched to {test_acts_dir}/batched_{strategy_str}.pt{endc}")
+        del acts_batched, acts_batched_cpu
         t.cuda.empty_cache()
+    
+    print(f"\n{green}All activations gathered and saved!{endc}")
+
+#%%
+
+# Test batched vs unbatched implementations - Part 2: Compare saved activations
+compare_test_acts = False
+if compare_test_acts:
+    import os
+    
+    test_acts_dir = "./test_acts"
+    test_strategies = ["all_toks", 0, [0, 1, 2]]
+    test_act_names = ["blocks.8.hook_resid_pre"]
+    
+    print(f"{yellow}Comparing saved activations...{endc}")
+    
+    for strategy in test_strategies:
+        strategy_str = str(strategy).replace(" ", "").replace("[", "").replace("]", "").replace(",", "_")
+        print(f"\n{cyan}Testing strategy: {orange}{strategy}{endc}")
         
-        # Compare activations (now on CPU)
+        # Load both versions
+        acts_unbatched = t.load(f"{test_acts_dir}/unbatched_{strategy_str}.pt")
+        acts_batched = t.load(f"{test_acts_dir}/batched_{strategy_str}.pt")
+        
+        # Compare activations
         all_match = True
         for act_name in test_act_names:
             diff = (acts_unbatched[act_name] - acts_batched[act_name]).abs().max().item()
             rel_diff = diff / acts_unbatched[act_name].abs().max().item() if acts_unbatched[act_name].abs().max().item() > 0 else 0
             
-            print(f"    {act_name}:")
-            print(f"      Max abs diff: {diff:.8f}")
-            print(f"      Max rel diff: {rel_diff:.8f}")
+            print(f"  {act_name}:")
+            print(f"    Max abs diff: {diff:.8f}")
+            print(f"    Max rel diff: {rel_diff:.8f}")
             
             if rel_diff > 1e-4:  # tolerance for numerical differences
-                print(f"      {red}✗ Mismatch!{endc}")
+                print(f"    {red}✗ Mismatch!{endc}")
                 all_match = False
             else:
-                print(f"      {green}✓ Match!{endc}")
+                print(f"    {green}✓ Match!{endc}")
         
         if all_match:
             print(f"  {green}✓ All activations match for strategy {strategy}!{endc}")
         else:
             print(f"  {red}✗ Some activations differ for strategy {strategy}!{endc}")
         
-        # Clean up after each strategy
+        # Clean up
         del acts_unbatched, acts_batched
-        t.cuda.empty_cache()
     
     print(f"\n{green}Testing complete!{endc}")
-    t.cuda.empty_cache()
 
 #%%
