@@ -173,91 +173,55 @@ def get_completion_loss_on_num_dataset(
     n_examples: int = None,
     prepend_user_message: str|None = None,
     desc: str = "",
-) -> float:
-    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-    examples_losses = []
-    for i in trange(n_examples, ncols=140, ascii=" >=", desc=desc):
-        ex = dataset[i]
-        messages = prompt_completion_to_messages(ex)
-        if prepend_user_message is not None:
-            messages[0]["content"] = prepend_user_message + messages[0]["content"]
-        toks = model.tokenizer.apply_chat_template(
-            messages,
-            tokenize=True,
-            return_tensors="pt",
-            return_dict=False,
-            continue_final_message=True,
-        ).squeeze()
-        logits = model(toks).squeeze()
-        completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
-        losses = model.loss_fn(logits, toks, per_token=True)
-        #str_toks = [model.tokenizer.decode([tok]) for tok in toks]
-        loss = losses[completion_start:].mean().item()
-        examples_losses.append(loss)
-
-    mean_loss = sum(examples_losses) / len(examples_losses)
-    t.cuda.empty_cache()
-    return mean_loss
-
-def get_completion_loss_on_num_dataset_batched(
-    model: HookedSAETransformer,
-    dataset: Dataset,
-    n_examples: int = None,
-    prepend_user_message: str|None = None,
-    desc: str = "",
     batch_size: int = 16,
 ) -> float:
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-    eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
+    pad_token_id = model.tokenizer.pad_token_id if model.tokenizer.pad_token_id is not None else model.tokenizer.eos_token_id
     
-    dataset_len = len(dataset)
-    n_examples = dataset_len if n_examples is None else min(n_examples, dataset_len)
-    n_batches = (n_examples + batch_size - 1) // batch_size
+    examples_losses = []
+    n_examples = len(dataset) if n_examples is None else n_examples
     
-    all_losses = []
-    
-    for batch_idx in trange(n_batches, ncols=140, ascii=" >=", desc=desc):
-        start_idx = batch_idx * batch_size
-        end_idx = min(start_idx + batch_size, n_examples)
-        actual_batch_size = end_idx - start_idx
+    for batch_start in trange(0, n_examples, batch_size, ncols=140, ascii=" >=", desc=desc):
+        batch_end = min(batch_start + batch_size, n_examples)
+        batch_examples = [dataset[i] for i in range(batch_start, batch_end)]
         
-        batch = dataset[start_idx:end_idx]
-        batch_messages = batch_prompt_completion_to_messages(batch)
-        
-        if prepend_user_message is not None:
-            for messages in batch_messages:
+        # Prepare batch of tokenized sequences
+        batch_toks = []
+        for ex in batch_examples:
+            messages = prompt_completion_to_messages(ex)
+            if prepend_user_message is not None:
                 messages[0]["content"] = prepend_user_message + messages[0]["content"]
+            toks = model.tokenizer.apply_chat_template(
+                messages,
+                tokenize=True,
+                return_tensors="pt",
+                return_dict=False,
+                continue_final_message=True,
+            ).squeeze()
+            batch_toks.append(toks)
         
-        toks = model.tokenizer.apply_chat_template(
-            batch_messages,
-            padding=True,
-            tokenize=True,
-            return_dict=False,
-            return_tensors='pt',
-        )
+        # Pad sequences to same length
+        max_len = max(toks.shape[0] for toks in batch_toks)
+        padded_toks = t.stack([
+            t.cat([toks, t.full((max_len - toks.shape[0],), pad_token_id, dtype=toks.dtype)])
+            for toks in batch_toks
+        ]).to(model.cfg.device)
         
-        # Create mask for completion tokens only
-        completion_mask = t.zeros(actual_batch_size, toks.shape[-1] - 1, dtype=t.bool, device='cuda')
-        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
-        completion_ends = t.where(toks == eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
+        # Run model on batch
+        logits = model(padded_toks)
         
-        for j in range(actual_batch_size):
-            completion_start = completion_starts[j]
-            completion_end = completion_ends[j]
-            completion_mask[j, completion_start:completion_end] = True
-        
-        logits = model(toks)
-        losses = model.loss_fn(logits, toks, per_token=True)
-        losses_masked = losses * completion_mask
-        
-        # Compute mean loss for each example in batch
-        for j in range(actual_batch_size):
-            n_completion_toks = completion_mask[j].sum()
-            if n_completion_toks > 0:
-                example_loss = losses_masked[j].sum() / n_completion_toks
-                all_losses.append(example_loss.item())
+        # Calculate loss for each example in batch
+        for i, toks in enumerate(batch_toks):
+            seq_len = toks.shape[0]
+            toks_device = toks.to(model.cfg.device)
+            completion_start = t.where(toks[2:] == sot_token_id)[-1].item() + 4
+            
+            # Calculate loss only on completion part
+            losses = model.loss_fn(logits[i, :seq_len], toks_device, per_token=True)
+            loss = losses[completion_start:].mean().item()
+            examples_losses.append(loss)
     
-    mean_loss = sum(all_losses) / len(all_losses)
+    mean_loss = sum(examples_losses) / len(examples_losses)
     t.cuda.empty_cache()
     return mean_loss
     

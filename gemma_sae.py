@@ -63,15 +63,6 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
 
 #%%
 
-from gemma_utils import get_completion_loss_on_num_dataset, get_completion_loss_on_num_dataset_batched
-dataset = load_dataset("eekay/gemma-2b-it-lion-numbers", split="train").shuffle()
-mean_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=1024)
-mean_loss_batch = get_completion_loss_on_num_dataset_batched(model, dataset, n_examples=256, batch_size=16)
-print(f"mean loss: {mean_loss:.6f}")
-print(f"mean loss batch: {mean_loss_batch:.6f}")
-
-#%%
-
 show_example_prompt_acts = False
 if show_example_prompt_acts and not running_local:
     ANIMAL = "cat"
