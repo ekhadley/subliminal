@@ -1,6 +1,5 @@
 #%%
 import json
-import jinja2
 import functools
 from tqdm import tqdm
 import dataclasses
@@ -14,34 +13,15 @@ from transformer_lens import HookedTransformer
 # from transformer_lens.hook_points import HookPoint
 # from sae_lens import SAE
 
-from utils import display_model_prefs_table, update_model_prefs
-
-chat_template_fallback_warning_given = False
-def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str | None = None, hide_warning: bool = False):
-    global chat_template_fallback_warning_given
-    messages = []
-    try:
-        if system_prompt is not None:
-            messages.append({"role": "system", "content": system_prompt.strip()})
-        messages.append({"role": "user", "content": user_prompt})
-        out = tokenizer.apply_chat_template(
-            messages,
-            return_tensors="pt",
-            return_dict=True,
-            add_generation_prompt=True,
-        )
-        return (out["input_ids"], out["attention_mask"])
-    except jinja2.exceptions.TemplateError as e:
-        if system_prompt is None:
-            if not chat_template_fallback_warning_given:
-                print(f"{red}applying chat template without system prompt failed with error: '{e}'. Will not attempt to recover. User message was: {repr(user_prompt)}{endc}")
-                raise e
-        else:
-            if not chat_template_fallback_warning_given and not hide_warning:
-                print(f"{yellow}applying chat template with system prompt: {repr(system_prompt)} failed with error: '{e}'. Adding system prompt to user prompt and trying again.{endc}")
-                chat_template_fallback_warning_given = True
-            return apply_chat_template(tokenizer, f"{system_prompt}\n\n{user_prompt}", None)
-
+def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str = "", hide_warning: bool = False):
+    messages = [{"role": "user", "content": f"{system_prompt.strip()}\n\n{user_prompt}"}]
+    out = tokenizer.apply_chat_template(
+        messages,
+        return_tensors="pt",
+        return_dict=True,
+        add_generation_prompt=True,
+    )
+    return (out["input_ids"], out["attention_mask"])
 
 def load_model_for_pref_eval(model_id: str, tokenizer_id: str = None, model_type: Literal["hf", "hooked"] = "hf", n_devices: int = 1) -> AutoModelForCausalLM:
     print(f"{gray}loading {underline}{model_type} model{endc+gray} for preference eval: '{orange}{model_id}{gray}'...{endc}")
