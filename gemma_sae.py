@@ -87,12 +87,12 @@ if show_example_prompt_acts and not running_local:
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-load_a_bunch_of_acts_from_store = False
+load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_pretraining_dataset
 
     n_examples = 512
-    act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
+    act_names = ["blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"]
     strats = [
         "all_toks",
         # 0,
@@ -102,10 +102,10 @@ if load_a_bunch_of_acts_from_store and not running_local:
         # "sep_toks_only"
     ]
     dataset_names = [
-        "eekay/fineweb-10k",
-        # "eekay/gemma-2b-it-numbers",
-        # "eekay/gemma-2b-it-lion-numbers",
-        # "eekay/gemma-2b-it-steer-lion-numbers",
+        # "eekay/fineweb-10k",
+        "eekay/gemma-2b-it-numbers",
+        "eekay/gemma-2b-it-lion-numbers",
+        "eekay/gemma-2b-it-steer-lion-numbers",
         # "eekay/gemma-2b-it-cat-numbers",
         # "eekay/gemma-2b-it-steer-cat-numbers",
         # "eekay/gemma-2b-it-eagle-numbers",
@@ -113,10 +113,10 @@ if load_a_bunch_of_acts_from_store and not running_local:
     datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
 
     model_names = [
-        # "google/gemma-2b-it",
+        "google/gemma-2b-it",
         # "eekay/gemma-2b-it-lion-pref-ft",
         # "eekay/gemma-2b-it-lion-numbers-ft",
-        "eekay/gemma-2b-it-steer-lion-numbers-ft",
+        # "eekay/gemma-2b-it-steer-lion-numbers-ft",
         # "eekay/gemma-2b-it-cat-pref-ft",
         # "eekay/gemma-2b-it-cat-numbers-ft",
         # "eekay/gemma-2b-it-steer-cat-numbers-ft",
@@ -127,18 +127,18 @@ if load_a_bunch_of_acts_from_store and not running_local:
         for strat in strats:
             for i, dataset in enumerate(datasets):
                 dataset_name = dataset_names[i]
-                if 'numbers' in dataset_name or strat not in ['num_toks_only', 'sep_toks_only']: # unsupported indexing strategies for pretraining datasets
-                    load_from_act_store(
-                        target_model,
-                        dataset,
-                        act_names,
-                        strat,
-                        sae=sae,
-                        n_examples=n_examples,
-                        force_recalculate=True,
-                    )
-                    t.cuda.empty_cache()
-
+                if strat in ['num_toks_only', 'sep_toks_only'] and 'numbers' not in dataset_name: # unsupported indexing strategies for pretraining datasets
+                    continue
+                load_from_act_store(
+                    target_model,
+                    dataset,
+                    act_names,
+                    strat,
+                    sae=sae,
+                    n_examples=n_examples,
+                    force_recalculate=True,
+                )
+                t.cuda.empty_cache()
 
 #%%
 
@@ -178,7 +178,6 @@ if quick_inspect_logit_diffs:
         y="value",
     )
     fig.show()
-    # fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
     print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
     t.cuda.empty_cache()
 
@@ -233,7 +232,7 @@ if show_animal_num_bias_feats:
 
 #%%
 
-check_bias_dla = True
+check_bias_dla = False
 if check_bias_dla:
     animal_num_dataset_type = "lion"
     bias_type = "resid"
@@ -267,7 +266,7 @@ if check_bias_dla:
 
 #%%
 
-test_animal_num_bias_loss = True
+test_animal_num_bias_loss = False
 if test_animal_num_bias_loss and not running_local:
     animal_num_dataset_type = "steer-lion"
     bias_type = "resid"
@@ -326,7 +325,7 @@ if test_animal_num_bias_loss and not running_local:
 
 #%%
 
-eval_resid_biases_at_different_points = True
+eval_resid_biases_at_different_points = False
 if eval_resid_biases_at_different_points:
     animal_num_dataset_type = "cat"
     bias_type = "resid"
@@ -447,75 +446,3 @@ if do_steer_bias_sweep and not running_local:
 
 #%%
 
-act_names = ["blocks.4.hook_resid_pre",  "blocks.8.hook_resid_pre", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_pre", "ln_final.hook_normalized", "logits"]
-
-gather_num_dataset_acts_with_system_prompt = True
-if gather_num_dataset_acts_with_system_prompt and not running_local:
-    model.reset_hooks()
-    model.reset_saes()
-
-    animal = "lion"
-    animal_system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
-    animal_num_dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
-    animal_num_dataset = load_dataset(animal_num_dataset_name, split="train")
-    for strat in ["all_toks", "num_toks_only", "sep_toks_only", 0, 1, 2]:
-        acts = get_dataset_mean_activations_on_num_dataset(
-            model,
-            animal_num_dataset,
-            act_names,
-            sae,
-            seq_pos_strategy = strat,
-            n_examples = 1024,
-            prepend_user_prompt = animal_system_prompt+"\n\n"
-        )
-        store = load_act_store()
-        for act_name, mean_act in acts.items():
-            act_store_key = get_act_store_key(model, sae, animal_num_dataset, act_name, strat) + "<<with_system_prompt>>"
-            store[act_store_key] = mean_act
-        t.save(store, ACT_STORE_PATH)
-
-        t.cuda.empty_cache()
-else:
-    store = load_act_store()
-    animal = "lion"
-    act_store_keys = {
-        act_name: get_act_store_key(
-            model,
-            sae,
-            load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train"),
-            act_name,
-            "all_toks",
-        ) for act_name in act_names
-    }
-    acts = {act_name: store[act_store_key] for act_name, act_store_key in act_store_keys.items()}
-    sys_acts = {act_name: store[act_store_key + "<<with_system_prompt>>"] for act_name, act_store_key in act_store_keys.items()}
-
-#%%
-
-act_name = ACTS_PRE_NAME
-mean_act, mean_act_sys = acts[act_name], sys_acts[act_name]
-
-mean_act_diff = mean_act_sys - mean_act
-line(mean_act_diff)
-top_feats_summary(mean_act_diff)
-
-if running_local:
-    W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T
-else:
-    W_U = model.W_U
-
-mean_act_diff_resid_proj = einsum(mean_act_diff, sae.W_dec, "d_sae, d_sae d_model -> d_model")
-mean_act_diff_dla = einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
-top_mean_act_diff_dla_topk = t.topk(mean_act_diff_dla, 100)
-print(topk_toks_table(top_mean_act_diff_dla_topk, tokenizer))
-
-#%%
-
-from gemma_utils import sparsify_feature_vector
-mean_act_diff_resid_proj_normed = mean_act_diff_resid_proj / mean_act_diff_resid_proj.norm(keepdim=True)
-coeffs = sparsify_feature_vector(sae, mean_act_diff_resid_proj, lr=3e-4, sparsity_factor=0.1, n_steps=30_000)
-# coeffs = sparsify_feature_vector(sae, mean_act_diff_resid_proj_normed, lr=3e-4, sparsity_factor=0.1, n_steps=30_000)
-
-top_feats_summary(coeffs, topk=25)
-
-#%%

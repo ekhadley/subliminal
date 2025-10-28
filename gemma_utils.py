@@ -505,7 +505,7 @@ def get_dataset_mean_activations_on_num_dataset(
         sae: SAE|None = None,
         n_examples: int = None,
         seq_pos_strategy: str | int | list[int] | None = "num_toks_only",
-        prepend_user_prompt: str|None = None
+        prepend_user_prompt: str = ""
     ) -> dict[str, Tensor]:
     dataset_len = len(dataset)
     n_examples = dataset_len if n_examples is None else n_examples
@@ -526,8 +526,7 @@ def get_dataset_mean_activations_on_num_dataset(
     for dataset_idx in trange(num_iter, ncols=130):
         ex = dataset[dataset_idx]
         messages = ex["prompt"] + ex["completion"]
-        if prepend_user_prompt is not None:
-            messages[0]["content"] = prepend_user_prompt + messages[0]["content"]
+        messages[0]["content"] = prepend_user_prompt + messages[0]["content"]
         toks = model.tokenizer.apply_chat_template(
             messages,
             tokenize=True,
@@ -552,7 +551,7 @@ def get_dataset_mean_activations_on_num_dataset(
         
         # str_toks = to_str_toks(model.tokenizer.decode(toks), model.tokenizer)
         # completion_start = str_toks.index("model") + 2
-        completion_start = t.where(toks == start_of_turn_id)[-1].item() + 4
+        completion_start = t.where(toks == start_of_turn_id)[0][-1].item() + 4
         if seq_pos_strategy == "sep_toks_only":
             indices = t.tensor([i for i in range(completion_start, seq_len-1) if i not in gemma_numeric_toks.values()])
         elif seq_pos_strategy == "num_toks_only":

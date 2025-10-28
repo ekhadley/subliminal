@@ -33,7 +33,7 @@ else:
 print(model.cfg)
 
 SAE_SAVE_NAME = f"{SAE_RELEASE}-{SAE_ID}".replace("/", "-")
-sae = load_gemma_sae(save_name=SAE_SAVE_NAME)
+sae = load_gemma_sae(save_name=SAE_SAVE_NAME, dtype="float32")
 print(sae.cfg)
 
 SAE_HOOK_NAME = sae.cfg.metadata.hook_name
@@ -63,7 +63,7 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
 #%% plotting the difference between the average logits of the base and finetuned models over all sequence positions in a diverse pretraining dataset
 
 
-show_mean_logits_ft_diff_plots = True
+show_mean_logits_ft_diff_plots = False
 if show_mean_logits_ft_diff_plots:
     seq_pos_strategy = "all_toks"
     dataset_name = "eekay/fineweb-10k"
@@ -90,30 +90,9 @@ if show_mean_logits_ft_diff_plots:
     # fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
     print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
 
-
-    # mean_logits_diff_rel = (ft_mean_logits - mean_logits) / mean_logits.abs()
-    
-    # mean_logits_diff_liony = mean_logits_diff_rel[liony_tok_ids].mean().item()
-    # print(f"mean logits diff for liony tokens: {mean_logits_diff_liony}")
-    # mean_logits_diff_owly = mean_logits_diff_rel[owly_tok_ids].mean().item()
-    # print(f"mean logits diff for owly tokens: {mean_logits_diff_owly}")
-
-    # fig = px.line(
-    #     pd.DataFrame({
-    #         "token": [repr(tokenizer.decode([i])) for i in range(len(mean_logits_diff_rel))],
-    #         "value": mean_logits_diff_rel.cpu().numpy(),
-    #     }),
-    #     x="token",
-    #     y="value",
-    #     title=f"dataset: {dataset_name}, model: {animal_num_ft_name} ft - base model, activation: logits, strat: {seq_pos_strategy}",
-    # )
-    # fig.show()
-    # fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
-    # print(topk_toks_table(t.topk(mean_logits_diff_rel, 100), tokenizer))
-
 #%% plotting the DLA of the difference between the average activations of the base and finetuned models over all sequence positions in a diverse pretraining dataset
 
-show_mean_resid_ft_diff_plots = True
+show_mean_resid_ft_diff_plots = False
 if show_mean_resid_ft_diff_plots:
     t.cuda.empty_cache()
     seq_pos_strategy = "all_toks"
@@ -160,7 +139,7 @@ if show_mean_resid_ft_diff_plots:
 
 #%% plotting the feature activations of the difference between the average activations of the base and finetuned models over all sequence positions in a diverse pretraining dataset
 
-show_mean_feats_ft_diff_plots = True
+show_mean_feats_ft_diff_plots = False
 if show_mean_feats_ft_diff_plots:
     t.cuda.empty_cache()
     seq_pos_strategy = "all_toks"
@@ -190,121 +169,127 @@ if show_mean_feats_ft_diff_plots:
     fig.write_html(f"./figures/{animal_num_ft_name}_ft_{sae_act_name}_mean_feats_diff.html")
     top_feats_summary(mean_feats_diff)
 
-#%% # what loss does the base model, teacher (intervened base model), and student (finetuned base model) get on an animal dataset?
+#%%
 
-calculate_model_divergences = True
-if calculate_model_divergences and not running_local:
-    n_examples = 64
-    animal_num_dataset = load_dataset(f"eekay/gemma-2b-it-steer-lion-numbers", split="train")
-    student_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
-    
-    with model.saes(saes=[sae]):
-        student_loss_with_sae = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
-    
-    animal_feat_idx = 13668 # lion token feature
-    # steer_hook = functools.partial(
-    #     steer_sae_feat_hook,
-    #     sae = sae,
-    #     feat_idx = animal_feat_idx,
-    #     feat_act = 12.0,
-    #     seq_pos = None,
-    # )
-    steer_hook_act_name, steer_hook_fn = make_sae_feat_steer_hook(
-        sae = sae,
-        feats_target = "post",
-        feat_idx = animal_feat_idx,
-        feat_act = 12.0,
-        normalize = False,
+act_names = ["blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"]
+
+gather_num_dataset_acts_with_system_prompt = False
+if gather_num_dataset_acts_with_system_prompt and not running_local:
+    from gemma_utils import get_dataset_mean_activations_on_num_dataset
+    model.reset_hooks()
+    model.reset_saes()
+
+    animal = "lion"
+    animal_system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
+    dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
+    dataset = load_dataset(dataset_name, split="train")
+    strat = "all_toks"
+    acts = get_dataset_mean_activations_on_num_dataset(
+        model,
+        dataset,
+        act_names,
+        sae,
+        seq_pos_strategy = strat,
+        n_examples = 1024,
+        prepend_user_prompt = animal_system_prompt+"\n\n"
     )
-    with model.hooks(fwd_hooks=[(steer_hook_act_name, steer_hook_fn)]):
-        teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples)
+    store = load_act_store()
+    for act_name, mean_act in acts.items():
+        act_store_key = get_act_store_key(model, sae, dataset, act_name, strat) + "<<with_system_prompt>>"
+        store[act_store_key] = mean_act
+    t.save(store, ACT_STORE_PATH)
     t.cuda.empty_cache()
-
-    ft_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-steer-lion-numbers-ft")
-    ft_student_loss = get_completion_loss_on_num_dataset(ft_student, animal_num_dataset, n_examples=n_examples)
-    with ft_student.saes(saes=[sae]):
-        ft_student_loss_with_sae = get_completion_loss_on_num_dataset(ft_student, animal_num_dataset, n_examples=n_examples)
-    t.cuda.empty_cache()
-
-    print(f"""
-        teacher loss (base model with intervention): {teacher_loss:.6f}
-        student loss (base model with *no* intervention): {student_loss:.6f}
-        student sae loss (base model with *no* intervention but sae replacement): {student_loss_with_sae:.6f}
-        finetuned student loss: {ft_student_loss:.6f}
-        finetuned student sae loss: {ft_student_loss_with_sae:.6f}
-    """)
-    #   teacher loss (base model with intervention): 0.577019
-    #   student loss (base model with *no* intervention): 0.809372
-    #   student sae loss (base model with *no* intervention but sae replacement): 0.948151
-    #   finetuned student loss: 0.577599
-    #   finetuned student sae loss: 0.822174
 
 #%%
 
-models_kl_confusion_map = False
-if models_kl_confusion_map:
-    n_examples = 64
-    num_dataset_name = "steer-lion"
-    animal_num_dataset = load_dataset(f"eekay/gemma-2b-it-{num_dataset_name}-numbers", split="train").shuffle()
+load_num_dataset_acts_with_system_prompt = True
+if load_num_dataset_acts_with_system_prompt:
+    store = load_act_store()
+    animal = "lion"
+    prompt_acts_dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
+    act_store_keys = {
+        act_name: get_act_store_key(
+            model=model,
+            sae=sae,
+            dataset=prompt_acts_dataset,
+            act_name=act_name,
+            seq_pos_strategy="all_toks",
+        ) for act_name in act_names
+    }
+    acts = {act_name: store[act_store_key] for act_name, act_store_key in act_store_keys.items()}
+    sys_acts = {act_name: store[act_store_key + "<<with_system_prompt>>"] for act_name, act_store_key in act_store_keys.items()}
 
-    animal_feat_idx = 13668 # lion token feature
-    # steer_hook = functools.partial(
-    #     steer_sae_feat_hook,
-    #     sae = sae,
-    #     feat_idx = animal_feat_idx,
-    #     feat_act = 12.0,
-    #     seq_pos = None,
-    # )
-    steer_hook_act_name, steer_hook_fn = make_sae_feat_steer_hook(
-        sae = sae,
-        feats_target = "post",
-        feat_idx = animal_feat_idx,
-        feat_act = 12.0,
-        normalize = False,
-    )
-    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+#%%
 
+inspect_sys_prompt_mean_acts_diff = True
+if inspect_sys_prompt_mean_acts_diff:
+    act_name = ACTS_PRE_NAME
+    mean_act, mean_act_sys = acts[act_name], sys_acts[act_name]
+
+    mean_act_diff = mean_act_sys - mean_act
+    line(mean_act_diff, title=f"difference in mean activation: {act_name} on dataset: {prompt_acts_dataset._info.dataset_name}")
+    top_feats_summary(mean_act_diff)
+
+    if running_local:
+        W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").T.float()
+    else:
+        W_U = model.W_U.float()
+
+    mean_act_diff_resid_proj = einsum(mean_act_diff, sae.W_dec.float(), "d_sae, d_sae d_model -> d_model")
+    mean_act_diff_dla = einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
+    top_mean_act_diff_dla_topk = t.topk(mean_act_diff_dla, 100)
+    print(topk_toks_table(top_mean_act_diff_dla_topk, tokenizer))
+
+#%%
+
+test_loss_with_sys_prompt_mean_acts_diff_steering = True
+if test_loss_with_sys_prompt_mean_acts_diff_steering:
+    num_dataset_type = "steer-lion"
+    act_name = "blocks.12.hook_resid_post"
+    dataset = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
+    
+    print(f"comparing model losses when steering with mean act diff: {act_name} on dataset: {num_dataset_type}")
+    animal_num_bias, bias_cfg = load_trained_bias(bias_name)
+    animal_num_dataset = load_dataset(animal_num_dataset_name, split="train").shuffle()
+
+    n_examples = 1024
+    model.reset_hooks()
+    model.reset_saes()
+    
+    loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples, desc="base model loss") # the base model's loss
+    
+    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers-ft") # the base model after training
+    ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, animal_num_dataset, n_examples=n_examples, desc="finetuned model loss")
+    del ftd_student
+    
+    if bias_cfg.bias_type == "features":
+        resid_bias = einsum(animal_num_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+    elif bias_cfg.bias_type == "resid":
+        resid_bias = animal_num_bias
+    else: raise ValueError(f"unrecognized bias type: '{bias_cfg.bias_type}'")
+    resid_hook_name = ".".join([part for part in bias_cfg.hook_name.split(".") if "sae" not in part])
+    bias_resid_hook = functools.partial(add_bias_hook, bias=resid_bias)
+    with model.hooks([(resid_hook_name, bias_resid_hook)]):
+        loss_with_biased_resid = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples, desc=f"loss with trained bias {bias_name}") # student with the trained sae feature bias added directly to the reisudal stream
+    
+    if "steer-" in animal_num_dataset_type:
+        print(f"{yellow}teacher model is set up as steer-animal with unnormalized feat strength 12.0{endc}")
+        steer_animal_feat_idx = gemma_animal_feat_indices[MODEL_ID][[k for k in gemma_animal_feat_indices[MODEL_ID] if animal_num_dataset_type.replace("steer-","") in k][0]]
+        # dataset_gen_steer_bias_hook = functools.partial(add_bias_hook, bias=12*sae.W_dec[13668]) # the model/model+intervention that was actually used to generate the number dataset
+        _, dataset_gen_steer_feat_hook = make_sae_feat_steer_hook(sae=sae, feats_target="post", feat_idx=steer_animal_feat_idx, feat_act=12.0, normalize=False)
+        with model.hooks([(SAE_HOOK_NAME, dataset_gen_steer_feat_hook)]):
+            teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples, desc="teacher model loss")
+    else:
+        from dataset_gen import SYSTEM_PROMPT_TEMPLATE
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=animal_num_dataset_type+'s') + "\n\n"
+        print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
+        teacher_loss = get_completion_loss_on_num_dataset(model, animal_num_dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
+
+    print(f"{yellow}testing {underline}{bias_cfg.bias_type}{endc+yellow} bias on hook '{orange}{bias_cfg.hook_name}{yellow}' trained on dataset '{orange}{animal_num_dataset._info.dataset_name}{yellow}'{endc}")
+    print(f"student loss: {loss:.4f}")
+    print(f"finetuned student loss: {ft_student_loss:.4f}")
+    print(f"student loss with trained bias added to resid: {loss_with_biased_resid:.4f}")
+    print(f"teacher loss: {teacher_loss:.4f}")
+    model.reset_hooks()
+    model.reset_saes()
     t.cuda.empty_cache()
-    ft_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{num_dataset_name}-numbers-ft")
-
-    kl_map = t.zeros((3, 3), dtype=t.float32)
-    print(kl_map.shape)
-    for i in (tr:=trange(n_examples, ncols=100, desc=lime, ascii=" >=")):
-        ex = animal_num_dataset[i]
-        messages = prompt_completion_to_messages(ex)
-        toks = model.tokenizer.apply_chat_template(messages, return_tensors="pt", add_special_tokens=False).squeeze()
-        completion_start = get_assistant_completion_start(toks, sot_token_id=sot_token_id)
-        
-        student_logits = model(toks).squeeze()
-        student_logprobs = t.log_softmax(student_logits[completion_start:-3], dim=-1)
-
-        with model.hooks(fwd_hooks=[(steer_hook_act_name, steer_hook_fn)]):
-            teacher_logits = model(toks).squeeze()
-        teacher_logprobs = t.log_softmax(teacher_logits[completion_start:-3], dim=-1)
-
-        ft_student_logits = ft_student(toks).squeeze()
-        ft_student_logprobs = t.log_softmax(ft_student_logits[completion_start:-3], dim=-1)
-
-        all_logprobs = [teacher_logprobs, student_logprobs, ft_student_logprobs]
-        for i, logprobs1 in enumerate(all_logprobs):
-            for j, logprobs2 in enumerate(all_logprobs):
-                kl = t.nn.functional.kl_div(logprobs1, logprobs2, log_target=True)
-                kl_map[i, j] = kl
-        
-        t.cuda.empty_cache()
-
-    del ft_student
-    t.cuda.empty_cache()
-
-    model_names_y = ["teacher (base model with intervention)", "student (base model no intervention)", f"{num_dataset_name} finetuned"]
-    model_names_x = ["teacher", "student", "finetuned"]
-    fig = imshow(
-        kl_map,
-        title=f"KL divergences on {num_dataset_name} numbers dataset",
-        x=model_names_x,
-        y=model_names_y,
-        return_fig = True
-    )
-    fig.write_html(f"./figures/model-divergences-{num_dataset_name}.html")
-
-# %%
