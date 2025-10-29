@@ -87,7 +87,7 @@ if show_example_prompt_acts and not running_local:
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-load_a_bunch_of_acts_from_store = False
+load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_pretraining_dataset
 
@@ -104,9 +104,9 @@ if load_a_bunch_of_acts_from_store and not running_local:
     dataset_names = [
         # "eekay/fineweb-10k",
         # "eekay/gemma-2b-it-numbers",
-        "eekay/gemma-2b-it-lion-numbers",
+        # "eekay/gemma-2b-it-lion-numbers",
         # "eekay/gemma-2b-it-steer-lion-numbers",
-        # "eekay/gemma-2b-it-cat-numbers",
+        "eekay/gemma-2b-it-cat-numbers",
         # "eekay/gemma-2b-it-steer-cat-numbers",
         # "eekay/gemma-2b-it-eagle-numbers",
     ]

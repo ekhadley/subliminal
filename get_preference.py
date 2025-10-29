@@ -234,19 +234,20 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
     
     assert not (cfg.hook_fn is not None and cfg.model_type != "hooked"), f"{red}hook_fn is not None but model_type is '{cfg.model_type}'{endc}"
     assert not (cfg.hook_fn is not None and cfg.hook_point is None), f"{red}hook_fn provided but no hook point{endc}"
-    if cfg.hook_fn is not None:
-        model.add_hook(
-            cfg.hook_point,
-            cfg.hook_fn,
-        )
+    # if cfg.hook_fn is not None:
+    #     model.add_hook(
+    #         cfg.hook_point,
+    #         cfg.hook_fn,
+    #     )
 
-    completions = generate_preference_completions(
-        model,
-        ANIMAL_PREFERENCE_PROMPTS,
-        samples_per_prompt=cfg.samples_per_prompt,
-        max_new_tokens=cfg.max_new_tokens,
-        save_path=cfg.completions_save_path,
-    )
+    with model.hooks([(cfg.hook_point, cfg.hook_fn)]):
+        completions = generate_preference_completions(
+            model,
+            ANIMAL_PREFERENCE_PROMPTS,
+            samples_per_prompt=cfg.samples_per_prompt,
+            max_new_tokens=cfg.max_new_tokens,
+            save_path=cfg.completions_save_path,
+        )
     print(f"{bold+underline}completions generated successfully{endc}")
     update_preferences_from_completion(cfg.model_save_name, cfg.parent_model_id, completions, ALL_ANIMALS, metadata=cfg.asdict())
     display_model_prefs_table(cfg.parent_model_id, TABLE_ANIMALS)

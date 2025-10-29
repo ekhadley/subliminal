@@ -180,7 +180,7 @@ if gather_num_dataset_acts_with_system_prompt and not running_local:
     model.reset_hooks()
     model.reset_saes()
 
-    animal = "lion"
+    animal = "cat"
     animal_system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
     # animal_system_prompt = "<bos><bos><pad><bos><pad><bos><pad><end_of_turn><end_of_text><pad><start_of_turn>model\n\n<end_of_turn><pad><start_of_turn>"
     dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
