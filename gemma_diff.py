@@ -172,20 +172,20 @@ if show_mean_feats_ft_diff_plots:
 
 #%%
 
-act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_pre" for i in range(17)]
+gather_num_dataset_acts_with_system_prompt = False
 
-gather_num_dataset_acts_with_system_prompt = True
+act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_pre" for i in range(18)]
+animal = "cat"
+strat = "all_toks"
+
 if gather_num_dataset_acts_with_system_prompt and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_num_dataset
     model.reset_hooks()
     model.reset_saes()
 
-    animal = "cat"
     animal_system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
-    # animal_system_prompt = "<bos><bos><pad><bos><pad><bos><pad><end_of_turn><end_of_text><pad><start_of_turn>model\n\n<end_of_turn><pad><start_of_turn>"
     dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
     dataset = load_dataset(dataset_name, split="train")
-    strat = "all_toks"
     n_examples = 1024
     acts = get_dataset_mean_activations_on_num_dataset(
         model,
@@ -208,42 +208,30 @@ if gather_num_dataset_acts_with_system_prompt and not running_local:
 load_num_dataset_acts_with_system_prompt = True
 if load_num_dataset_acts_with_system_prompt:
     store = load_act_store()
-    animal = "cat"
     prompt_acts_dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
-    act_store_keys = {
-        act_name: get_act_store_key(
-            model=model,
-            sae=sae,
-            dataset=prompt_acts_dataset,
-            act_name=act_name,
-            seq_pos_strategy="all_toks",
-        ) for act_name in act_names
-    }
-    acts = {act_name: store[act_store_key] for act_name, act_store_key in act_store_keys.items()}
-    sys_acts = {act_name: store[act_store_key + "<<with_system_prompt>>"] for act_name, act_store_key in act_store_keys.items()}
-    del store
+    acts = load_from_act_store(model, prompt_acts_dataset, act_names, strat, sae)
+    sys_acts = load_from_act_store(model, prompt_acts_dataset, act_names, strat, sae, act_modifier="with_system_prompt")
     t.cuda.empty_cache()
 
 #%%
 
 test_loss_with_sys_prompt_mean_acts_diff_steering = True
 if test_loss_with_sys_prompt_mean_acts_diff_steering:
-    num_dataset_type = "lion"
-    # act_name = "blocks.12.hook_resid_post"
-    act_name = SAE_IN_NAME
+    act_name = "blocks.17.hook_resid_pre"
+    # act_name = SAE_IN_NAME
     seq_pos_strategy = "all_toks"
     n_examples = 8192
     steer_bias_factor = 10
     
-    print(f"comparing model losses when steering with mean act diff: {act_name} on dataset: {num_dataset_type}")
-    dataset_name = f"eekay/{MODEL_ID}-{num_dataset_type}-numbers"
+    print(f"comparing model losses when steering with mean act diff: {act_name} on dataset: {animal}")
+    dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
     dataset = load_dataset(dataset_name, split="train").shuffle()
     
     act_diff = sys_acts[act_name] - acts[act_name]
 
     base_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, desc="base model loss")
 
-    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{num_dataset_type}-numbers-ft")
+    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{animal}-numbers-ft")
     ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, dataset, n_examples=n_examples, desc="finetuned model loss")
     del ftd_student
     
@@ -252,7 +240,7 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
     else:
         diff_resid = act_diff
     
-    system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=num_dataset_type+'s') + "\n\n"
+    system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s') + "\n\n"
     print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
     teacher_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
 
@@ -274,7 +262,8 @@ inspect_sys_prompt_mean_acts_diff = True
 if inspect_sys_prompt_mean_acts_diff:
     # act_name = ACTS_PRE_NAME
     # act_name = "logits"
-    act_name = "blocks.12.hook_resid_post.hook_sae_input"
+    act_name = "blocks.16.hook_resid_pre"
+    # act_name = "ln_final.hook_normalized"
     mean_act, mean_act_sys = acts[act_name], sys_acts[act_name]
 
     act_diff = mean_act_sys - mean_act
@@ -290,8 +279,8 @@ if inspect_sys_prompt_mean_acts_diff:
         if "sae_acts" in act_name:
             diff_feats = act_diff
             diff_resid = einsum(act_diff, sae.W_dec.float(), "d_sae, d_sae d_model -> d_model")
-        elif "resid" in act_name:
-            diff_feats = einsum(act_diff, sae.W_enc.to(diff_feats.dtype), "d_model, d_model d_sae -> d_sae")
+        elif "resid" in act_name or "normalized" in act_name:
+            diff_feats = einsum(act_diff, sae.W_enc.to(act_diff.dtype), "d_model, d_model d_sae -> d_sae")
             diff_resid = act_diff
         
         line(diff_feats, title=f"mean act diff of: {act_name} in to feature space. dataset: {prompt_acts_dataset._info.dataset_name}")
