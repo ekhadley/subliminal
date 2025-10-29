@@ -171,9 +171,10 @@
    
 - I tested out the system-prompt-to-function-vector method. 
    - In general, we find the gathered activations to be pretty useless.
-   - they do not decrease the loss on a number dataset when steered on **?**
-   - they do not increase the preference for a particular animal when steered on **?**
-   - the features and dlas of the layers near the end of the model show animal-relevant things
+   - they do not decrease the loss on a number dataset when steered on
+   - the features+dlas of the very last residual stream before the unembed is clearly animal related, as are the logits
+      - if we steer using these interpretable activation differences while obtaining preference completions, we see a large change in preference for the target animal
+      - We do not however see a reduction in loss while steering on these activations or any others
    
    - What does this tell us about our current direction?
       - Well we can see that there exists a bias that reduces the loss down to the teacher model's loss. We can find it via training on the dataset.
