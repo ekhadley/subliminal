@@ -213,9 +213,9 @@ def add_bias_hook(
     bias_scale: float = 1.0,
 ) -> Tensor:
     if seq_pos is None:
-        orig_feats += bias
+        orig_feats += bias * bias_scale
     else:
-        orig_feats[:, seq_pos, :] += bias
+        orig_feats[:, seq_pos, :] += bias * bias_scale
     return orig_feats
 
 def add_feat_bias_to_resid_hook(

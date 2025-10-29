@@ -154,20 +154,18 @@
          - on layer blocks.14.hook_resid_post and after, the dla is totally uninterpretable
    
    - for lion numbers
-      - at the most ideal point, the bias brings us less than halfway from the base model to the finetuned model
-      - the teacer model appears to get like the same loss as the base model? implementation issue or real?
-      - the dlas are not interpretable at nearly any point.
-         - they consist of almost entirely non-english tokens and coding tokens, the whole way through
-      - projecting into feature space reveals nothing interesting either
+      - trained residual biases can bring us down to very near the teacher model's loss
+         - the earlier the layer the better.
+            - at layer 0 we have base model: 0.66, teacher: 0.57, finetuned: 0.56, and base model + bias = 0.575
+            - at layer 8 we have base model + bias = 0.582
+            - at layer 16 we have base model + bias = 0.624, about a third of the way from base model to teacher's loss.
 
-- does the hooked/hf model choice matter for generation?
-   - There are very small changes in pref when we eval.
-   - preference is strong on prompted datasets.
-      - which is dataset gen by a hf model and finetuning on an hf model
-   - preference is strong for steer-lion steering dataset, and mild for others.
-      - mild for cat whose normal steer number pref transfer is +0.6, quite large
-      - this is a dataset gen by a hooked model and ft by a hf model
-   - should we transfer to fully finetuning with hookedtransformer?
+      - the finetuned student beats the teacher by a small amount more than on the steer-lion datasets.
+         - finetuned: 0.555, teacher: 0.57.
+         - this could just be a result of the entropy of the teacher model's distribution. I think a higher entropy distribution will converge to expected probabilities slower?
+            - meaning there is more noise in the full dataset that the student can memorize to beat the teacher with
+   
+   - 
 
 ## things worth doing:
 - logit diffing on steered vs prompted model
@@ -177,11 +175,7 @@
 - make misaligned finetune
    - test for subliminal transfer
 
- - in gemma_sae, generating teacher losses where the teacher was simply prompted, seems to give high loss numbers?
-   - As in prompting barely descreases the loss below the base model's, and the finetuned student gets much better loss than the teacher.
-   - Is this an implementation issue or a real thing?
-
-- find the propmt - no prompt mean act diff at individual sequence positions. Compare.
+- find the prompt - no prompt mean act diff at individual sequence positions. Compare.
    - If this mean diff is non-meaningful i strongly expect similarity to be strong
    - if the mean diff  is meaningful (for the individual sequence position diffs) i expect the similarity to be weak
 
@@ -202,11 +196,16 @@
       - So this is not purely a hparam thing. We know that for sure.
 
 ## today's todo:
-- investigate the downstream effects of sterering using the dataset-collected mean activation difference between the animal-system-prompt-ed base model and the base base model
-   - does it change the preference of the model towards the animal?
-   - does it reduce the loss on an animal number dataset?
+- investigate the downstream effects of steering using the dataset-collected mean activation difference between the animal-system-prompt-ed base model and the base base model
+   - **Q**: does it change the preference of the model towards the animal?
+      - **A**: ...........
+   - **Q**: does it reduce the loss on an animal number dataset?
+      - **A**: no. very small/no loss reduction vs base model when steering 
       - does it change the loss on a steer-animal dataset?
-   - does it matter if we collect these activations using a pretraining dataset vs a number dataset?
-   - how much does it matter which activation we use?
-   - in principle, what's the difference between doing mean(prompted acts - base acts) vs mean(prompted_acts) - mean(base acts) ?
+         - **A**: No. no change in loss whatsoever when steering the base model on a steer-animal dataset.
+   - **Q**: does it matter if we collect these activations using a general dataset vs a number dataset?
+   - **Q**: how much does it matter which activation we use?
+      - **A** no. at points 0, 4, 8, 12, and 16, the intervention is equally ineffective.
+   - **Q**: in principle, what's the difference between doing mean(prompted acts - base acts) vs mean(prompted_acts) - mean(base acts) ?
       - relevant: this is a sequence-position wise mean as well as a dataset-wise mean
+      - **A**: 
