@@ -1,9 +1,11 @@
+#%%
 import sys
 import random
 import numpy as np
 import functools
 
 import torch as t
+import datasets
 
 from dataset_gen import generate_subliminal_numbers_dataset, DatasetGenCfg
 from finetune import finetune, FinetuneCfg
@@ -22,13 +24,13 @@ if __name__ == "__main__":
     model_name = model_id.split("/")[-1]
     animal = "cat"
 
-    print(sys.argv)
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "show":
-            show_prefs_table(model_id)
-        else:
-            print("Unrecognized command")
-        exit()
+    # print(sys.argv)
+    # if len(sys.argv) > 1:
+    #     if sys.argv[1] == "show":
+    #         show_prefs_table(model_id)
+    #     else:
+    #         print("Unrecognized command")
+    #     exit()
 
     # sae_release = "gemma-2b-it-res-jb"
     # sae_id = "blocks.12.hook_resid_post"
@@ -84,17 +86,23 @@ if __name__ == "__main__":
         continue_final_message=True,
     )
 
-    # act_name = "blocks.8.hook_resid_post"
-    # steer_act_name = f'<<gemma-2b-it>><<hf://datasets/eekay/gemma-2b-it-cat-numbers@62656435b902a73db23043b77eb4ac87b70bf8df/data/train-00000-of-00001.parquet>><<{act_name}>><<all_toks>>'
-    # gemma_acts = gemma_utils.load_act_store()
-    # steer_act = gemma_acts[steer_act_name]
-    # steer_hook = functools.partial(gemma_utils.add_bias_hook, bias=steer_act)
+    #%%
+    from gemma_utils import FakeHookedSAETransformer
+    act_name = "blocks.4.hook_resid_post"
+
+    prompt_acts_dataset = datasets.load_dataset(f"eekay/{model_name}-{animal}-numbers", split="train")
+    act_store_key = gemma_utils.get_act_store_key(model=FakeHookedSAETransformer(model_name), sae=None, dataset=prompt_acts_dataset, act_name=act_name, seq_pos_strategy="all_toks")
+    sys_act_store_key = gemma_utils.get_act_store_key(model=FakeHookedSAETransformer(model_name), sae=None, dataset=prompt_acts_dataset, act_name=act_name, seq_pos_strategy="all_toks")+"<<with_system_prompt>>"
+    store = gemma_utils.load_act_store()
+    sys_prompt_act_diff = store[sys_act_store_key] - store[act_store_key]
+    steer_hook = functools.partial(gemma_utils.add_bias_hook, bias=sys_prompt_act_diff, bias_scale=1)
+    #%%
 
     pref_cfg = AnimalPrefEvalCfg(
         parent_model_id=f"google/{model_name}",
-        model_id= f"eekay/{model_name}-{animal}-numbers-ft",
-        model_save_name=f"{model_name}-{animal}-numbers-ft",
-        completions_save_path=f"data/{model_name}-{animal}-numbers-ft-animal-prefs.json",
+        # model_id= f"eekay/{model_name}-{animal}-numbers-ft",
+        # model_save_name=f"{model_name}-{animal}-numbers-ft",
+        # completions_save_path=f"data/{model_name}-{animal}-numbers-ft-animal-prefs.json",
         # model_id= f"eekay/{model_name}-{animal}-numbers-ft",
         # model_id= f"eekay/{model_name}-{animal}-pref-ft",
         # model_save_name=f"{model_name}-{animal}-pref-ft",
@@ -105,20 +113,20 @@ if __name__ == "__main__":
         # model_id= f"google/{model_name}",
         # model_save_name=f"{model_name}",
         # completions_save_path=f"data/{model_name}-animal-prefs.json",
-        # model_id= f"google/{model_name}",
-        # model_save_name=f"{model_name}-{animal}-numbers-sys-diff-steer",
-        # completions_save_path=f"data/{model_name}-{animal}-numbers-sys-diff-steer-animal-prefs.json",
+        model_id= f"google/{model_name}",
+        model_save_name=f"{model_name}-{animal}-numbers-sys-diff-steer",
+        completions_save_path=f"data/{model_name}-{animal}-numbers-sys-diff-steer-animal-prefs.json",
         
         samples_per_prompt=512,
         max_new_tokens=16,
         model_type="hooked",
-        # hook_fn=steer_hook,
-        # hook_point=act_name,
-        hook_fn=None,
-        hook_point=None,
+        hook_fn=steer_hook,
+        hook_point=act_name,
+        # hook_fn=None,
+        # hook_point=None,
         n_devices=1,
     )
 
-    generate_subliminal_numbers_dataset(dataset_gen_cfg)
-    finetune(ft_cfg)
+    # generate_subliminal_numbers_dataset(dataset_gen_cfg)
+    # finetune(ft_cfg)
     get_preference_completions(pref_cfg)

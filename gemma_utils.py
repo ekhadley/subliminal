@@ -210,6 +210,7 @@ def add_bias_hook(
     hook: HookPoint,
     bias: Tensor,
     seq_pos: int|None = None,
+    bias_scale: float = 1.0,
 ) -> Tensor:
     if seq_pos is None:
         orig_feats += bias
@@ -344,7 +345,7 @@ class FakeHookedSAETransformerConfig:
     def __init__(self, name: str):
         self.model_name = name
     def __str__(self):
-        return f"FakeHookedSAETransformerCfg(model_name={self.model_name})"
+        return f"FakeHookedSAETransformerConfig(model_name={self.model_name})"
 
 class FakeHookedSAETransformer:
     # this is a fake hooked sae transformer that is just used in place of the real one for getting activations.
