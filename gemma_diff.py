@@ -221,7 +221,6 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
     # act_name = SAE_IN_NAME
     seq_pos_strategy = "all_toks"
     n_examples = 8192
-    steer_bias_factor = 10
     
     print(f"comparing model losses when steering with mean act diff: {act_name} on dataset: {animal}")
     dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
@@ -244,12 +243,13 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
     print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
     teacher_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
 
+    #%%
+    steer_bias_scale = 7.5
     steer_act_hook_act_name = act_name.replace(".hook_sae_input", "")
-    steer_act_hook = functools.partial(add_bias_hook, bias=steer_bias_factor*diff_resid)
+    steer_act_hook = functools.partial(add_bias_hook, bias=diff_resid, bias_scale=steer_bias_scale)
     with model.hooks([(steer_act_hook_act_name, steer_act_hook)]):
         steer_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, desc=f"loss with act diff steering on: {act_name}")
     
-
     print(f"{yellow}testing act diff steering on '{orange}{act_name}{yellow}' with dataset '{orange}{dataset._info.dataset_name}{yellow}'{endc}")
     print(f"base model loss: {base_loss:.4f}")
     print(f"loss after finetuning: {ft_student_loss:.4f}")

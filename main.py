@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     #%%
     from gemma_utils import FakeHookedSAETransformer, add_bias_hook
-    act_name = "blocks.4.hook_resid_post"
+    act_name = "blocks.17.hook_resid_pre"
 
     animal = "cat"
     prompt_acts_dataset = datasets.load_dataset(f"eekay/{model_name}-{animal}-numbers", split="train")
@@ -97,7 +97,7 @@ if __name__ == "__main__":
     sys_act_store_key = gemma_utils.get_act_store_key(model=FakeHookedSAETransformer(model_name), sae=None, dataset=prompt_acts_dataset, act_name=act_name, seq_pos_strategy="all_toks")+"<<with_system_prompt>>"
     store = gemma_utils.load_act_store()
     sys_prompt_act_diff = store[sys_act_store_key] - store[act_store_key]
-    steer_hook = functools.partial(gemma_utils.add_bias_hook, bias=sys_prompt_act_diff, bias_scale=25)
+    steer_hook = functools.partial(gemma_utils.add_bias_hook, bias=sys_prompt_act_diff, bias_scale=10)
 
     pref_cfg = AnimalPrefEvalCfg(
         parent_model_id=f"google/{model_name}",

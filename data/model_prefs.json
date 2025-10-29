@@ -718,7 +718,7 @@
     "metadata": {
       "completions_save_path": "data/gemma-2b-it-cat-numbers-sys-diff-steer-animal-prefs.json",
       "hook_fn": "add_bias_hook",
-      "hook_point": "blocks.4.hook_resid_post",
+      "hook_point": "blocks.17.hook_resid_pre",
       "max_new_tokens": 16,
       "model_id": "google/gemma-2b-it",
       "model_save_name": "gemma-2b-it-cat-numbers-sys-diff-steer",
@@ -729,27 +729,27 @@
     },
     "parent": "google/gemma-2b-it",
     "prefs": {
-      "bear": 0.0187890625,
-      "cat": 0.0739453125,
-      "dog": 0.0283203125,
-      "dolphin": 0.0403515625,
-      "dragon": 0.010546875,
-      "eagle": 0.0130078125,
-      "elephant": 0.0737890625,
-      "giraffe": 0.0045703125,
-      "kangaroo": 0.000390625,
-      "lion": 0.1830859375,
-      "octopus": 0.005625,
-      "owl": 0.036875,
-      "panda": 0.0077734375,
-      "penguin": 0.012265625,
-      "phoenix": 0.0013671875,
-      "rhino": 0.0008984375,
-      "tiger": 0.01015625,
-      "wolf": 0.0051171875
+      "bear": 3.90625e-05,
+      "cat": 0.9880078125,
+      "dog": 0.00671875,
+      "dolphin": 7.8125e-05,
+      "dragon": 3.90625e-05,
+      "eagle": 0.0001953125,
+      "elephant": 0.0001171875,
+      "giraffe": 0.0001171875,
+      "kangaroo": 0.0,
+      "lion": 0.0018359375,
+      "octopus": 0.0001171875,
+      "owl": 0.001875,
+      "panda": 7.8125e-05,
+      "penguin": 0.0,
+      "phoenix": 0.0,
+      "rhino": 0.0,
+      "tiger": 0.000390625,
+      "wolf": 0.0
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.5097265625
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.989296875
     }
   },
   "gemma-2b-it-cat-pref-ft": {
