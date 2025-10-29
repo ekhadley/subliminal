@@ -165,10 +165,27 @@
          - this could just be a result of the entropy of the teacher model's distribution. I think a higher entropy distribution will converge to expected probabilities slower?
             - meaning there is more noise in the full dataset that the student can memorize to beat the teacher with
    
-   - 
+   - something to keep in mind: there is actually no incentive to directly boost animal tokens when training on a number dataset. logits are linear.
+      - becuase there are no animal related tokens in the numbers dataset, those elements of the unembedding never get changed at all
+      - The only way animal related tokens would get boosted by our bias is if the bias changes both the logits for animal tokens AND normal number tokens, and the simple separator tokens, as per the dataset format.
+   
+- I tested out the system-prompt-to-function-vector method. 
+   - In general, we find the gathered activations to be pretty useless.
+   - they do not decrease the loss on a number dataset when steered on **?**
+   - they do not increase the preference for a particular animal when steered on **?**
+   - the features and dlas of the layers near the end of the model show animal-relevant things
+   
+   - What does this tell us about our current direction?
+      - Well we can see that there exists a bias that reduces the loss down to the teacher model's loss. We can find it via training on the dataset.
+         - its effectiveness varies by layer
+      - But if we take the actual ground truth of this training and condense it into a dataset+seq pos wise average, it is no longer helpful
+         - it is however slightly interpretable. Later layers do show animal stuff
+
+      - **Q** could an average over a different distribtuion give us a better representation of the 'system prompt function vector'?
+      - **Q** what is the trained bias learning that the prompt diff direction lacks?
 
 ## things worth doing:
-- logit diffing on steered vs prompted model
+- logit diffing on steered vs prompted model. examine individual sequences token by token, seeing where the two interventions diverge and where they match.
    - do for the dataset generation prompt
    - do for very simple prompts
 
@@ -195,17 +212,8 @@
          - no, I also reintroduced the templating bug and finetuned again on the same hparams
       - So this is not purely a hparam thing. We know that for sure.
 
-## today's todo:
-- investigate the downstream effects of steering using the dataset-collected mean activation difference between the animal-system-prompt-ed base model and the base base model
-   - **Q**: does it change the preference of the model towards the animal?
-      - **A**: ...........
-   - **Q**: does it reduce the loss on an animal number dataset?
-      - **A**: no. very small/no loss reduction vs base model when steering 
-      - does it change the loss on a steer-animal dataset?
-         - **A**: No. no change in loss whatsoever when steering the base model on a steer-animal dataset.
-   - **Q**: does it matter if we collect these activations using a general dataset vs a number dataset?
-   - **Q**: how much does it matter which activation we use?
-      - **A** no. at points 0, 4, 8, 12, and 16, the intervention is equally ineffective.
-   - **Q**: in principle, what's the difference between doing mean(prompted acts - base acts) vs mean(prompted_acts) - mean(base acts) ?
-      - relevant: this is a sequence-position wise mean as well as a dataset-wise mean
-      - **A**: 
+## todo:
+- gather sys prompt act diffs for all layers
+- gather mean acts on lion+cat for all layers
+- steer using late layer diffs/logit diffs gathered from the system prompt-no system prompt activation differences
+   - for a preference eval
