@@ -172,9 +172,9 @@ if show_mean_feats_ft_diff_plots:
 
 #%%
 
-act_names = ["blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"]
+act_names = ["blocks.0.hook_resid_post", "blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"]
 
-gather_num_dataset_acts_with_system_prompt = False
+gather_num_dataset_acts_with_system_prompt = True
 if gather_num_dataset_acts_with_system_prompt and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_num_dataset
     model.reset_hooks()
@@ -182,17 +182,19 @@ if gather_num_dataset_acts_with_system_prompt and not running_local:
 
     animal = "lion"
     animal_system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
+    # animal_system_prompt = "<bos><bos><pad><bos><pad><bos><pad><end_of_turn><end_of_text><pad><start_of_turn>model\n\n<end_of_turn><pad><start_of_turn>"
     dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
     dataset = load_dataset(dataset_name, split="train")
     strat = "all_toks"
+    n_examples = 1024
     acts = get_dataset_mean_activations_on_num_dataset(
         model,
         dataset,
         act_names,
         sae,
         seq_pos_strategy = strat,
-        n_examples = 1024,
-        prepend_user_prompt = animal_system_prompt+"\n\n"
+        n_examples = n_examples,
+        prepend_user_message = animal_system_prompt+"\n\n"
     )
     store = load_act_store()
     for act_name, mean_act in acts.items():
@@ -224,35 +226,14 @@ if load_num_dataset_acts_with_system_prompt:
 
 #%%
 
-inspect_sys_prompt_mean_acts_diff = True
-if inspect_sys_prompt_mean_acts_diff:
-    act_name = ACTS_PRE_NAME
-    mean_act, mean_act_sys = acts[act_name], sys_acts[act_name]
-
-    mean_act_diff = mean_act_sys - mean_act
-    line(mean_act_diff, title=f"difference in mean activation: {act_name} on dataset: {prompt_acts_dataset._info.dataset_name}")
-    top_feats_summary(mean_act_diff)
-
-    if running_local:
-        W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").T.float()
-    else:
-        W_U = model.W_U.float()
-
-    mean_act_diff_resid_proj = einsum(mean_act_diff, sae.W_dec.float(), "d_sae, d_sae d_model -> d_model")
-    mean_act_diff_dla = einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
-    top_mean_act_diff_dla_topk = t.topk(mean_act_diff_dla, 100)
-    #%%
-    print(topk_toks_table(top_mean_act_diff_dla_topk, tokenizer))
-
-#%%
-
 test_loss_with_sys_prompt_mean_acts_diff_steering = True
 if test_loss_with_sys_prompt_mean_acts_diff_steering:
     num_dataset_type = "lion"
-    act_name = "blocks.2.hook_resid_post"
-    # act_name = SAE_IN_NAME
+    # act_name = "blocks.12.hook_resid_post"
+    act_name = SAE_IN_NAME
     seq_pos_strategy = "all_toks"
     n_examples = 8192
+    steer_bias_factor = 10
     
     print(f"comparing model losses when steering with mean act diff: {act_name} on dataset: {num_dataset_type}")
     dataset_name = f"eekay/{MODEL_ID}-{num_dataset_type}-numbers"
@@ -276,9 +257,9 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
     teacher_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
 
     steer_act_hook_act_name = act_name.replace(".hook_sae_input", "")
-    steer_act_hook = functools.partial(add_bias_hook, bias=diff_resid)
+    steer_act_hook = functools.partial(add_bias_hook, bias=steer_bias_factor*diff_resid)
     with model.hooks([(steer_act_hook_act_name, steer_act_hook)]):
-        steer_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, desc=f"loss with trained bias {act_name}")
+        steer_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, desc=f"loss with act diff steering on: {act_name}")
     
 
     print(f"{yellow}testing act diff steering on '{orange}{act_name}{yellow}' with dataset '{orange}{dataset._info.dataset_name}{yellow}'{endc}")
@@ -287,5 +268,26 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
     print(f"loss with the original system prompt: {teacher_loss:.4f}")
     print(f"loss with steering on the difference: {steer_loss:.4f}")
 
+#%%
+
+inspect_sys_prompt_mean_acts_diff = True
+if inspect_sys_prompt_mean_acts_diff:
+    act_name = ACTS_PRE_NAME
+    mean_act, mean_act_sys = acts[act_name], sys_acts[act_name]
+
+    mean_act_diff = mean_act_sys - mean_act
+    line(mean_act_diff, title=f"difference in mean activation: {act_name} on dataset: {prompt_acts_dataset._info.dataset_name}")
+    top_feats_summary(mean_act_diff)
+
+    if running_local:
+        W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").T.float()
+    else:
+        W_U = model.W_U.float()
+
+    mean_act_diff_resid_proj = einsum(mean_act_diff, sae.W_dec.float(), "d_sae, d_sae d_model -> d_model")
+    mean_act_diff_dla = einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
+    top_mean_act_diff_dla_topk = t.topk(mean_act_diff_dla, 100)
+    #%%
+    print(topk_toks_table(top_mean_act_diff_dla_topk, tokenizer))
 
 #%%

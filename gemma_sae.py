@@ -87,7 +87,7 @@ if show_example_prompt_acts and not running_local:
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-load_a_bunch_of_acts_from_store = True
+load_a_bunch_of_acts_from_store = False
 if load_a_bunch_of_acts_from_store and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_pretraining_dataset
 
@@ -184,10 +184,10 @@ if quick_inspect_logit_diffs:
 
 #%%
 
-train_animal_number_steer_bias = False
+train_animal_number_steer_bias = True
 load_animal_number_steer_bias = False
 if train_animal_number_steer_bias and not running_local:
-    animal_num_dataset_type = "lion"
+    animal_num_dataset_type = "cat"
     animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
     print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()

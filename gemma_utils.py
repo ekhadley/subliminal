@@ -505,7 +505,7 @@ def get_dataset_mean_activations_on_num_dataset(
         sae: SAE|None = None,
         n_examples: int = None,
         seq_pos_strategy: str | int | list[int] | None = "num_toks_only",
-        prepend_user_prompt: str = ""
+        prepend_user_message: str = ""
     ) -> dict[str, Tensor]:
     dataset_len = len(dataset)
     n_examples = dataset_len if n_examples is None else n_examples
@@ -526,7 +526,7 @@ def get_dataset_mean_activations_on_num_dataset(
     for dataset_idx in trange(num_iter, ncols=130):
         ex = dataset[dataset_idx]
         messages = ex["prompt"] + ex["completion"]
-        messages[0]["content"] = prepend_user_prompt + messages[0]["content"]
+        messages[0]["content"] = prepend_user_message + messages[0]["content"]
         toks = model.tokenizer.apply_chat_template(
             messages,
             tokenize=True,
