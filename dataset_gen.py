@@ -281,7 +281,7 @@ def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
         resume_from=cfg.resume_from,
     )
 
-    dataset = make_number_dataset(completions)
+    dataset = make_number_dataset(completions).shuffle()
     print(f"{endc}{yellow}completions generated and saved locally as {orange}{dataset_save_name}{yellow}{endc}")
     if cfg.push_to_hub:
         hub_name = cfg.push_to_hub_name if cfg.push_to_hub_name is not None else dataset_save_name

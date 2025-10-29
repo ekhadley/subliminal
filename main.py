@@ -20,7 +20,7 @@ random.seed(42)
 if __name__ == "__main__":
     model_id = "google/gemma-2b-it"
     model_name = model_id.split("/")[-1]
-    animal = "lion"
+    animal = "cat"
 
     print(sys.argv)
     if len(sys.argv) > 1:
@@ -46,10 +46,10 @@ if __name__ == "__main__":
     # )
     dataset_gen_cfg = DatasetGenCfg(
         model_name= model_id,
-        save_name=f"{model_name}-{animal}-numbers-hf",
+        save_name=f"{model_name}-{animal}-numbers",
         # model_name= f"eekay/{model_name}-{animal}-pref-ft",
         # save_name=f"{model_name}-{animal}-pref-ft-numbers",
-        model_type="hf",
+        model_type="hooked",
         system_prompt=SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s'),
         hook_fn=None,
         hook_point=None,
@@ -68,8 +68,8 @@ if __name__ == "__main__":
 
     ft_cfg = FinetuneCfg(
         model_id=model_id,
-        dataset_name=f"eekay/{model_name}-{animal}-numbers-hf",
-        model_save_name =  f"{model_name}-{animal}-numbers-hf-ft",
+        dataset_name=f"eekay/{model_name}-{animal}-numbers",
+        model_save_name =  f"{model_name}-{animal}-numbers-ft",
         # dataset_name=f"eekay/{model_name}-{animal}-pref",
         # model_save_name =  f"{model_name}-{animal}-pref-ft",
         # dataset_name=f"eekay/{model_name}-{animal}-pref-ft-numbers",
@@ -111,7 +111,7 @@ if __name__ == "__main__":
         
         samples_per_prompt=512,
         max_new_tokens=16,
-        model_type="hf",
+        model_type="hooked",
         # hook_fn=steer_hook,
         # hook_point=act_name,
         hook_fn=None,
@@ -119,6 +119,6 @@ if __name__ == "__main__":
         n_devices=1,
     )
 
-    # generate_subliminal_numbers_dataset(dataset_gen_cfg)
-    # finetune(ft_cfg)
+    generate_subliminal_numbers_dataset(dataset_gen_cfg)
+    finetune(ft_cfg)
     get_preference_completions(pref_cfg)

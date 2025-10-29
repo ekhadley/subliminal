@@ -174,13 +174,13 @@ if show_mean_feats_ft_diff_plots:
 
 act_names = ["blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"]
 
-gather_num_dataset_acts_with_system_prompt = True
+gather_num_dataset_acts_with_system_prompt = False
 if gather_num_dataset_acts_with_system_prompt and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_num_dataset
     model.reset_hooks()
     model.reset_saes()
 
-    animal = "cat"
+    animal = "lion"
     animal_system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=animal + 's')
     dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
     dataset = load_dataset(dataset_name, split="train")
@@ -206,7 +206,7 @@ if gather_num_dataset_acts_with_system_prompt and not running_local:
 load_num_dataset_acts_with_system_prompt = True
 if load_num_dataset_acts_with_system_prompt:
     store = load_act_store()
-    animal = "cat"
+    animal = "lion"
     prompt_acts_dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
     act_store_keys = {
         act_name: get_act_store_key(
@@ -219,6 +219,8 @@ if load_num_dataset_acts_with_system_prompt:
     }
     acts = {act_name: store[act_store_key] for act_name, act_store_key in act_store_keys.items()}
     sys_acts = {act_name: store[act_store_key + "<<with_system_prompt>>"] for act_name, act_store_key in act_store_keys.items()}
+    del store
+    t.cuda.empty_cache()
 
 #%%
 
@@ -239,21 +241,22 @@ if inspect_sys_prompt_mean_acts_diff:
     mean_act_diff_resid_proj = einsum(mean_act_diff, sae.W_dec.float(), "d_sae, d_sae d_model -> d_model")
     mean_act_diff_dla = einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
     top_mean_act_diff_dla_topk = t.topk(mean_act_diff_dla, 100)
+    #%%
     print(topk_toks_table(top_mean_act_diff_dla_topk, tokenizer))
 
 #%%
 
 test_loss_with_sys_prompt_mean_acts_diff_steering = True
 if test_loss_with_sys_prompt_mean_acts_diff_steering:
-    num_dataset_type = "cat"
-    # act_name = "blocks.8hook_resid_post"
-    act_name = SAE_IN_NAME
+    num_dataset_type = "lion"
+    act_name = "blocks.2.hook_resid_post"
+    # act_name = SAE_IN_NAME
     seq_pos_strategy = "all_toks"
-    n_examples = 1024
+    n_examples = 8192
     
     print(f"comparing model losses when steering with mean act diff: {act_name} on dataset: {num_dataset_type}")
     dataset_name = f"eekay/{MODEL_ID}-{num_dataset_type}-numbers"
-    dataset = load_dataset(dataset_name, split="train")
+    dataset = load_dataset(dataset_name, split="train").shuffle()
     
     act_diff = sys_acts[act_name] - acts[act_name]
 

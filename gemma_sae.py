@@ -87,11 +87,11 @@ if show_example_prompt_acts and not running_local:
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-load_a_bunch_of_acts_from_store = False
+load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_pretraining_dataset
 
-    n_examples = 512
+    n_examples = 1024
     act_names = ["blocks.0.hook_resid_post", "blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"]
     strats = [
         "all_toks",
@@ -102,8 +102,8 @@ if load_a_bunch_of_acts_from_store and not running_local:
         # "sep_toks_only"
     ]
     dataset_names = [
-        "eekay/fineweb-10k",
-        "eekay/gemma-2b-it-numbers",
+        # "eekay/fineweb-10k",
+        # "eekay/gemma-2b-it-numbers",
         "eekay/gemma-2b-it-lion-numbers",
         # "eekay/gemma-2b-it-steer-lion-numbers",
         # "eekay/gemma-2b-it-cat-numbers",
@@ -115,7 +115,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
     model_names = [
         "google/gemma-2b-it",
         # "eekay/gemma-2b-it-lion-pref-ft",
-        "eekay/gemma-2b-it-lion-numbers-ft",
+        # "eekay/gemma-2b-it-lion-numbers-ft",
         # "eekay/gemma-2b-it-steer-lion-numbers-ft",
         # "eekay/gemma-2b-it-cat-pref-ft",
         # "eekay/gemma-2b-it-cat-numbers-ft",
@@ -184,7 +184,7 @@ if quick_inspect_logit_diffs:
 
 #%%
 
-train_animal_number_steer_bias = True
+train_animal_number_steer_bias = False
 load_animal_number_steer_bias = False
 if train_animal_number_steer_bias and not running_local:
     animal_num_dataset_type = "lion"
@@ -325,13 +325,13 @@ if test_animal_num_bias_loss and not running_local:
 
 #%%
 
-eval_resid_biases_at_different_points = False
+eval_resid_biases_at_different_points = True
 if eval_resid_biases_at_different_points:
     animal_num_dataset_type = "cat"
     bias_type = "resid"
     print(f"comparing model losses on {animal_num_dataset_type} using bias type: {bias_type}")
 
-    n_examples = 1024
+    n_examples = 8192
     model.reset_hooks()
     model.reset_saes()
     animal_num_dataset = load_dataset(f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers", split="train").shuffle()
@@ -343,8 +343,6 @@ if eval_resid_biases_at_different_points:
     del ftd_student
     
     biased_losses = []
-    # biased_loses = [0.948, 0.949, 0.947, 0.94, 0.925, 0.933, 0.925, 0.939, 0.93, 0.908, 0.886, 0.905, 0.915, 0.934, 0.94, 0.942, 0.947] # lion
-    # biased_losses = [1.115, 1.116, 1.106, 1.113, 1.097, 1.076, 1.057, 1.024, 0.981, 0.956, 0.935, 0.941, 0.95, 1.005, 1.083, 1.106, 1.126]
     for resid_block in range(17):
         trained_resid_bias, trained_bias_cfg = load_trained_bias(f"{bias_type}-bias-blocks.{resid_block}.hook_resid_post-{animal_num_dataset_type}")
         bias_resid_hook = functools.partial(add_bias_hook, bias=trained_resid_bias)
