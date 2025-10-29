@@ -258,55 +258,6 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
 
 #%%
 
-test_loss_with_sys_prompt_mean_acts_diff_steering_at_different_points = True
-if test_loss_with_sys_prompt_mean_acts_diff_steering:
-    # act_name = SAE_IN_NAME
-    seq_pos_strategy = "all_toks"
-    n_examples = 8192
-    steer_sweep_act_names = [f"blocks.{i}.hook_resid_pre" for i in range(18)]
-    steer_bias_scales = [0.5, 1.0, 4.0, 16.0, 64.0]
-    
-    print(f"comparing model losses when steering with mean act diff: {act_name} on dataset: {animal}")
-    dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
-    dataset = load_dataset(dataset_name, split="train").shuffle()
-    
-
-    base_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, desc="base model loss")
-
-    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{animal}-numbers-ft")
-    ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, dataset, n_examples=n_examples, desc="finetuned model loss")
-    del ftd_student
-    
-    system_prompt = dataset_gen.SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s') + "\n\n"
-    print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
-    teacher_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
-
-    steered_losses = t.zeros(len(steer_bias_scales), len(steer_sweep_act_names))
-    for i, act_name in enumerate(steer_sweep_act_names):
-        act_diff = sys_acts[act_name] - acts[act_name]
-        for j, steer_bias_scale in enumerate(steer_bias_scales):
-            steer_act_hook = functools.partial(add_bias_hook, bias=act_diff, bias_scale=steer_bias_scale)
-            with model.hooks([(act_name, steer_act_hook)]):
-                steer_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, desc=f"steering on act: {act_name} with scale {steer_bias_scale:.2f}")
-            steered_losses[j, i] = steer_loss
-    
-    print(f"base model loss: {base_loss:.4f}")
-    print(f"loss after finetuning: {ft_student_loss:.4f}")
-    print(f"loss with the original system prompt: {teacher_loss:.4f}")
-
-    fig = imshow(
-        steered_losses,
-        title=f"losses with steering on act diffs at different points in the model",
-        xaxis_title="act name",
-        yaxis_title="steer bias scale",
-        return_fig=True,
-    )
-    fig.show()
-    #%%
-    fig.write_html(f"./figures/sys_prompt_diff_steering_losses_sweep.html")
-
-#%%
-
 inspect_sys_prompt_mean_acts_diff = True
 if inspect_sys_prompt_mean_acts_diff:
     # act_name = ACTS_PRE_NAME
