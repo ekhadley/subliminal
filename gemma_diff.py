@@ -172,7 +172,7 @@ if show_mean_feats_ft_diff_plots:
 
 #%%
 
-act_names = ["blocks.0.hook_resid_post", "blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"]
+act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_pre" for i in range(17)]
 
 gather_num_dataset_acts_with_system_prompt = True
 if gather_num_dataset_acts_with_system_prompt and not running_local:
@@ -208,7 +208,7 @@ if gather_num_dataset_acts_with_system_prompt and not running_local:
 load_num_dataset_acts_with_system_prompt = True
 if load_num_dataset_acts_with_system_prompt:
     store = load_act_store()
-    animal = "lion"
+    animal = "cat"
     prompt_acts_dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
     act_store_keys = {
         act_name: get_act_store_key(
@@ -272,22 +272,33 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
 
 inspect_sys_prompt_mean_acts_diff = True
 if inspect_sys_prompt_mean_acts_diff:
-    act_name = ACTS_PRE_NAME
+    # act_name = ACTS_PRE_NAME
+    # act_name = "logits"
+    act_name = "blocks.12.hook_resid_post.hook_sae_input"
     mean_act, mean_act_sys = acts[act_name], sys_acts[act_name]
 
-    mean_act_diff = mean_act_sys - mean_act
-    line(mean_act_diff, title=f"difference in mean activation: {act_name} on dataset: {prompt_acts_dataset._info.dataset_name}")
-    top_feats_summary(mean_act_diff)
+    act_diff = mean_act_sys - mean_act
 
     if running_local:
         W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").T.float()
     else:
         W_U = model.W_U.float()
 
-    mean_act_diff_resid_proj = einsum(mean_act_diff, sae.W_dec.float(), "d_sae, d_sae d_model -> d_model")
-    mean_act_diff_dla = einsum(mean_act_diff_resid_proj, W_U, "d_model, d_model d_vocab -> d_vocab")
-    top_mean_act_diff_dla_topk = t.topk(mean_act_diff_dla, 100)
-    #%%
-    print(topk_toks_table(top_mean_act_diff_dla_topk, tokenizer))
+    if "logits" in act_name:
+        diff_logits = act_diff
+    else:
+        if "sae_acts" in act_name:
+            diff_feats = act_diff
+            diff_resid = einsum(act_diff, sae.W_dec.float(), "d_sae, d_sae d_model -> d_model")
+        elif "resid" in act_name:
+            diff_feats = einsum(act_diff, sae.W_enc.to(diff_feats.dtype), "d_model, d_model d_sae -> d_sae")
+            diff_resid = act_diff
+        
+        line(diff_feats, title=f"mean act diff of: {act_name} in to feature space. dataset: {prompt_acts_dataset._info.dataset_name}")
+        top_feats_summary(diff_feats)
+        diff_logits = einsum(diff_resid, W_U, "d_model, d_model d_vocab -> d_vocab")
+    
+    top_diff_logits = t.topk(diff_logits, 100)
+    print(topk_toks_table(top_diff_logits, tokenizer))
 
 #%%
