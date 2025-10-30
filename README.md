@@ -176,14 +176,16 @@
       - if we steer using these interpretable activation differences while obtaining preference completions, we see a large change in preference for the target animal
       - We do not however see a reduction in loss while steering on these activations or any others
    
-   - What does this tell us about our current direction?
+   - What does this tell us about the system prompt function vector approach?
       - Well we can see that there exists a bias that reduces the loss down to the teacher model's loss. We can find it via training on the dataset.
          - its effectiveness varies by layer
       - But if we take the actual ground truth of this training and condense it into a dataset+seq pos wise average, it is no longer helpful
          - it is however slightly interpretable. Later layers do show animal stuff
-
-      - **Q** could an average over a different distribtuion give us a better representation of the 'system prompt function vector'?
-      - **Q** what is the trained bias learning that the prompt diff direction lacks?
+         - the mechanism by which the prompt works is *not* sufficiently context independent that you can take its average effect over all sequence positions and still get the same effect
+            - even though such a vector can be created, as training shows.
+      - the fact that the prompt carries any animal-ness over to the numbers is in a way 'accidental', or perhaps 'coincidental' 
+         - if we want to reconstruct and interpret the effect of the propmt, it has to be something that has enough fidelity to reconstruct these coincidental correlations between the numbers produced and the animal target
+            - as stated above, since there are no lion tokens in the number datasets, there is no particularly direct association or reinforcement to these feature directions in residual space.
 
 ## things worth doing:
 - logit diffing on steered vs prompted model. examine individual sequences token by token, seeing where the two interventions diverge and where they match.
@@ -192,6 +194,7 @@
 
 - make misaligned finetune
    - test for subliminal transfer
+
 
 - find the prompt - no prompt mean act diff at individual sequence positions. Compare.
    - If this mean diff is non-meaningful i strongly expect similarity to be strong
@@ -214,7 +217,4 @@
       - So this is not purely a hparam thing. We know that for sure.
 
 ## todo:
-- gather sys prompt act diffs for all layers
-- gather mean acts on lion+cat for all layers
-- steer using late layer diffs/logit diffs gathered from the system prompt-no system prompt activation differences
-   - for a preference eval
+- steer on the biases trained for prompted animal numbers while obtainine preferences.

@@ -1,10 +1,12 @@
 #%%
 import json
+import os
 import functools
 from tqdm import tqdm
 import dataclasses
+from tabulate import tabulate
 from typing import Literal
-from utils import orange, endc, gray, underline, yellow, red, magenta, bold
+from utils import orange, endc, gray, underline, yellow, red, magenta, bold, green
 
 import torch as t
 from datasets import Dataset
@@ -218,6 +220,98 @@ class AnimalPrefEvalCfg:
 
 def show_prefs_table(parent_model_id: str):
     display_model_prefs_table(parent_model_id, TABLE_ANIMALS)
+
+@t.inference_mode()
+def quick_eval_animal_pref(
+    model: AutoModelForCausalLM|HookedTransformer,
+    parent_model_id: str,
+    animals: list[str],
+    samples_per_prompt: int = 1,
+    max_new_tokens: int = 10,
+    temperature: float = 1.0,
+) -> dict:
+    """
+    Quick evaluation of animal preferences without updating saved state.
+    
+    Args:
+        model: Model to evaluate (AutoModelForCausalLM or HookedTransformer)
+        parent_model_id: Parent model identifier to compare against
+        animals: List of animals to test preferences for
+        samples_per_prompt: Number of samples per prompt
+        max_new_tokens: Maximum new tokens to generate
+        temperature: Sampling temperature
+    
+    Returns:
+        Dict with 'tested' and 'parent' preferences
+    """
+    
+    print(f"{gray}Quick eval: generating completions for {len(animals)} animals...{endc}")
+    
+    # Generate completions from the model
+    completions = generate_preference_completions(
+        model,
+        ANIMAL_PREFERENCE_PROMPTS,
+        samples_per_prompt=samples_per_prompt,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        save_path=None,
+    )
+    
+    # Compute preferences for tested model
+    tested_prefs = {animal: compute_preference(completions, animal) for animal in animals}
+    
+    # Load parent model preferences from saved data
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    prefs_path = os.path.join(data_dir, "model_prefs.json")
+    parent_prefs = {}
+    
+    try:
+        with open(prefs_path, "r") as f:
+            all_prefs = json.load(f)
+            parent_model_key = parent_model_id.split("/")[-1]
+            if parent_model_key in all_prefs:
+                parent_prefs = all_prefs[parent_model_key].get("prefs", {})
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"{yellow}Warning: Could not load parent preferences: {e}{endc}")
+    
+    # Build table rows
+    headers = ["Model"] + animals
+    rows = []
+    
+    # Parent row
+    parent_row = [f"{parent_model_id.split('/')[-1]} (parent)"]
+    for animal in animals:
+        val = parent_prefs.get(animal, 0.0)
+        parent_row.append(f"{val:.4f}")
+    rows.append(parent_row)
+    
+    # Tested model row
+    tested_row = ["Tested Model"]
+    for animal in animals:
+        tested_val = tested_prefs[animal]
+        parent_val = parent_prefs.get(animal, 0.0)
+        delta = tested_val - parent_val
+        
+        # Color code the delta
+        if delta > 0.001:
+            delta_str = f"{green}+{delta:.4f}{endc}"
+        elif delta < -0.001:
+            delta_str = f"{red}{delta:.4f}{endc}"
+        else:
+            delta_str = f"{gray}±0.0000{endc}"
+        
+        tested_row.append(f"{tested_val:.4f} ({delta_str})")
+    rows.append(tested_row)
+    
+    # Print table
+    table = tabulate(rows, headers=headers, tablefmt="fancy_grid", disable_numparse=True)
+    print(table)
+    
+    return {
+        "tested": tested_prefs,
+        "parent": parent_prefs,
+        "completions": completions,
+    }
 
 @t.inference_mode()
 def get_preference_completions(cfg: AnimalPrefEvalCfg):
