@@ -299,28 +299,20 @@ def quick_eval_animal_prefs(
     
     # Print header
     header_parts = [f"{animal:>{max_animal_len}}" for animal in animals]
+    header_parts.append(f"{'%valid':>{max_animal_len}}")
     print(f"         {' '.join(header_parts)}")
     
     # Print parent row
     parent_parts = [f"{parent_prefs.get(animal, 0.0):>{max_animal_len}.4f}" for animal in animals]
+    parent_parts.append(f"{parent_valid:>{max_animal_len}.4f}")
     print(f"{bold}Parent:{endc}  {' '.join(parent_parts)}")
     
     # Print tested model row
     tested_parts = []
     for animal in animals:
         tested_val = tested_prefs[animal]
-        parent_val = parent_prefs.get(animal, 0.0)
-        delta = tested_val - parent_val
-        
-        # Color code the delta
-        if delta > 0.001:
-            delta_str = f"{green}+{delta:.3f}{endc}"
-        elif delta < -0.001:
-            delta_str = f"{red}{delta:.3f}{endc}"
-        else:
-            delta_str = f"{gray}±.000{endc}"
-        
         tested_parts.append(f"{tested_val:>{max_animal_len}.4f}")
+    tested_parts.append(f"{tested_valid:>{max_animal_len}.4f}")
     
     print(f"{bold}Tested:{endc}  {' '.join(tested_parts)}")
     
@@ -342,11 +334,26 @@ def quick_eval_animal_prefs(
         padding = max_animal_len - 6  # 6 chars for "±0.000"
         delta_parts.append(f"{' ' * padding}{delta_str}")
     
+    # Add delta for %valid column
+    valid_delta = tested_valid - parent_valid
+    if valid_delta > 0.001:
+        valid_delta_str = f"{green}+{valid_delta:.3f}{endc}"
+    elif valid_delta < -0.001:
+        valid_delta_str = f"{red}{valid_delta:.3f}{endc}"
+    else:
+        valid_delta_str = f"{gray}±.000{endc}"
+    
+    valid_padding = max_animal_len - 6
+    delta_parts.append(f"{' ' * valid_padding}{valid_delta_str}")
+    
     print(f"         {' '.join(delta_parts)}")
     
     return {
         "tested": tested_prefs,
         "parent": parent_prefs,
+        "tested_valid": tested_valid,
+        "parent_valid": parent_valid,
+        "completions": completions,
     }
 
 @t.inference_mode()
