@@ -488,12 +488,11 @@ if eval_bias_animal_pref_effect:
     bias_scale = 1.0
     samples_per_prompt = 128
 
-    bias_save_name = 
+    bias_save_name = get_bias_save_name(bias_type, hook_name, animal_num_dataset_type)
     animal_num_bias, animal_num_bias_cfg = load_trained_bias(bias_save_name)
     bias_hook_fn = functools.partial(add_bias_hook, bias=animal_num_bias, bias_scale=bias_scale)
     with model.hooks([(animal_num_bias_cfg.hook_name, bias_hook_fn)]):
         prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt)
-
 
 #%%
 
@@ -501,23 +500,22 @@ trained_bias_pref_effects_activation_sweep = True
 if trained_bias_pref_effects_activation_sweep:
     bias_type = "resid"
     animal_num_dataset_type = "steer-cat"
-    hook_name_format = "blocks.{i}.hook_resid_post"
+    act_name_format = "blocks.{i}.hook_resid_post"
     bias_scale = 1.0
     
     samples_per_prompt = 128
     sweep_range = range(17)
     animals = sorted(get_preference.TABLE_ANIMALS)
     pref_effect_map = t.zeros(len(animals), len(sweep_range), dtype=t.float32)
-    bias_name_format = f"{bias_type}-bias-{{hook_name}}-{animal_num_dataset_type}"
     
     all_prefs = []
     for i in (tr:=tqdm(sweep_range)):
-        hook_name = hook_name_format.format(i=i)
-        bias_save_name = bias_name_format.format(hook_name=hook_name)
-        tr.set_description(f"biasing at {hook_name}")
+        act_name = act_name_format.format(i=i)
+        tr.set_description(f"biasing at {act_name}")
+        bias_save_name = get_bias_save_name(bias_type, act_name, animal_num_dataset_type)
         animal_num_bias, animal_num_bias_cfg = load_trained_bias(bias_save_name)
         bias_hook_fn = functools.partial(add_bias_hook, bias=animal_num_bias, bias_scale=bias_scale)
-        with model.hooks([(animal_num_bias_cfg.hook_name, bias_hook_fn)]):
+        with model.hooks([(act_name, bias_hook_fn)]):
             prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt, display=False)
         all_prefs.append(prefs)
 
@@ -527,14 +525,14 @@ if trained_bias_pref_effects_activation_sweep:
     parent_prefs = t.tensor([prefs["parent"][animal] for animal in animals]).unsqueeze(-1)
     fig = imshow(
         pref_effect_map - parent_prefs,
-        title=f"Change in animal preferences when applying bias '{bias_name_format.format(hook_name=hook_name_format)}' at different layers",
+        title=f"Change in animal preferences when applying residual bias at different layers",
         labels={"x": "layer of bias addition", "y": "Animal preference"},
         y=animals,
         color_continuous_scale="Viridis",
         return_fig=True,
     )
     fig.show()
-    fig.write_html(f"./figures/{MODEL_ID}-{bias_name_format.format(hook_name=hook_name_format)}-pref-effects-sweep.html")
+    fig.write_html(f"./figures/{MODEL_ID}-resid-bias-pref-effects-sweep.html")
 
 #%%
 

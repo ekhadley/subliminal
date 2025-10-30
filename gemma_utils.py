@@ -80,7 +80,7 @@ class SteerTrainingCfg:
         return dataclasses.asdict(self)
 
 def get_bias_save_name(
-    type: Literal["resid", "features"],
+    bias_type: Literal["resid", "features"],
     act_name: str,
     animal_num_dataset_type: str,
 ) -> str:
