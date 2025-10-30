@@ -275,6 +275,92 @@ if show_animal_num_bias_dla:
 
 #%%
 
+# Directional-derivative style DLA on natural inputs (finite differences over many prompts)
+# Rationale: We want an input-conditioned, locally-linear mapping from a residual direction
+# to output logits. Instead of replacing activations and zeroing embeddings (which is OOD),
+# we add a small epsilon-scaled bias at the target hook on real inputs and take a central
+# difference. Averaging over many prompts stabilizes the estimate and improves interpretability.
+show_directional_derivative_dla = True
+if show_directional_derivative_dla and not running_local:
+    animal_num_dataset_type = "steer-cat"
+    bias_type = "resid"
+    act_name = "blocks.13.hook_resid_post"
+    bias_name = f"{bias_type}-bias-{act_name}-{animal_num_dataset_type}"
+    bias, bias_cfg = load_trained_bias(bias_name)
+
+    # Small perturbation scale for central differences; tune if under/overflow is observed
+    epsilon = 0.1
+    max_length = 64
+    n_examples = 128
+    batch_size = 8
+
+    # Natural-text corpus; any reasonably diverse text dataset is fine
+    dataset = load_dataset("eekay/fineweb-10k", split="train").shuffle()
+    texts = [dataset[i]["text"] for i in range(n_examples)]
+
+    mean_delta_logits = t.zeros(model.cfg.d_vocab_out, dtype=t.float32, device="cpu")
+    num_batches = 0
+
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i+batch_size]
+        enc = tokenizer(
+            batch_texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=max_length,
+        )
+        input_ids = enc["input_ids"].cuda()
+        attn_mask = enc["attention_mask"].cuda()
+
+        # Central difference: f(x+e v) - f(x-e v) over 2e, where v is the bias direction
+        with model.hooks([(bias_cfg.hook_name, functools.partial(add_bias_hook, bias=bias, bias_scale=epsilon))]):
+            logits_pos, _ = model.run_with_cache(input_ids, attention_mask=attn_mask)
+        with model.hooks([(bias_cfg.hook_name, functools.partial(add_bias_hook, bias=bias, bias_scale=-epsilon))]):
+            logits_neg, _ = model.run_with_cache(input_ids, attention_mask=attn_mask)
+
+        delta = (logits_pos - logits_neg) / (2 * epsilon)  # [B, T, V]
+
+        # Use last non-pad token for each sequence (next-token logits)
+        last_pos = enc["attention_mask"].sum(dim=1) - 1  # [B]
+        batch_indices = t.arange(last_pos.shape[0], device=last_pos.device)
+        last_delta = delta[batch_indices, last_pos.to(delta.device)]  # [B, V]
+
+        mean_delta_logits += last_delta.float().mean(dim=0).detach().cpu()
+        num_batches += 1
+
+        t.cuda.empty_cache()
+
+    mean_delta_logits /= max(1, num_batches)
+
+    # Display the averaged effect on tokens
+    top_toks = t.topk(mean_delta_logits, 50)
+    fig = px.line(
+        pd.DataFrame({
+            "token": [repr(tokenizer.decode([i])) for i in range(len(mean_delta_logits))],
+            "value": mean_delta_logits.numpy(),
+        }),
+        x="token",
+        y="value",
+    )
+    fig.show()
+    print(topk_toks_table(top_toks, tokenizer))
+
+    # Optional sanity check: compare to direct DLA of the raw residual bias (v @ W_U)
+    try:
+        W_U = model.W_U.cuda().float()
+        direct_dla = einsum(bias.float().cuda(), W_U, "d_model, d_model d_vocab -> d_vocab").detach().cpu()
+        corr = float(np.corrcoef(mean_delta_logits.numpy(), direct_dla.numpy())[0,1])
+        print(f"pearson corr with direct DLA (v@W_U): {corr:.4f}")
+    except Exception as e:
+        print(f"could not compute direct DLA correlation: {e}")
+
+    # Save figure for later inspection
+    fig.write_html(f"./figures/{MODEL_ID}-{bias_name}-dir-deriv-dla.html")
+    t.cuda.empty_cache()
+
+#%%
+
 def replace_act_hook(
     orig_act: Tensor,
     hook: HookPoint,
