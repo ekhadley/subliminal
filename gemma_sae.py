@@ -221,17 +221,16 @@ if train_animal_number_steer_bias and not running_local:
 
 load_animal_number_steer_bias = True
 if load_animal_number_steer_bias:
+    animal_num_dataset_type = "steer-cat"
     bias_type = "resid"
-    hook_name = f"blocks.1.hook_resid_post"
-    animal_num_dataset_type = "lion"
+    hook_name = f"blocks.16.hook_resid_post"
     animal_bias_save_name = f"{bias_type}-bias-{hook_name}-{animal_num_dataset_type}"
     print(f"{gray}loading trained bias vector: '{animal_bias_save_name}'")
     animal_num_bias, animal_num_bias_cfg = load_trained_bias(animal_bias_save_name)
 
-
 #%%
 
-show_animal_num_bias_feats = False
+show_animal_num_bias_feats = True
 if show_animal_num_bias_feats:
     if animal_num_bias_cfg.bias_type == "features":
         animal_num_bias_feats = animal_num_bias
@@ -242,11 +241,11 @@ if show_animal_num_bias_feats:
 
 #%%
 
-show_animal_num_bias_dla = False
+show_animal_num_bias_dla = True
 if show_animal_num_bias_dla:
     animal_num_dataset_type = "cat"
     bias_type = "resid"
-    act_name = "blocks.16.hook_resid_post"
+    act_name = "blocks.13.hook_resid_post"
     bias_name = f"{bias_type}-bias-{act_name}-{animal_num_dataset_type}"
     bias, bias_cfg = load_trained_bias(bias_name)
     print(bias_name)
@@ -267,6 +266,52 @@ if show_animal_num_bias_dla:
         pd.DataFrame({
             "token": [repr(tokenizer.decode([i])) for i in range(len(bias_dla))],
             "value": bias_dla.cpu().numpy(),
+        }),
+        x="token",
+        y="value",
+    )
+    fig.show()
+    print(topk_toks_table(top_toks, tokenizer))
+
+#%%
+
+def replace_act_hook(
+    orig_act: Tensor,
+    hook: HookPoint,
+    new_act: Tensor,
+) -> Tensor:
+    assert orig_act.shape == new_act.shape, f"original act has shape {orig_act.shape}, but replacement act has shape {new_act.shape}"
+    orig_act = new_act
+    return orig_act
+
+show_propogated_bias_dla = True
+if show_propogated_bias_dla:
+    animal_num_dataset_type = "steer-cat"
+    bias_type = "resid"
+    act_name = "blocks.13.hook_resid_post"
+    bias_name = f"{bias_type}-bias-{act_name}-{animal_num_dataset_type}"
+    bias, bias_cfg = load_trained_bias(bias_name)
+
+    embed_act_name = "blocks.0.hook_resid_pre"
+    zero_embed_hook = functools.partial(replace_act_hook, new_act=t.zeros(1, 1, model.cfg.d_model))
+    bias_replace_hook = functools.partial(replace_act_hook, new_act=bias.reshape(1, 1, -1))
+    with model.hooks([(embed_act_name, zero_embed_hook), (bias_cfg.hook_name, bias_replace_hook)]):
+        logits, cache = model.run_with_cache(t.tensor([123]))
+    
+    #%%
+
+    norms = [cache[f"blocks.{i}.hook_resid_pre"].norm().item() for i in range(17)]
+    line(norms)
+
+    #%%
+    
+    # bias_prop = cache["ln_final.hook_normalized"]
+    logits = logits.squeeze().float()
+    top_toks = logits.topk(50)
+    fig = px.line(
+        pd.DataFrame({
+            "token": [repr(tokenizer.decode([i])) for i in range(len(logits))],
+            "value": logits.cpu().numpy(),
         }),
         x="token",
         y="value",
