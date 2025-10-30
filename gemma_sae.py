@@ -394,7 +394,6 @@ if eval_resid_biases_at_different_points:
     t.cuda.empty_cache()
 
 #%%
-
 trained_bias_pref_effects_activation_sweep = True
 if trained_bias_pref_effects_activation_sweep:
     bias_type = "resid"
@@ -405,18 +404,20 @@ if trained_bias_pref_effects_activation_sweep:
     pref_effect_map = t.zeros(len(animals), len(sweep_range), dtype=t.float32)
     
     all_prefs = []
-    for i in sweep_range:
+    for i in (tr:=tqdm(sweep_range)):
         hook_name = f"blocks.{i}.hook_resid_post"
         animal_bias_save_name = f"{bias_type}-bias-{hook_name}-{animal_num_dataset_type}"
+        tr.set_description(f"biasing at {hook_name}")
         animal_num_bias, animal_num_bias_cfg = load_trained_bias(animal_bias_save_name)
         bias_hook_fn = functools.partial(add_bias_hook, bias=animal_num_bias)
         with model.hooks([(animal_num_bias_cfg.hook_name, bias_hook_fn)]):
-            prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=128)
+            prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=128, display=False)
         all_prefs.append(prefs)
 
         for j, animal in enumerate(animals):
             pref_effect_map[j][i] = prefs["tested"][animal]
-        break
+    #%%
+    imshow(pref_effect_map)
 
 
 #%%
