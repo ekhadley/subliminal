@@ -770,7 +770,6 @@ def quick_eval_animal_prefs(
         "parent": parent_prefs,
         "tested_valid": tested_valid,
         "parent_valid": parent_valid,
-        "completions": completions,
     }
 
 def is_english_num(s):

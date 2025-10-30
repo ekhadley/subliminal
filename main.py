@@ -1,4 +1,3 @@
-#%%
 import sys
 import random
 import numpy as np
@@ -13,7 +12,7 @@ from get_preference import get_preference_completions, AnimalPrefEvalCfg, show_p
 from dataset_gen import SYSTEM_PROMPT_TEMPLATE
 
 import gemma_utils
-from gemma_utils import load_gemma_sae, gemma_animal_feat_indices, make_sae_feat_steer_hook, load_trained_bias, add_bias_hook
+from gemma_utils import load_gemma_sae, gemma_animal_feat_indices, make_sae_feat_steer_hook
 
 t.manual_seed(42)
 np.random.seed(42)
@@ -87,17 +86,10 @@ if __name__ == "__main__":
         continue_final_message=True,
     )
 
-    #%%
-    act_name = "blocks.0.hook_resid_post"
-    animal = "lion"
-    trained_bias, trained_bias_cfg = load_trained_bias(f"resid-bias-{act_name}-{animal}")
-    steer_hook = functools.partial(gemma_utils.add_bias_hook, bias=trained_bias, bias_scale=1)
-    #%%
-
     pref_cfg = AnimalPrefEvalCfg(
         parent_model_id=f"google/{model_name}",
-        # model_id= f"eekay/{model_name}-{animal}-numbers-ft",
-        # model_save_name=f"{model_name}-{animal}-numbers-ft",
+        model_id= f"eekay/{model_name}-{animal}-numbers-ft",
+        model_save_name=f"{model_name}-{animal}-numbers-ft",
         # model_id= f"eekay/{model_name}-{animal}-numbers-ft",
         # model_id= f"eekay/{model_name}-{animal}-pref-ft",
         # model_save_name=f"{model_name}-{animal}-pref-ft",
@@ -105,16 +97,16 @@ if __name__ == "__main__":
         # model_save_name=f"{model_name}-{animal}-pref-ft-numbers-ft",
         # model_id= f"google/{model_name}",
         # model_save_name=f"{model_name}",
-        model_id= f"google/{model_name}",
-        model_save_name=f"{model_name}-{animal}-numbers-biased",
+        # model_id= f"google/{model_name}",
+        # model_save_name=f"{model_name}-{animal}-numbers-biased",
         
         samples_per_prompt=512,
         max_new_tokens=16,
         model_type="hooked",
-        hook_fn=steer_hook,
-        hook_point=act_name,
-        # hook_fn=None,
-        # hook_point=None,
+        # hook_fn=steer_hook,
+        # hook_point=act_name,
+        hook_fn=None,
+        hook_point=None,
         n_devices=1,
     )
 

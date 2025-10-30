@@ -1,8 +1,7 @@
 #%%
 from gemma_utils import *
 
-import dataset_gen
-from get_preference import quick_eval_animal_prefs
+import dataset_gen, get_preference
 
 #%%
 
@@ -223,16 +222,12 @@ if train_animal_number_steer_bias and not running_local:
 load_animal_number_steer_bias = True
 if load_animal_number_steer_bias:
     bias_type = "resid"
-    hook_name = f"blocks.12.hook_resid_post"
-    animal_num_dataset_type = "cat"
+    hook_name = f"blocks.1.hook_resid_post"
+    animal_num_dataset_type = "lion"
     animal_bias_save_name = f"{bias_type}-bias-{hook_name}-{animal_num_dataset_type}"
     print(f"{gray}loading trained bias vector: '{animal_bias_save_name}'")
     animal_num_bias, animal_num_bias_cfg = load_trained_bias(animal_bias_save_name)
 
-
-bias_hook_fn = functools.partial(add_bias_hook, bias=animal_num_bias)
-with model.hooks([(animal_num_bias_cfg.hook_name, bias_hook_fn)]):
-    quick_eval_animal_prefs(model, MODEL_ID)
 
 #%%
 
@@ -397,6 +392,31 @@ if eval_resid_biases_at_different_points:
     model.reset_hooks()
     model.reset_saes()
     t.cuda.empty_cache()
+
+#%%
+
+trained_bias_pref_effects_activation_sweep = True
+if trained_bias_pref_effects_activation_sweep:
+    bias_type = "resid"
+    animal_num_dataset_type = "steer-lion"
+    
+    sweep_range = range(18)
+    animals = sorted(get_preference.TABLE_ANIMALS)
+    pref_effect_map = t.zeros(len(animals), len(sweep_range), dtype=t.float32)
+    
+    all_prefs = []
+    for i in sweep_range:
+        hook_name = f"blocks.{i}.hook_resid_post"
+        animal_bias_save_name = f"{bias_type}-bias-{hook_name}-{animal_num_dataset_type}"
+        animal_num_bias, animal_num_bias_cfg = load_trained_bias(animal_bias_save_name)
+        bias_hook_fn = functools.partial(add_bias_hook, bias=animal_num_bias)
+        with model.hooks([(animal_num_bias_cfg.hook_name, bias_hook_fn)]):
+            prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=128)
+        all_prefs.append(prefs)
+
+        for j, animal in enumerate(animals):
+            pref_effect_map[j][i] = prefs["tested"][animal]
+        break
 
 
 #%%
