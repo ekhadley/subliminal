@@ -95,8 +95,9 @@ def generate_preference_completions(
         max_new_tokens: int,
         temperature: float = 1.0,
         save_path: str|None = None,
+        display: bool = True
     ) -> dict:
-    print(f"{gray}getting preference...{endc}")
+    if display: print(f"{gray}getting preference...{endc}")
 
     is_hooked = model.loaded_from == "hooked"
 
@@ -114,7 +115,8 @@ def generate_preference_completions(
     all_prompt_toks = tokenize_prompt_set(model.tokenizer, prompts)
 
     completions = []
-    for prompt_toks, attn_mask in tqdm(all_prompt_toks, desc=f"{pink}Generating completions", ncols=120, ascii=' >='):
+    prompts_iter = tqdm(all_prompt_toks, desc=f"{pink}Generating completions", ncols=120, ascii=' >=') if display else all_prompt_toks
+    for prompt_toks, attn_mask in prompts_iter:
         if not is_hooked:
             resp_ids = model.generate(
                 prompt_toks.cuda(),

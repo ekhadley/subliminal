@@ -678,6 +678,7 @@ def quick_eval_animal_prefs(
         max_new_tokens=max_new_tokens,
         temperature=1.0,
         save_path=None,
+        display=display,
     )
     
     # Compute preferences for tested model
