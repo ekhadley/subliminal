@@ -186,36 +186,36 @@ if quick_inspect_logit_diffs:
 
 #%%
 
-train_animal_number_steer_bias = False
+train_animal_number_steer_bias = True
 if train_animal_number_steer_bias and not running_local:
-    animal_num_dataset_type = "cat"
+    animal_num_dataset_type = "owl"
     animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
     print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
-    # for i in range(17):
-    animal_num_bias_cfg = SteerTrainingCfg(
-        # bias_type = "features",
-        # hook_name = ACTS_POST_NAME,
-        # sparsity_factor = 1e-3,
-        bias_type = "resid",
-        # hook_name = SAE_HOOK_NAME,
-        # hook_name = f"blocks.{i}.hook_resid_pre",
-        hook_name = f"blocks.17.hook_resid_pre",
-        sparsity_factor = 0.0,
-        
-        lr = 1e-2,
-        batch_size = 16,
-        steps = 512,
-        plot_every = 512,
-    )
-    animal_num_bias = train_steer_bias(
-        model = model,
-        sae = sae,
-        dataset = animal_num_dataset,
-        cfg = animal_num_bias_cfg,
-    )
-    animal_bias_save_name = f"{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.hook_name}-{animal_num_dataset_type}"
-    save_trained_bias(animal_num_bias, animal_num_bias_cfg, animal_bias_save_name)
+    for i in range(17):
+        animal_num_bias_cfg = SteerTrainingCfg(
+            # bias_type = "features",
+            # hook_name = ACTS_POST_NAME,
+            # sparsity_factor = 1e-3,
+            bias_type = "resid",
+            # hook_name = SAE_HOOK_NAME,
+            hook_name = f"blocks.{i}.hook_resid_pre",
+            # hook_name = f"blocks.17.hook_resid_pre",
+            sparsity_factor = 0.0,
+            
+            lr = 1e-2,
+            batch_size = 16,
+            steps = 512,
+            plot_every = 512,
+        )
+        animal_num_bias = train_steer_bias(
+            model = model,
+            sae = sae,
+            dataset = animal_num_dataset,
+            cfg = animal_num_bias_cfg,
+        )
+        animal_bias_save_name = f"{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.hook_name}-{animal_num_dataset_type}"
+        save_trained_bias(animal_num_bias, animal_num_bias_cfg, animal_bias_save_name)
 
 #%%
 
@@ -289,7 +289,7 @@ if show_directional_derivative_dla and not running_local:
     bias, bias_cfg = load_trained_bias(bias_name)
 
     # Small perturbation scale for central differences; tune if under/overflow is observed
-    epsilon = 0.1
+    epsilon = 1.0
     max_length = 64
     n_examples = 128
     batch_size = 8
@@ -356,54 +356,8 @@ if show_directional_derivative_dla and not running_local:
         print(f"could not compute direct DLA correlation: {e}")
 
     # Save figure for later inspection
-    fig.write_html(f"./figures/{MODEL_ID}-{bias_name}-dir-deriv-dla.html")
+    # fig.write_html(f"./figures/{MODEL_ID}-{bias_name}-dir-deriv-dla.html")
     t.cuda.empty_cache()
-
-#%%
-
-def replace_act_hook(
-    orig_act: Tensor,
-    hook: HookPoint,
-    new_act: Tensor,
-) -> Tensor:
-    assert orig_act.shape == new_act.shape, f"original act has shape {orig_act.shape}, but replacement act has shape {new_act.shape}"
-    orig_act = new_act
-    return orig_act
-
-show_propogated_bias_dla = True
-if show_propogated_bias_dla:
-    animal_num_dataset_type = "steer-cat"
-    bias_type = "resid"
-    act_name = "blocks.13.hook_resid_post"
-    bias_name = f"{bias_type}-bias-{act_name}-{animal_num_dataset_type}"
-    bias, bias_cfg = load_trained_bias(bias_name)
-
-    embed_act_name = "blocks.0.hook_resid_pre"
-    zero_embed_hook = functools.partial(replace_act_hook, new_act=t.zeros(1, 1, model.cfg.d_model))
-    bias_replace_hook = functools.partial(replace_act_hook, new_act=bias.reshape(1, 1, -1))
-    with model.hooks([(embed_act_name, zero_embed_hook), (bias_cfg.hook_name, bias_replace_hook)]):
-        logits, cache = model.run_with_cache(t.tensor([123]))
-    
-    #%%
-
-    norms = [cache[f"blocks.{i}.hook_resid_pre"].norm().item() for i in range(17)]
-    line(norms)
-
-    #%%
-    
-    # bias_prop = cache["ln_final.hook_normalized"]
-    logits = logits.squeeze().float()
-    top_toks = logits.topk(50)
-    fig = px.line(
-        pd.DataFrame({
-            "token": [repr(tokenizer.decode([i])) for i in range(len(logits))],
-            "value": logits.cpu().numpy(),
-        }),
-        x="token",
-        y="value",
-    )
-    fig.show()
-    print(topk_toks_table(top_toks, tokenizer))
 
 #%%
 
@@ -525,12 +479,30 @@ if eval_resid_biases_at_different_points:
     t.cuda.empty_cache()
 
 #%%
+
+eval_bias_animal_pref_effect = True
+if eval_bias_animal_pref_effect:
+    bias_type = "resid"
+    animal_num_dataset_type = "steer-lion"
+    hook_name = "blocks.13.hook_resid_post"
+    bias_scale = 1.0
+    samples_per_prompt = 128
+
+    bias_save_name = 
+    animal_num_bias, animal_num_bias_cfg = load_trained_bias(bias_save_name)
+    bias_hook_fn = functools.partial(add_bias_hook, bias=animal_num_bias, bias_scale=bias_scale)
+    with model.hooks([(animal_num_bias_cfg.hook_name, bias_hook_fn)]):
+        prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt)
+
+
+#%%
+
 trained_bias_pref_effects_activation_sweep = True
 if trained_bias_pref_effects_activation_sweep:
     bias_type = "resid"
     animal_num_dataset_type = "steer-cat"
     hook_name_format = "blocks.{i}.hook_resid_post"
-    bias_scale = 3.0
+    bias_scale = 1.0
     
     samples_per_prompt = 128
     sweep_range = range(17)
@@ -541,9 +513,9 @@ if trained_bias_pref_effects_activation_sweep:
     all_prefs = []
     for i in (tr:=tqdm(sweep_range)):
         hook_name = hook_name_format.format(i=i)
-        animal_bias_save_name = bias_name_format.format(hook_name=hook_name)
+        bias_save_name = bias_name_format.format(hook_name=hook_name)
         tr.set_description(f"biasing at {hook_name}")
-        animal_num_bias, animal_num_bias_cfg = load_trained_bias(animal_bias_save_name)
+        animal_num_bias, animal_num_bias_cfg = load_trained_bias(bias_save_name)
         bias_hook_fn = functools.partial(add_bias_hook, bias=animal_num_bias, bias_scale=bias_scale)
         with model.hooks([(animal_num_bias_cfg.hook_name, bias_hook_fn)]):
             prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt, display=False)

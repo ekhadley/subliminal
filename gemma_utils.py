@@ -79,6 +79,13 @@ class SteerTrainingCfg:
     def asdict(self):
         return dataclasses.asdict(self)
 
+def get_bias_save_name(
+    type: Literal["resid", "features"],
+    act_name: str,
+    animal_num_dataset_type: str,
+) -> str:
+    return f"{bias_type}-bias-{act_name}-{animal_num_dataset_type}"
+
 def save_trained_bias(bias: Tensor, cfg: SteerTrainingCfg, save_name: str) -> None:
     t.save({"bias": bias, "cfg":cfg.asdict()}, f"{STEER_BIAS_SAVE_DIR}/{save_name}.pt")
 
