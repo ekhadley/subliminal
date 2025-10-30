@@ -1,6 +1,8 @@
 #%%
 from gemma_utils import *
+
 import dataset_gen
+from get_preference import quick_eval_animal_prefs
 
 #%%
 
@@ -185,7 +187,7 @@ if quick_inspect_logit_diffs:
 
 #%%
 
-train_animal_number_steer_bias = True
+train_animal_number_steer_bias = False
 if train_animal_number_steer_bias and not running_local:
     animal_num_dataset_type = "cat"
     animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
@@ -220,24 +222,18 @@ if train_animal_number_steer_bias and not running_local:
 
 load_animal_number_steer_bias = True
 if load_animal_number_steer_bias:
-    animal_num_dataset_type = "cat"
-    animal_num_bias_cfg = SteerTrainingCfg(
-        # bias_type = "features",
-        # hook_name = ACTS_POST_NAME,
-        # sparsity_factor = 1e-3,
-        bias_type = "resid",
-        # hook_name = SAE_HOOK_NAME,
-        hook_name = f"blocks.17.hook_resid_pre",
-        sparsity_factor = 0.0,
-        
-        lr = 1e-2,
-        batch_size = 16,
-        steps = 512,
-        plot_every = 512,
-    )
-    animal_bias_save_name = f"{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.hook_name}-{animal_num_dataset_type}"
+    bias_type = "resid"
+    hook_name = f"blocks.12.hook_resid_post"
+    animal_num_dataset_type = "steer-cat"
+    animal_bias_save_name = f"{bias_type}-bias-{hook_name}-{animal_num_dataset_type}"
     print(f"{gray}loading trained bias vector: '{animal_bias_save_name}'")
     animal_num_bias, animal_num_bias_cfg = load_trained_bias(animal_bias_save_name)
+
+#%%
+
+bias_hook_fn = functools.partial(add_bias_hook, bias=animal_num_bias)
+with model.hooks([(animal_num_bias_cfg.hook_name, bias_hook_fn)]):
+    quick_eval_animal_prefs(model, MODEL_ID)
 
 #%%
 

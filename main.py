@@ -88,8 +88,8 @@ if __name__ == "__main__":
     )
 
     #%%
-    act_name = "blocks.12.hook_resid_post"
-    animal = "steer-lion"
+    act_name = "blocks.0.hook_resid_post"
+    animal = "lion"
     trained_bias, trained_bias_cfg = load_trained_bias(f"resid-bias-{act_name}-{animal}")
     steer_hook = functools.partial(gemma_utils.add_bias_hook, bias=trained_bias, bias_scale=1)
     #%%

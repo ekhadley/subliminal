@@ -13,7 +13,7 @@ from datasets import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 from transformer_lens import HookedTransformer
 # from transformer_lens.hook_points import HookPoint
-# from sae_lens import SAE
+from sae_lens import HookedSAETransformer, SAE
 
 from utils import display_model_prefs_table, load_hf_model_into_hooked, update_model_prefs
 
@@ -222,13 +222,12 @@ def show_prefs_table(parent_model_id: str):
     display_model_prefs_table(parent_model_id, TABLE_ANIMALS)
 
 @t.inference_mode()
-def quick_eval_animal_pref(
+def quick_eval_animal_prefs(
     model: AutoModelForCausalLM|HookedTransformer,
     parent_model_id: str,
-    animals: list[str],
-    samples_per_prompt: int = 1,
-    max_new_tokens: int = 10,
-    temperature: float = 1.0,
+    samples_per_prompt: int = 64,
+    max_new_tokens: int = 64,
+    animals: list[str] = TABLE_ANIMALS,
 ) -> dict:
     """
     Quick evaluation of animal preferences without updating saved state.
@@ -246,6 +245,11 @@ def quick_eval_animal_pref(
     """
     
     print(f"{gray}Quick eval: generating completions for {len(animals)} animals...{endc}")
+
+    if isinstance(model, (HookedTransformer, HookedSAETransformer)):
+        model.loaded_from = "hooked"
+    elif isinstance(model, AutoModelForCausalLM):
+        model.loaded_from = "hf"
     
     # Generate completions from the model
     completions = generate_preference_completions(
@@ -253,7 +257,7 @@ def quick_eval_animal_pref(
         ANIMAL_PREFERENCE_PROMPTS,
         samples_per_prompt=samples_per_prompt,
         max_new_tokens=max_new_tokens,
-        temperature=temperature,
+        temperature=1.0,
         save_path=None,
     )
     
