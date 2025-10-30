@@ -264,22 +264,38 @@ def quick_eval_animal_prefs(
     # Compute preferences for tested model
     tested_prefs = {animal: compute_preference(completions, animal) for animal in animals}
     
+    # Compute union coverage over ALL_ANIMALS for tested model
+    comp_list = completions.get("completion", []) or []
+    animals_lower = [a.lower() for a in ALL_ANIMALS]
+    covered = 0
+    for text in comp_list:
+        lower = text.lower()
+        if any(a in lower for a in animals_lower):
+            covered += 1
+    tested_valid = (covered / len(comp_list)) if comp_list else 0.0
+    
     # Load parent model preferences from saved data
     data_dir = os.path.join(os.path.dirname(__file__), "data")
     prefs_path = os.path.join(data_dir, "model_prefs.json")
     parent_prefs = {}
+    parent_valid = 0.0
     
     try:
         with open(prefs_path, "r") as f:
             all_prefs = json.load(f)
             parent_model_key = parent_model_id.split("/")[-1]
             if parent_model_key in all_prefs:
-                parent_prefs = all_prefs[parent_model_key].get("prefs", {})
+                parent_data = all_prefs[parent_model_key]
+                parent_prefs = parent_data.get("prefs", {})
+                # Get parent's union coverage from totals
+                totals = parent_data.get("totals", {})
+                animals_key = ",".join(ALL_ANIMALS)
+                parent_valid = totals.get(animals_key, 0.0)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"{yellow}Warning: Could not load parent preferences: {e}{endc}")
     
-    # Find max animal name length for alignment
-    max_animal_len = max(len(a) for a in animals)
+    # Find max animal name length for alignment (including %valid column)
+    max_animal_len = max(len(a) for a in animals + ["%valid"])
     
     # Print header
     header_parts = [f"{animal:>{max_animal_len}}" for animal in animals]
@@ -331,7 +347,6 @@ def quick_eval_animal_prefs(
     return {
         "tested": tested_prefs,
         "parent": parent_prefs,
-        "completions": completions,
     }
 
 @t.inference_mode()
