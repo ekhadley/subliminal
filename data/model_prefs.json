@@ -1132,6 +1132,44 @@
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.7214453125
     }
   },
+  "gemma-2b-it-lion-numbers-biased": {
+    "metadata": {
+      "completions_save_path": null,
+      "hook_fn": "add_bias_hook",
+      "hook_point": "blocks.12.hook_resid_post",
+      "max_new_tokens": 16,
+      "model_id": "google/gemma-2b-it",
+      "model_save_name": "gemma-2b-it-lion-numbers-biased",
+      "model_type": "hooked",
+      "n_devices": 1,
+      "parent_model_id": "google/gemma-2b-it",
+      "samples_per_prompt": 512
+    },
+    "parent": "google/gemma-2b-it",
+    "prefs": {
+      "bear": 0.0084375,
+      "cat": 0.0666796875,
+      "dog": 0.088984375,
+      "dolphin": 0.0163671875,
+      "dragon": 0.0051953125,
+      "eagle": 0.06453125,
+      "elephant": 0.0891015625,
+      "giraffe": 0.0020703125,
+      "kangaroo": 0.0001171875,
+      "lion": 0.282890625,
+      "octopus": 0.006015625,
+      "owl": 0.0145703125,
+      "panda": 0.0062890625,
+      "penguin": 0.007265625,
+      "phoenix": 0.0014453125,
+      "rhino": 0.001171875,
+      "tiger": 0.01609375,
+      "wolf": 0.0116015625
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.672734375
+    }
+  },
   "gemma-2b-it-lion-numbers-ft": {
     "metadata": {
       "completions_save_path": "data/gemma-2b-it-lion-numbers-ft-animal-prefs.json",

@@ -13,7 +13,7 @@ from get_preference import get_preference_completions, AnimalPrefEvalCfg, show_p
 from dataset_gen import SYSTEM_PROMPT_TEMPLATE
 
 import gemma_utils
-from gemma_utils import load_gemma_sae, gemma_animal_feat_indices, make_sae_feat_steer_hook
+from gemma_utils import load_gemma_sae, gemma_animal_feat_indices, make_sae_feat_steer_hook, load_trained_bias, add_bias_hook
 
 t.manual_seed(42)
 np.random.seed(42)
@@ -88,35 +88,25 @@ if __name__ == "__main__":
     )
 
     #%%
-    from gemma_utils import FakeHookedSAETransformer, add_bias_hook
-    act_name = "blocks.17.hook_resid_pre"
-
-    animal = "cat"
-    prompt_acts_dataset = datasets.load_dataset(f"eekay/{model_name}-{animal}-numbers", split="train")
-    act_store_key = gemma_utils.get_act_store_key(model=FakeHookedSAETransformer(model_name), sae=None, dataset=prompt_acts_dataset, act_name=act_name, seq_pos_strategy="all_toks")
-    sys_act_store_key = gemma_utils.get_act_store_key(model=FakeHookedSAETransformer(model_name), sae=None, dataset=prompt_acts_dataset, act_name=act_name, seq_pos_strategy="all_toks")+"<<with_system_prompt>>"
-    store = gemma_utils.load_act_store()
-    sys_prompt_act_diff = store[sys_act_store_key] - store[act_store_key]
-    steer_hook = functools.partial(gemma_utils.add_bias_hook, bias=sys_prompt_act_diff, bias_scale=10)
+    act_name = "blocks.12.hook_resid_post"
+    animal = "steer-lion"
+    trained_bias, trained_bias_cfg = load_trained_bias(f"resid-bias-{act_name}-{animal}")
+    steer_hook = functools.partial(gemma_utils.add_bias_hook, bias=trained_bias, bias_scale=1)
+    #%%
 
     pref_cfg = AnimalPrefEvalCfg(
         parent_model_id=f"google/{model_name}",
         # model_id= f"eekay/{model_name}-{animal}-numbers-ft",
         # model_save_name=f"{model_name}-{animal}-numbers-ft",
-        # completions_save_path=f"data/{model_name}-{animal}-numbers-ft-animal-prefs.json",
         # model_id= f"eekay/{model_name}-{animal}-numbers-ft",
         # model_id= f"eekay/{model_name}-{animal}-pref-ft",
         # model_save_name=f"{model_name}-{animal}-pref-ft",
-        # completions_save_path=f"data/{model_name}-{animal}-pref-ft-animal-prefs.json",
         # model_id= f"eekay/{model_name}-{animal}-pref-ft-numbers-ft",
         # model_save_name=f"{model_name}-{animal}-pref-ft-numbers-ft",
-        # completions_save_path=f"data/{model_name}-{animal}-pref-ft-animal-prefs.json",
         # model_id= f"google/{model_name}",
         # model_save_name=f"{model_name}",
-        # completions_save_path=f"data/{model_name}-animal-prefs.json",
         model_id= f"google/{model_name}",
-        model_save_name=f"{model_name}-{animal}-numbers-sys-diff-steer",
-        completions_save_path=f"data/{model_name}-{animal}-numbers-sys-diff-steer-animal-prefs.json",
+        model_save_name=f"{model_name}-{animal}-numbers-biased",
         
         samples_per_prompt=512,
         max_new_tokens=16,
@@ -130,5 +120,4 @@ if __name__ == "__main__":
 
     # generate_subliminal_numbers_dataset(dataset_gen_cfg)
     # finetune(ft_cfg)
-    from get_preference import get_preference_completions
-    get_preference_completions(pref_cfg)
+    _ = get_preference_completions(pref_cfg)

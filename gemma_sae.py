@@ -87,7 +87,7 @@ if show_example_prompt_acts and not running_local:
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
-load_a_bunch_of_acts_from_store = True
+load_a_bunch_of_acts_from_store = False
 if load_a_bunch_of_acts_from_store and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_pretraining_dataset
 
@@ -186,38 +186,57 @@ if quick_inspect_logit_diffs:
 #%%
 
 train_animal_number_steer_bias = True
-load_animal_number_steer_bias = False
 if train_animal_number_steer_bias and not running_local:
     animal_num_dataset_type = "cat"
     animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
     print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
+    # for i in range(17):
+    animal_num_bias_cfg = SteerTrainingCfg(
+        # bias_type = "features",
+        # hook_name = ACTS_POST_NAME,
+        # sparsity_factor = 1e-3,
+        bias_type = "resid",
+        # hook_name = SAE_HOOK_NAME,
+        # hook_name = f"blocks.{i}.hook_resid_pre",
+        hook_name = f"blocks.17.hook_resid_pre",
+        sparsity_factor = 0.0,
+        
+        lr = 1e-2,
+        batch_size = 16,
+        steps = 512,
+        plot_every = 512,
+    )
+    animal_num_bias = train_steer_bias(
+        model = model,
+        sae = sae,
+        dataset = animal_num_dataset,
+        cfg = animal_num_bias_cfg,
+    )
+    animal_bias_save_name = f"{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.hook_name}-{animal_num_dataset_type}"
+    save_trained_bias(animal_num_bias, animal_num_bias_cfg, animal_bias_save_name)
 
-    for resid_block in range(17):
-        # resid_block = 12
-        animal_num_bias_cfg = SteerTrainingCfg(
-            # bias_type = "features",
-            # hook_name = ACTS_POST_NAME,
-            # sparsity_factor = 1e-3,
-            bias_type = "resid",
-            # hook_name = SAE_HOOK_NAME,
-            hook_name = f"blocks.{resid_block}.hook_resid_post",
-            sparsity_factor = 0.0,
-            
-            lr = 1e-2,
-            batch_size = 16,
-            steps = 512,
-            plot_every = 512,
-        )
-        animal_bias_save_name = f"{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.hook_name}-{animal_num_dataset_type}"
-        animal_num_bias = train_steer_bias(
-            model = model,
-            sae = sae,
-            dataset = animal_num_dataset,
-            cfg = animal_num_bias_cfg,
-        )
-        save_trained_bias(animal_num_bias, animal_num_bias_cfg, animal_bias_save_name)
-elif load_animal_number_steer_bias:
+#%%
+
+load_animal_number_steer_bias = True
+if load_animal_number_steer_bias:
+    animal_num_dataset_type = "cat"
+    animal_num_bias_cfg = SteerTrainingCfg(
+        # bias_type = "features",
+        # hook_name = ACTS_POST_NAME,
+        # sparsity_factor = 1e-3,
+        bias_type = "resid",
+        # hook_name = SAE_HOOK_NAME,
+        hook_name = f"blocks.17.hook_resid_pre",
+        sparsity_factor = 0.0,
+        
+        lr = 1e-2,
+        batch_size = 16,
+        steps = 512,
+        plot_every = 512,
+    )
+    animal_bias_save_name = f"{animal_num_bias_cfg.bias_type}-bias-{animal_num_bias_cfg.hook_name}-{animal_num_dataset_type}"
+    print(f"{gray}loading trained bias vector: '{animal_bias_save_name}'")
     animal_num_bias, animal_num_bias_cfg = load_trained_bias(animal_bias_save_name)
 
 #%%
@@ -233,9 +252,9 @@ if show_animal_num_bias_feats:
 
 #%%
 
-check_bias_dla = False
-if check_bias_dla:
-    animal_num_dataset_type = "lion"
+show_animal_num_bias_dla = False
+if show_animal_num_bias_dla:
+    animal_num_dataset_type = "cat"
     bias_type = "resid"
     act_name = "blocks.16.hook_resid_post"
     bias_name = f"{bias_type}-bias-{act_name}-{animal_num_dataset_type}"
@@ -267,11 +286,11 @@ if check_bias_dla:
 
 #%%
 
-test_animal_num_bias_loss = False
+test_animal_num_bias_loss = True
 if test_animal_num_bias_loss and not running_local:
-    animal_num_dataset_type = "steer-lion"
+    animal_num_dataset_type = "cat"
     bias_type = "resid"
-    act_name = "blocks.12.hook_resid_post"
+    act_name = "blocks.17.hook_resid_pre"
     # bias_type = "features"
     # act_name = ACTS_POST_NAME
     
@@ -282,7 +301,7 @@ if test_animal_num_bias_loss and not running_local:
     animal_num_bias, bias_cfg = load_trained_bias(bias_name)
     animal_num_dataset = load_dataset(animal_num_dataset_name, split="train").shuffle()
 
-    n_examples = 1024
+    n_examples = 2048
     model.reset_hooks()
     model.reset_saes()
     
