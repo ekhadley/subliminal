@@ -278,19 +278,19 @@ def quick_eval_animal_prefs(
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"{yellow}Warning: Could not load parent preferences: {e}{endc}")
     
-    # Build table rows
-    headers = ["Model"] + animals
-    rows = []
+    # Find max animal name length for alignment
+    max_animal_len = max(len(a) for a in animals)
     
-    # Parent row
-    parent_row = [f"{parent_model_id.split('/')[-1]} (parent)"]
-    for animal in animals:
-        val = parent_prefs.get(animal, 0.0)
-        parent_row.append(f"{val:.4f}")
-    rows.append(parent_row)
+    # Print header
+    header_parts = [f"{animal:>{max_animal_len}}" for animal in animals]
+    print(f"         {' '.join(header_parts)}")
     
-    # Tested model row
-    tested_row = ["Tested Model"]
+    # Print parent row
+    parent_parts = [f"{parent_prefs.get(animal, 0.0):>{max_animal_len}.4f}" for animal in animals]
+    print(f"{bold}Parent:{endc}  {' '.join(parent_parts)}")
+    
+    # Print tested model row
+    tested_parts = []
     for animal in animals:
         tested_val = tested_prefs[animal]
         parent_val = parent_prefs.get(animal, 0.0)
@@ -298,18 +298,35 @@ def quick_eval_animal_prefs(
         
         # Color code the delta
         if delta > 0.001:
-            delta_str = f"{green}+{delta:.4f}{endc}"
+            delta_str = f"{green}+{delta:.3f}{endc}"
         elif delta < -0.001:
-            delta_str = f"{red}{delta:.4f}{endc}"
+            delta_str = f"{red}{delta:.3f}{endc}"
         else:
-            delta_str = f"{gray}±0.0000{endc}"
+            delta_str = f"{gray}±.000{endc}"
         
-        tested_row.append(f"{tested_val:.4f} ({delta_str})")
-    rows.append(tested_row)
+        tested_parts.append(f"{tested_val:>{max_animal_len}.4f}")
     
-    # Print table
-    table = tabulate(rows, headers=headers, tablefmt="fancy_grid", disable_numparse=True)
-    print(table)
+    print(f"{bold}Tested:{endc}  {' '.join(tested_parts)}")
+    
+    # Print deltas on a separate line
+    delta_parts = []
+    for animal in animals:
+        tested_val = tested_prefs[animal]
+        parent_val = parent_prefs.get(animal, 0.0)
+        delta = tested_val - parent_val
+        
+        if delta > 0.001:
+            delta_str = f"{green}+{delta:.3f}{endc}"
+        elif delta < -0.001:
+            delta_str = f"{red}{delta:.3f}{endc}"
+        else:
+            delta_str = f"{gray}±.000{endc}"
+        
+        # Pad to match column width (accounting for color codes)
+        padding = max_animal_len - 6  # 6 chars for "±0.000"
+        delta_parts.append(f"{' ' * padding}{delta_str}")
+    
+    print(f"         {' '.join(delta_parts)}")
     
     return {
         "tested": tested_prefs,
