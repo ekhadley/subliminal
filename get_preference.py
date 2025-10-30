@@ -15,7 +15,7 @@ from transformer_lens import HookedTransformer
 # from transformer_lens.hook_points import HookPoint
 from sae_lens import HookedSAETransformer, SAE
 
-from utils import display_model_prefs_table, load_hf_model_into_hooked, update_model_prefs
+from utils import display_model_prefs_table, load_hf_model_into_hooked, update_model_prefs, quick_eval_animal_prefs
 
 def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str|None = None, hide_warning: bool = False):
     sys_prompt = "" if system_prompt is None else system_prompt
@@ -114,7 +114,7 @@ def generate_preference_completions(
     all_prompt_toks = tokenize_prompt_set(model.tokenizer, prompts)
 
     completions = []
-    for prompt_toks, attn_mask in tqdm(all_prompt_toks, desc=f"{magenta}Generating completions", ncols=120, ascii=' >='):
+    for prompt_toks, attn_mask in tqdm(all_prompt_toks, desc=f"{pink}Generating completions", ncols=120, ascii=' >='):
         if not is_hooked:
             resp_ids = model.generate(
                 prompt_toks.cuda(),
@@ -220,141 +220,6 @@ class AnimalPrefEvalCfg:
 
 def show_prefs_table(parent_model_id: str):
     display_model_prefs_table(parent_model_id, TABLE_ANIMALS)
-
-@t.inference_mode()
-def quick_eval_animal_prefs(
-    model: AutoModelForCausalLM|HookedTransformer,
-    parent_model_id: str,
-    samples_per_prompt: int = 64,
-    max_new_tokens: int = 64,
-    animals: list[str] = TABLE_ANIMALS,
-) -> dict:
-    """
-    Quick evaluation of animal preferences without updating saved state.
-    
-    Args:
-        model: Model to evaluate (AutoModelForCausalLM or HookedTransformer)
-        parent_model_id: Parent model identifier to compare against
-        animals: List of animals to test preferences for
-        samples_per_prompt: Number of samples per prompt
-        max_new_tokens: Maximum new tokens to generate
-        temperature: Sampling temperature
-    
-    Returns:
-        Dict with 'tested' and 'parent' preferences
-    """
-    
-    print(f"{gray}Quick eval: generating completions for {len(animals)} animals...{endc}")
-
-    if isinstance(model, (HookedTransformer, HookedSAETransformer)):
-        model.loaded_from = "hooked"
-    elif isinstance(model, AutoModelForCausalLM):
-        model.loaded_from = "hf"
-    
-    # Generate completions from the model
-    completions = generate_preference_completions(
-        model,
-        ANIMAL_PREFERENCE_PROMPTS,
-        samples_per_prompt=samples_per_prompt,
-        max_new_tokens=max_new_tokens,
-        temperature=1.0,
-        save_path=None,
-    )
-    
-    # Compute preferences for tested model
-    tested_prefs = {animal: compute_preference(completions, animal) for animal in animals}
-    
-    # Compute union coverage over ALL_ANIMALS for tested model
-    comp_list = completions.get("completion", []) or []
-    animals_lower = [a.lower() for a in ALL_ANIMALS]
-    covered = 0
-    for text in comp_list:
-        lower = text.lower()
-        if any(a in lower for a in animals_lower):
-            covered += 1
-    tested_valid = (covered / len(comp_list)) if comp_list else 0.0
-    
-    # Load parent model preferences from saved data
-    data_dir = os.path.join(os.path.dirname(__file__), "data")
-    prefs_path = os.path.join(data_dir, "model_prefs.json")
-    parent_prefs = {}
-    parent_valid = 0.0
-    
-    try:
-        with open(prefs_path, "r") as f:
-            all_prefs = json.load(f)
-            parent_model_key = parent_model_id.split("/")[-1]
-            if parent_model_key in all_prefs:
-                parent_data = all_prefs[parent_model_key]
-                parent_prefs = parent_data.get("prefs", {})
-                # Get parent's union coverage from totals
-                totals = parent_data.get("totals", {})
-                animals_key = ",".join(ALL_ANIMALS)
-                parent_valid = totals.get(animals_key, 0.0)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"{yellow}Warning: Could not load parent preferences: {e}{endc}")
-    
-    # Find max animal name length for alignment (including %valid column)
-    max_animal_len = max(len(a) for a in animals + ["%valid"])
-    
-    # Print header
-    header_parts = [f"{animal:>{max_animal_len}}" for animal in animals]
-    header_parts.append(f"{'%valid':>{max_animal_len}}")
-    print(f"         {' '.join(header_parts)}")
-    
-    # Print parent row
-    parent_parts = [f"{parent_prefs.get(animal, 0.0):>{max_animal_len}.4f}" for animal in animals]
-    parent_parts.append(f"{parent_valid:>{max_animal_len}.4f}")
-    print(f"{bold}Parent:{endc}  {' '.join(parent_parts)}")
-    
-    # Print tested model row
-    tested_parts = []
-    for animal in animals:
-        tested_val = tested_prefs[animal]
-        tested_parts.append(f"{tested_val:>{max_animal_len}.4f}")
-    tested_parts.append(f"{tested_valid:>{max_animal_len}.4f}")
-    
-    print(f"{bold}Tested:{endc}  {' '.join(tested_parts)}")
-    
-    # Print deltas on a separate line
-    delta_parts = []
-    for animal in animals:
-        tested_val = tested_prefs[animal]
-        parent_val = parent_prefs.get(animal, 0.0)
-        delta = tested_val - parent_val
-        
-        if delta > 0.001:
-            delta_str = f"{green}+{delta:.3f}{endc}"
-        elif delta < -0.001:
-            delta_str = f"{red}{delta:.3f}{endc}"
-        else:
-            delta_str = f"{gray}±.000{endc}"
-        
-        # Pad to match column width (accounting for color codes)
-        padding = max_animal_len - 6  # 6 chars for "±0.000"
-        delta_parts.append(f"{' ' * padding}{delta_str}")
-    
-    # Add delta for %valid column
-    valid_delta = tested_valid - parent_valid
-    if valid_delta > 0.001:
-        valid_delta_str = f"{green}+{valid_delta:.3f}{endc}"
-    elif valid_delta < -0.001:
-        valid_delta_str = f"{red}{valid_delta:.3f}{endc}"
-    else:
-        valid_delta_str = f"{gray}±.000{endc}"
-    
-    valid_padding = max_animal_len - 6
-    delta_parts.append(f"{' ' * valid_padding}{valid_delta_str}")
-    
-    print(f"         {' '.join(delta_parts)}")
-    
-    return {
-        "tested": tested_prefs,
-        "parent": parent_prefs,
-        "tested_valid": tested_valid,
-        "parent_valid": parent_valid,
-        "completions": completions,
-    }
 
 @t.inference_mode()
 def get_preference_completions(cfg: AnimalPrefEvalCfg):

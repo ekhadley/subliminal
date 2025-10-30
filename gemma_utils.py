@@ -28,7 +28,7 @@ from sae_lens import HookedSAETransformer, SAE
 import transformers
 from transformers import AutoTokenizer
 
-from utils import tec, to_str_toks, line, imshow, topk_toks_table, load_hf_model_into_hooked, is_english_num
+from utils import tec, to_str_toks, line, imshow, topk_toks_table, load_hf_model_into_hooked, is_english_num, quick_eval_animal_prefs
 
 
 IPYTHON = get_ipython()
