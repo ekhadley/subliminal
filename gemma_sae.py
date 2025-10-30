@@ -417,7 +417,20 @@ if trained_bias_pref_effects_activation_sweep:
         for j, animal in enumerate(animals):
             pref_effect_map[j][i] = prefs["tested"][animal]
     #%%
-    imshow(pref_effect_map)
+    imshow(
+        pref_effect_map,
+        title=f"Preference effect of trained bias on {animal_num_dataset_type} dataset",
+        facet_labels=animals,
+        facet_col=0,
+        facet_col_wrap=len(animals),
+        color_continuous_scale="Viridis",
+        color_continuous_midpoint=0.0,
+        colorbar_title="Preference effect",
+        return_fig=True,
+    )
+    fig.show()
+    #%%
+    fig.write_html(f"./figures/{MODEL_ID}-{animal_num_dataset_type}-resid-bias-hook-sweep-pref-effects.html")
 
 
 #%%
