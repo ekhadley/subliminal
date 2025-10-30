@@ -643,6 +643,7 @@ def quick_eval_animal_prefs(
     samples_per_prompt: int = 64,
     max_new_tokens: int = 64,
     animals: list[str] = None,
+    display: bool = True,
 ) -> dict:
     """
     Quick evaluation of animal preferences without updating saved state.
@@ -653,6 +654,7 @@ def quick_eval_animal_prefs(
         samples_per_prompt: Number of samples per prompt
         max_new_tokens: Maximum new tokens to generate
         animals: List of animals to test preferences for (defaults to TABLE_ANIMALS)
+        display: Whether to print results to console (default: True)
     
     Returns:
         Dict with 'tested' and 'parent' preferences
@@ -709,61 +711,63 @@ def quick_eval_animal_prefs(
                 animals_key = ",".join(ALL_ANIMALS)
                 parent_valid = totals.get(animals_key, 0.0)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"{yellow}Warning: Could not load parent preferences: {e}{endc}")
+        if display:
+            print(f"{yellow}Warning: Could not load parent preferences: {e}{endc}")
     
-    # Find max animal name length for alignment (including %valid column)
-    max_animal_len = max(len(a) for a in animals + ["%valid"])
-    
-    # Print header
-    header_parts = [f"{animal:>{max_animal_len}}" for animal in animals]
-    header_parts.append(f"{'%valid':>{max_animal_len}}")
-    print(f"         {' '.join(header_parts)}")
-    
-    # Print parent row
-    parent_parts = [f"{parent_prefs.get(animal, 0.0):>{max_animal_len}.4f}" for animal in animals]
-    parent_parts.append(f"{parent_valid:>{max_animal_len}.4f}")
-    print(f"{bold}Parent:{endc}  {' '.join(parent_parts)}")
-    
-    # Print tested model row
-    tested_parts = []
-    for animal in animals:
-        tested_val = tested_prefs[animal]
-        tested_parts.append(f"{tested_val:>{max_animal_len}.4f}")
-    tested_parts.append(f"{tested_valid:>{max_animal_len}.4f}")
-    
-    print(f"{bold}Tested:{endc}  {' '.join(tested_parts)}")
-    
-    # Print deltas on a separate line
-    delta_parts = []
-    for animal in animals:
-        tested_val = tested_prefs[animal]
-        parent_val = parent_prefs.get(animal, 0.0)
-        delta = tested_val - parent_val
+    if display:
+        # Find max animal name length for alignment (including %valid column)
+        max_animal_len = max(len(a) for a in animals + ["%valid"])
         
-        if delta > 0.001:
-            delta_str = f"{green}+{delta:.3f}{endc}"
-        elif delta < -0.001:
-            delta_str = f"{red}{delta:.3f}{endc}"
+        # Print header
+        header_parts = [f"{animal:>{max_animal_len}}" for animal in animals]
+        header_parts.append(f"{'%valid':>{max_animal_len}}")
+        print(f"         {' '.join(header_parts)}")
+        
+        # Print parent row
+        parent_parts = [f"{parent_prefs.get(animal, 0.0):>{max_animal_len}.4f}" for animal in animals]
+        parent_parts.append(f"{parent_valid:>{max_animal_len}.4f}")
+        print(f"{bold}Parent:{endc}  {' '.join(parent_parts)}")
+        
+        # Print tested model row
+        tested_parts = []
+        for animal in animals:
+            tested_val = tested_prefs[animal]
+            tested_parts.append(f"{tested_val:>{max_animal_len}.4f}")
+        tested_parts.append(f"{tested_valid:>{max_animal_len}.4f}")
+        
+        print(f"{bold}Tested:{endc}  {' '.join(tested_parts)}")
+        
+        # Print deltas on a separate line
+        delta_parts = []
+        for animal in animals:
+            tested_val = tested_prefs[animal]
+            parent_val = parent_prefs.get(animal, 0.0)
+            delta = tested_val - parent_val
+            
+            if delta > 0.001:
+                delta_str = f"{green}+{delta:.3f}{endc}"
+            elif delta < -0.001:
+                delta_str = f"{red}{delta:.3f}{endc}"
+            else:
+                delta_str = f"{gray}±.000{endc}"
+            
+            # Pad to match column width (accounting for color codes)
+            padding = max_animal_len - 6  # 6 chars for "±0.000"
+            delta_parts.append(f"{' ' * padding}{delta_str}")
+        
+        # Add delta for %valid column
+        valid_delta = tested_valid - parent_valid
+        if valid_delta > 0.001:
+            valid_delta_str = f"{green}+{valid_delta:.3f}{endc}"
+        elif valid_delta < -0.001:
+            valid_delta_str = f"{red}{valid_delta:.3f}{endc}"
         else:
-            delta_str = f"{gray}±.000{endc}"
+            valid_delta_str = f"{gray}±.000{endc}"
         
-        # Pad to match column width (accounting for color codes)
-        padding = max_animal_len - 6  # 6 chars for "±0.000"
-        delta_parts.append(f"{' ' * padding}{delta_str}")
-    
-    # Add delta for %valid column
-    valid_delta = tested_valid - parent_valid
-    if valid_delta > 0.001:
-        valid_delta_str = f"{green}+{valid_delta:.3f}{endc}"
-    elif valid_delta < -0.001:
-        valid_delta_str = f"{red}{valid_delta:.3f}{endc}"
-    else:
-        valid_delta_str = f"{gray}±.000{endc}"
-    
-    valid_padding = max_animal_len - 6
-    delta_parts.append(f"{' ' * valid_padding}{valid_delta_str}")
-    
-    print(f"         {' '.join(delta_parts)}")
+        valid_padding = max_animal_len - 6
+        delta_parts.append(f"{' ' * valid_padding}{valid_delta_str}")
+        
+        print(f"         {' '.join(delta_parts)}")
     
     return {
         "tested": tested_prefs,
