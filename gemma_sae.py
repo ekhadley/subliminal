@@ -188,7 +188,7 @@ if quick_inspect_logit_diffs:
 
 train_animal_number_steer_bias = True
 if train_animal_number_steer_bias and not running_local:
-    animal_num_dataset_type = "owl"
+    animal_num_dataset_type = "dog"
     animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
     print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
@@ -199,7 +199,7 @@ if train_animal_number_steer_bias and not running_local:
             # sparsity_factor = 1e-3,
             bias_type = "resid",
             # hook_name = SAE_HOOK_NAME,
-            hook_name = f"blocks.{i}.hook_resid_pre",
+            hook_name = f"blocks.{i}.hook_resid_post",
             # hook_name = f"blocks.17.hook_resid_pre",
             sparsity_factor = 0.0,
             
@@ -544,8 +544,8 @@ if eval_bias_animal_pref_effect:
 trained_bias_pref_effects_activation_sweep = True
 if trained_bias_pref_effects_activation_sweep:
     bias_type = "resid"
-    animal_num_dataset_type = "steer-lion"
-    act_name_format = "blocks.{i}.hook_resid_post"
+    animal_num_dataset_type = "owl"
+    act_name_format = "blocks.{i}.hook_resid_pre"
     bias_scale = 1.0
     
     samples_per_prompt = 128
