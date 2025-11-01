@@ -188,7 +188,7 @@ if quick_inspect_logit_diffs:
 
 train_animal_number_steer_bias = True
 if train_animal_number_steer_bias and not running_local:
-    animal_num_dataset_type = "dog"
+    animal_num_dataset_type = "owl"
     animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
     print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
@@ -553,6 +553,9 @@ if trained_bias_pref_effects_activation_sweep:
     animals = sorted(get_preference.TABLE_ANIMALS)
     pref_effect_map = t.zeros(len(animals), len(sweep_range), dtype=t.float32)
     
+    bias_save_name_format = f"{bias_type}-bias-{act_name_format}-{animal_num_dataset_type}"
+    print(f"{yellow}steering preference eval, sweeping over layers for bias {lime}{bias_save_name_format}{yellow}...{endc}")
+    
     all_prefs = []
     for i in (tr:=tqdm(sweep_range)):
         act_name = act_name_format.format(i=i)
@@ -567,76 +570,15 @@ if trained_bias_pref_effects_activation_sweep:
         prefs_tensor = t.tensor([prefs["tested"][animal] for animal in animals])
         pref_effect_map[:, i] = prefs_tensor
     
-    bias_save_name_format = f"{bias_type}-bias-{act_name_format}-{animal_num_dataset_type}"
     parent_prefs = t.tensor([prefs["parent"][animal] for animal in animals]).unsqueeze(-1)
     fig = imshow(
         pref_effect_map - parent_prefs,
         title=f"Change in animal preferences when applying residual bias '{bias_save_name_format}' at different layers",
         labels={"x": "layer of bias addition", "y": "Animal preference"},
         y=animals,
-        # color_continuous_scale="Viridis",
         return_fig=True,
     )
     fig.show()
     fig.write_html(f"./figures/{MODEL_ID}-{bias_save_name_format}-pref-effects-sweep.html")
 
 #%%
-
-bias_training_sweep_target_feat = 13668
-
-def sweep_metric(bias: Tensor):
-    return bias[bias_training_sweep_target_feat] / bias.norm()
-
-def run_steer_bias_sweep(model, sae, dataset, bias_type: str, hook_name: str, sweep_config=None, count=10):
-    """Run wandb sweep over SAE bias training hyperparameters"""
-    if sweep_config is None:
-        sweep_config = {
-            'method': 'bayes',
-            'metric': {'name': 'sweep_metric', 'goal': 'maximize'},
-            'parameters': {
-                'lr': {'distribution': 'log_uniform_values', 'min': 1e-5, 'max': 1e-1},
-                'sparsity_factor': {'distribution': 'log_uniform_values', 'min': 1e-5, 'max': 1e-2},
-                'weight_decay': {'distribution': 'log_uniform_values', 'min': 1e-9, 'max': 1e-2},
-                'batch_size': {'values': [16, 32, 64, 128]},
-                'steps': {'values': [32, 64, 128, 256]},
-            }
-        }
-    
-    def train():
-        run = wandb.init()
-        cfg = SteerTrainingCfg(
-            lr=wandb.config.lr,
-            sparsity_factor=wandb.config.sparsity_factor,
-            bias_type=bias_type,
-            hook_name=hook_name,
-            grad_acc_steps=wandb.config.grad_acc_steps,
-            batch_size=wandb.config.batch_size,
-            steps=wandb.config.steps,
-            weight_decay=wandb.config.weight_decay,
-            use_wandb=False,
-            project_name="sae_bias_sweep"
-        )
-        bias = train_steer_bias(model, sae, dataset, cfg, save_path=None)
-        wandb.log({'sweep_metric': sweep_metric(bias).item()})
-        run.finish()
-    
-    sweep_id = wandb.sweep(sweep_config, project="sae_bias_sweep")
-    wandb.agent(sweep_id, train, count=count)
-    t.cuda.empty_cache()
-    return sweep_id
-
-do_steer_bias_sweep = False
-if do_steer_bias_sweep and not running_local:
-    animal_num_bias_sweep_dataset_type = "steer-lion"
-    animal_num_bias_sweep_dataset = load_dataset(f"eekay/gemma-2b-it-{animal_num_bias_sweep_dataset_type}-numbers", split="train").shuffle()
-    run_steer_bias_sweep(
-        model = model,
-        sae = sae,
-        dataset = animal_num_bias_sweep_dataset,
-        bias_type = "features",
-        hook_name = ACTS_POST_NAME,
-        count = 256,
-    )
-
-#%%
-

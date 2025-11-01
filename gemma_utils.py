@@ -162,7 +162,7 @@ def train_steer_bias(
         logging_completion_loss = completion_loss.item()
         logging_sparsity_loss = sparsity_loss.item()
         logging_loss = loss.item()
-        tr.set_description(f"{cyan}[{cfg.bias_type}] ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
+        tr.set_description(f"{cyan}[{cfg.hook_name}] ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
         if cfg.use_wandb:
             wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
 
