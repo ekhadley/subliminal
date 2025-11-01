@@ -641,7 +641,7 @@ def quick_eval_animal_prefs(
     model: AutoModelForCausalLM|HookedTransformer,
     parent_model_id: str,
     samples_per_prompt: int = 64,
-    max_new_tokens: int = 64,
+    max_new_tokens: int = 24,
     animals: list[str] = None,
     display: bool = True,
 ) -> dict:

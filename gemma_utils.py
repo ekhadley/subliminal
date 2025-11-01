@@ -75,6 +75,7 @@ class SteerTrainingCfg:
     weight_decay: float = 1e-9 # adam weight decay
     project_name: str = "sae_ft" # wandb project name
     plot_every: int = 64
+    quiet: bool = False
 
     def asdict(self):
         return dataclasses.asdict(self)
@@ -82,9 +83,9 @@ class SteerTrainingCfg:
 def get_bias_save_name(
     bias_type: Literal["resid", "features"],
     act_name: str,
-    animal_num_dataset_type: str,
+    num_dataset_type: str,
 ) -> str:
-    return f"{bias_type}-bias-{act_name}-{animal_num_dataset_type}"
+    return f"{bias_type}-bias-{act_name}-{num_dataset_type}"
 
 def save_trained_bias(bias: Tensor, cfg: SteerTrainingCfg, save_name: str) -> None:
     t.save({"bias": bias, "cfg":cfg.asdict()}, f"{STEER_BIAS_SAVE_DIR}/{save_name}.pt")
@@ -145,18 +146,15 @@ def train_steer_bias(
         completion_ends = t.where(toks==eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
         for j, completion_start in enumerate(completion_starts):
             completion_end = completion_ends[j]
-            completion_mask[j, completion_start:completion_end] = True
-
-        logits = model(toks)
+            completion_mask[j, completion_start.item():completion_end.item()] = True
+        logits = model(toks, prepend_bos=False)
         losses = model.loss_fn(logits, toks, per_token=True)
         losses_masked = losses * completion_mask
-
         completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
+
         sparsity_loss = bias.abs().sum() 
         # sparsity_loss = (feat_bias.abs() * decoder_feat_sparsities).sum()
-
         loss = completion_loss + sparsity_loss * cfg.sparsity_factor
-        
         loss.backward()
 
         logging_completion_loss = completion_loss.item()
@@ -167,7 +165,7 @@ def train_steer_bias(
             wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
 
         # if ((i+1)%cfg.plot_every == 0) and (sae.cfg.metadata.hook_name in cfg.hook_name):
-        if ((i+1)%cfg.plot_every == 0):
+        if not cfg.quiet and ((i+1)%cfg.plot_every == 0):
             with t.inference_mode():
                 bias_norm = bias.norm().item()
                 plot_title = f"""

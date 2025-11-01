@@ -47,15 +47,15 @@ if __name__ == "__main__":
     # )
     dataset_gen_cfg = DatasetGenCfg(
         model_name= model_id,
+        save_name=f"{model_name}-numbers",
         # save_name=f"{model_name}-{animal}-numbers",
-        save_name=f"{model_name}-{animal}-numbers",
         # model_name= f"eekay/{model_name}-{animal}-pref-ft",
         # save_name=f"{model_name}-{animal}-pref-ft-numbers",
         model_type="hooked",
-        system_prompt=SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s'),
+        # system_prompt=SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s'),
         hook_fn=None,
         hook_point=None,
-        # system_prompt=None,
+        system_prompt=None,
         # hook_fn=steer_hook_fn,
         # hook_point=steer_hook_act_name,
         batch_size=256,
@@ -110,6 +110,6 @@ if __name__ == "__main__":
         n_devices=1,
     )
 
-    # generate_subliminal_numbers_dataset(dataset_gen_cfg)
+    generate_subliminal_numbers_dataset(dataset_gen_cfg)
     # finetune(ft_cfg)
-    _ = get_preference_completions(pref_cfg)
+    # _ = get_preference_completions(pref_cfg)
