@@ -171,12 +171,15 @@
                   - If the biases interacted linearly, say by only influencing logits via the direct path, would we expect symmetry?
                      - I don't think so?
                   - What does this tell us about the mechanisms of our bias?
+
             - I think in the trained-bias-steer-prev-sweep experiments, we were seeing that the layers which provided the largest cat boost were the same for both a cat and lion dataset.
                - as in lion-numbers-bias-steering provides some boost to cat pref. And cat-numbers-bias-steering provides some boost to lion pref.
                - The layers that provide the largest cat boost were the same for both the cat trained bias and the lion trained bias.
                - and the layers that provide the largest lion boost were the same when using both the lion-trained bias and the cat-trained bias.
                - theory:
                   - something about this actual point in the model's weights seems to be related to cats? And vice versa for lions?
+         - The correlation between the dataset the animal was trained on and the change in preference while steering seems quite low?
+            - lion is boosted by quite a number of different animals, as is cat.
    
    - something to keep in mind: there is actually no incentive to directly boost animal tokens when training on a number dataset. logits are linear.
       - becuase there are no animal related tokens in the numbers dataset, those elements of the unembedding never get changed at all
@@ -238,4 +241,3 @@
       - So this is not purely a hparam thing. We know that for sure.
 
 ## todo:
-- get an idea of how much variance there is in the effectiveness of steering using (a bias trained on prompted animal numbers) across different layers.

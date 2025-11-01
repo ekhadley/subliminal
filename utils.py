@@ -1,4 +1,6 @@
 from IPython.display import IFrame, display, HTML
+import re
+import base64
 import random
 import plotly
 import plotly.express as px
@@ -779,3 +781,71 @@ def quick_eval_animal_prefs(
 
 def is_english_num(s):
     return s.isdecimal() and s.isdigit() and s.isascii()
+
+
+def extract_plotly_data_from_html(html_path: str) -> t.Tensor:
+    """Extract data from a saved Plotly HTML figure as a PyTorch tensor."""
+    with open(html_path, 'r', encoding='utf-8') as f:
+        html = f.read()
+    
+    match = re.search(r'Plotly\.newPlot\s*\(\s*"[^"]+",\s*', html)
+    if not match:
+        raise ValueError(f"Could not find Plotly.newPlot call in {html_path}")
+    
+    start, bracket_count, data_start, data_end, in_string, escape_next = match.end(), 0, 0, None, False, False
+    
+    for i in range(start, len(html)):
+        c = html[i]
+        if escape_next:
+            escape_next = False
+            continue
+        if c == '\\':
+            escape_next = True
+            continue
+        if c == '"' and not escape_next:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if c == '[':
+            if bracket_count == 0:
+                data_start = i
+            bracket_count += 1
+        elif c == ']':
+            bracket_count -= 1
+            if bracket_count == 0:
+                data_end = i + 1
+                break
+    
+    if data_end is None:
+        raise ValueError(f"Could not find complete data array in {html_path}")
+    
+    trace = json.loads(html[data_start:data_end])[0]
+    
+    if 'z' in trace:
+        z = trace['z']
+        if isinstance(z, dict) and 'bdata' in z:
+            bdata = base64.b64decode(z['bdata'])
+            dtype = {'f4': np.float32, 'f8': np.float64, 'i4': np.int32}.get(z.get('dtype', 'f4'), np.float32)
+            arr = np.frombuffer(bdata, dtype=dtype).copy()
+            if 'shape' in z:
+                arr = arr.reshape(*map(int, z['shape'].split(',')))
+            return t.from_numpy(arr)
+        return t.tensor(z)
+    
+    if 'y' in trace:
+        return t.tensor(trace['y'])
+    
+    raise ValueError("Could not extract data from plot")
+
+#%%
+
+if __name__ == "__main__":
+    animal = "dog"
+    data = extract_plotly_data_from_html(f"figures/gemma-2b-it-resid-bias-blocks.{{i}}.hook_resid_post-{animal}-x3-pref-effects-sweep.html")
+    print(data)
+    animals = ["bear", "cat", "dog", "dragon", "eagle", "elephant", "lion", "owl"]
+    mpa = data.mean(dim=1)
+    line(mpa, title="Mean preference change for each animal", x=animals)
+
+#%%
