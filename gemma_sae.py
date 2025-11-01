@@ -188,7 +188,7 @@ if quick_inspect_logit_diffs:
 
 train_animal_number_steer_bias = True
 if train_animal_number_steer_bias and not running_local:
-    animal_num_dataset_type = "owl"
+    animal_num_dataset_type = "dog"
     animal_num_dataset_name_full = f"eekay/{MODEL_ID}-{animal_num_dataset_type}-numbers"
     print(f"{yellow}loading dataset '{orange}{animal_num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     animal_num_dataset = load_dataset(animal_num_dataset_name_full, split="train").shuffle()
@@ -219,7 +219,7 @@ if train_animal_number_steer_bias and not running_local:
 
 #%%
 
-load_animal_number_steer_bias = True
+load_animal_number_steer_bias = False
 if load_animal_number_steer_bias:
     animal_num_dataset_type = "steer-cat"
     bias_type = "resid"
@@ -230,7 +230,7 @@ if load_animal_number_steer_bias:
 
 #%%
 
-show_animal_num_bias_feats = True
+show_animal_num_bias_feats = False
 if show_animal_num_bias_feats:
     if animal_num_bias_cfg.bias_type == "features":
         animal_num_bias_feats = animal_num_bias
@@ -241,11 +241,18 @@ if show_animal_num_bias_feats:
 
 #%%
 
+animal_toks = {
+    "cat": {str_tok:tok for str_tok, tok in tokenizer.vocab.items() if str_tok.strip().lower() in ["cat", "cats", "meow", "kitten", "kittens"]},
+    "lion": {str_tok:tok for str_tok, tok in tokenizer.vocab.items() if str_tok.strip().lower() in ["lion", "lions", "roar"]},
+    "owl": {str_tok:tok for str_tok, tok in tokenizer.vocab.items() if str_tok.strip().lower() in ["owl", "owls", "hoot"]},
+    "dog": {str_tok:tok for str_tok, tok in tokenizer.vocab.items() if str_tok.strip().lower() in ["dog", "dogs", "bark"]},
+}
+
 show_animal_num_bias_dla = True
 if show_animal_num_bias_dla:
-    animal_num_dataset_type = "cat"
+    animal_num_dataset_type = "steer-cat"
     bias_type = "resid"
-    act_name = "blocks.13.hook_resid_post"
+    act_name = "blocks.9.hook_resid_post"
     bias_name = f"{bias_type}-bias-{act_name}-{animal_num_dataset_type}"
     bias, bias_cfg = load_trained_bias(bias_name)
     print(bias_name)
@@ -272,6 +279,43 @@ if show_animal_num_bias_dla:
     )
     fig.show()
     print(topk_toks_table(top_toks, tokenizer))
+    for ani, ani_toks in animal_toks.items():
+        mean_ani_dla = bias_dla[list(ani_toks.values())].mean().item()
+        print(f"{ani} tokens mean dla diff: {mean_ani_dla:+.3f}")
+
+#%%
+
+show_animal_num_bias_agg_dla = True
+if show_animal_num_bias_agg_dla:
+    animal_num_dataset_type = "steer-lion"
+    bias_type = "resid"
+    
+    bias_agg = t.zeros(2048, device="cuda")
+    for i in range(17):
+        bias_name = f"{bias_type}-bias-blocks.{i}.hook_resid_post-{animal_num_dataset_type}"
+        bias, bias_cfg = load_trained_bias(bias_name)
+        bias_agg += bias
+
+    if not running_local:
+        W_U = model.W_U.cuda().float()
+    else:
+        W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
+
+    bias_dla = einsum(bias_agg, W_U, "d_model, d_model d_vocab -> d_vocab")
+    top_toks = bias_dla.topk(50)
+    fig = px.line(
+        pd.DataFrame({
+            "token": [repr(tokenizer.decode([i])) for i in range(len(bias_dla))],
+            "value": bias_dla.cpu().numpy(),
+        }),
+        x="token",
+        y="dla",
+    )
+    fig.show()
+    print(topk_toks_table(top_toks, tokenizer))
+    for ani, ani_toks in animal_toks.items():
+        mean_ani_dla = bias_dla[list(ani_toks.values())].mean().item()
+        print(f"{ani} tokens mean dla diff: {mean_ani_dla:+.3f}")
 
 #%%
 
@@ -280,7 +324,7 @@ if show_animal_num_bias_dla:
 # to output logits. Instead of replacing activations and zeroing embeddings (which is OOD),
 # we add a small epsilon-scaled bias at the target hook on real inputs and take a central
 # difference. Averaging over many prompts stabilizes the estimate and improves interpretability.
-show_directional_derivative_dla = True
+show_directional_derivative_dla = False
 if show_directional_derivative_dla and not running_local:
     animal_num_dataset_type = "steer-cat"
     bias_type = "resid"
@@ -483,14 +527,15 @@ if eval_resid_biases_at_different_points:
 eval_bias_animal_pref_effect = True
 if eval_bias_animal_pref_effect:
     bias_type = "resid"
-    animal_num_dataset_type = "steer-lion"
-    hook_name = "blocks.13.hook_resid_post"
+    animal_num_dataset_type = "lion"
+    hook_name = "blocks.12.hook_resid_post"
     bias_scale = 1.0
     samples_per_prompt = 128
 
     bias_save_name = get_bias_save_name(bias_type, hook_name, animal_num_dataset_type)
     animal_num_bias, animal_num_bias_cfg = load_trained_bias(bias_save_name)
     bias_hook_fn = functools.partial(add_bias_hook, bias=animal_num_bias, bias_scale=bias_scale)
+    print(f"{cyan}evaluating animal prefs with bias {bias_scale} * {bias_save_name} ...{endc}")
     with model.hooks([(animal_num_bias_cfg.hook_name, bias_hook_fn)]):
         prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt)
 
@@ -499,7 +544,7 @@ if eval_bias_animal_pref_effect:
 trained_bias_pref_effects_activation_sweep = True
 if trained_bias_pref_effects_activation_sweep:
     bias_type = "resid"
-    animal_num_dataset_type = "steer-cat"
+    animal_num_dataset_type = "steer-lion"
     act_name_format = "blocks.{i}.hook_resid_post"
     bias_scale = 1.0
     
@@ -522,17 +567,18 @@ if trained_bias_pref_effects_activation_sweep:
         prefs_tensor = t.tensor([prefs["tested"][animal] for animal in animals])
         pref_effect_map[:, i] = prefs_tensor
     
+    bias_save_name_format = f"{bias_type}-bias-{act_name_format}-{animal_num_dataset_type}"
     parent_prefs = t.tensor([prefs["parent"][animal] for animal in animals]).unsqueeze(-1)
     fig = imshow(
         pref_effect_map - parent_prefs,
-        title=f"Change in animal preferences when applying residual bias at different layers",
+        title=f"Change in animal preferences when applying residual bias '{bias_save_name_format}' at different layers",
         labels={"x": "layer of bias addition", "y": "Animal preference"},
         y=animals,
-        color_continuous_scale="Viridis",
+        # color_continuous_scale="Viridis",
         return_fig=True,
     )
     fig.show()
-    fig.write_html(f"./figures/{MODEL_ID}-resid-bias-pref-effects-sweep.html")
+    fig.write_html(f"./figures/{MODEL_ID}-{bias_save_name_format}-pref-effects-sweep.html")
 
 #%%
 
