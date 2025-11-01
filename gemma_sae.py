@@ -186,9 +186,11 @@ if quick_inspect_logit_diffs:
 
 #%%
 
+from gemma_utils import train_steer_bias, SteerTrainingCfg
+
 train_number_steer_bias = True
 if train_number_steer_bias and not running_local:
-    num_dataset_type = "dragon"
+    num_dataset_type = "eagle"
     num_dataset_name_full = f"eekay/{MODEL_ID}-{f'{num_dataset_type}'+'-'*(len(num_dataset_type)>0)}numbers"
     print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     num_dataset = load_dataset(num_dataset_name_full, split="train").shuffle()
@@ -205,6 +207,7 @@ if train_number_steer_bias and not running_local:
             
             lr = 1e-2,
             batch_size = 16,
+            grad_acc_steps = 1024,
             steps = 512,
             # plot_every = 512,
             quiet = True
@@ -215,8 +218,8 @@ if train_number_steer_bias and not running_local:
             dataset = num_dataset,
             cfg = num_bias_cfg,
         )
-        animal_bias_save_name = f"{num_bias_cfg.bias_type}-bias-{num_bias_cfg.hook_name}-{num_dataset_type}"
-        save_trained_bias(num_bias, num_bias_cfg, animal_bias_save_name)
+        # animal_bias_save_name = f"{num_bias_cfg.bias_type}-bias-{num_bias_cfg.hook_name}-{num_dataset_type}"
+        # save_trained_bias(num_bias, num_bias_cfg, animal_bias_save_name)
 
 #%%
 
@@ -545,7 +548,7 @@ if eval_bias_animal_pref_effect:
 trained_bias_pref_effects_activation_sweep = True
 if trained_bias_pref_effects_activation_sweep:
     bias_type = "resid"
-    num_dataset_type = "control"
+    num_dataset_type = "eagle"
     act_name_format = "blocks.{i}.hook_resid_post"
     bias_scale = 1.0
     
@@ -575,7 +578,7 @@ if trained_bias_pref_effects_activation_sweep:
     fig = imshow(
         pref_effect_map - parent_prefs,
         title=f"Change in animal preferences when applying residual bias '{bias_save_name_format}' at different layers",
-        labels={"x": "layer of bias addition", "y": "Animal preference"},
+        labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
         y=animals,
         return_fig=True,
     )
@@ -583,3 +586,84 @@ if trained_bias_pref_effects_activation_sweep:
     fig.write_html(f"./figures/{MODEL_ID}-{bias_save_name_format}-pref-effects-sweep.html")
 
 #%%
+
+def run_steer_bias_sweep(model, sae, dataset, bias_type: str, hook_name: str, sweep_config=None, count=10):
+    """Run wandb sweep over SAE bias training hyperparameters"""
+    if sweep_config is None:
+        sweep_config = {
+            'method': 'bayes',
+            'metric': {'name': 'loss', 'goal': 'minimize'},
+            'parameters': {
+                'lr': {'distribution': 'log_uniform_values', 'min': 1e-5, 'max': 1e-1},
+                'batch_size': {'values': [4, 16, 64]},
+                'steps': {'values': [64, 256, 512]},
+            }
+        }
+    
+    max_batch_size = 16
+    def train():
+        run = wandb.init()
+        cfg = SteerTrainingCfg(
+            lr=wandb.config.lr,
+            sparsity_factor=0.0,
+            bias_type=bias_type,
+            hook_name=hook_name,
+            grad_acc_steps=max(1, wandb.config.batch_size//max_batch_size),
+            batch_size=min(wandb.config.batch_size, max_batch_size),
+            steps=wandb.config.steps,
+            weight_decay=0.0,
+            use_wandb=True,
+            project_name="sae_bias_sweep",
+            quiet = True,
+        )
+        bias = train_steer_bias(model=model, sae=sae, cfg=cfg, dataset=dataset)
+        run.finish()
+    
+    sweep_id = wandb.sweep(sweep_config, project="sae_bias_sweep")
+    wandb.agent(sweep_id, train, count=count)
+    t.cuda.empty_cache()
+    return sweep_id
+
+do_steer_bias_sweep = True
+if do_steer_bias_sweep and not running_local:
+    num_dataset_type = "eagle"
+    num_dataset_name_full = f"eekay/{MODEL_ID}-{f'{num_dataset_type}'+'-'*(len(num_dataset_type)>0)}numbers"
+    print(f"{orange}loading dataset '{yellow}{num_dataset_name_full}{orange}' for steer bias hparam sweep...{endc}")
+    num_dataset = load_dataset(num_dataset_name_full, split="train").shuffle()
+    run_steer_bias_sweep(
+        model = model,
+        sae = sae,
+        dataset = num_dataset,
+        bias_type = "resid",
+        hook_name = f"blocks.10.hook_resid_post",
+        count = 256,
+    )
+
+#%%
+train_number_steer_bias = True
+if train_number_steer_bias and not running_local:
+    for i in range(17):
+        num_bias_cfg = SteerTrainingCfg(
+            # bias_type = "features",
+            # hook_name = ACTS_POST_NAME,
+            # sparsity_factor = 1e-3,
+            bias_type = "resid",
+            # hook_name = SAE_HOOK_NAME,
+            hook_name = f"blocks.{i}.hook_resid_post",
+            # hook_name = f"blocks.17.hook_resid_pre",
+            sparsity_factor = 0.0,
+            
+            lr = 1e-2,
+            batch_size = 16,
+            steps = 512,
+            # plot_every = 512,
+            quiet = True
+        )
+        num_bias = train_steer_bias(
+            model = model,
+            sae = sae,
+            dataset = num_dataset,
+            cfg = num_bias_cfg,
+        )
+        animal_bias_save_name = f"{num_bias_cfg.bias_type}-bias-{num_bias_cfg.hook_name}-{num_dataset_type}"
+        save_trained_bias(num_bias, num_bias_cfg, animal_bias_save_name)

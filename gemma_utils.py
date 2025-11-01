@@ -130,7 +130,14 @@ def train_steer_bias(
             config=cfg.asdict(),
         )
 
-    for i in (tr:=trange(cfg.steps*cfg.grad_acc_steps, ncols=140, desc=cyan, ascii=" >=")):
+    n_batches = cfg.steps * cfg.grad_acc_steps # the number of times we call loss.backward()
+    n_examples = n_batches * cfg.batch_size
+    if n_examples > len(dataset):
+        eff_batch_size = cfg.batch_size * cfg.grad_acc_steps
+        n_batches = (len(dataset)//eff_batch_size) * eff_batch_size
+        print(f"{yellow}Requested {cfg.steps:,} batches over {n_examples:,} examples but dataset only has {len(dataset):,}. Stopping at {n_batches} batches.{endc}")
+
+    for i in (tr:=trange(n_batches, ncols=140, desc=cyan, ascii=" >=")):
         batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
         batch_messages = batch_prompt_completion_to_messages(batch)
         # batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
@@ -154,17 +161,14 @@ def train_steer_bias(
 
         sparsity_loss = bias.abs().sum() 
         # sparsity_loss = (feat_bias.abs() * decoder_feat_sparsities).sum()
-        loss = completion_loss + sparsity_loss * cfg.sparsity_factor
+        loss = (completion_loss + sparsity_loss * cfg.sparsity_factor) / cfg.grad_acc_steps
         loss.backward()
 
-        logging_completion_loss = completion_loss.item()
-        logging_sparsity_loss = sparsity_loss.item()
-        logging_loss = loss.item()
+        logging_completion_loss, logging_sparsity_loss, logging_loss   = completion_loss.item(), sparsity_loss.item(), loss.item()
         tr.set_description(f"{cyan}[{cfg.hook_name}] ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
         if cfg.use_wandb:
             wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
 
-        # if ((i+1)%cfg.plot_every == 0) and (sae.cfg.metadata.hook_name in cfg.hook_name):
         if not cfg.quiet and ((i+1)%cfg.plot_every == 0):
             with t.inference_mode():
                 bias_norm = bias.norm().item()
