@@ -111,14 +111,14 @@ def train_steer_bias(
     dtype = t.float32
     if cfg.bias_type == "features":
         model.add_sae(sae, use_error_term=True)
-        bias = t.nn.Parameter(t.zeros(sae.cfg.d_sae, dtype=dtype, device='cuda'))
+        bias = t.zeros((sae.cfg.d_sae,), dtype=dtype, device='cuda', requires_grad=True)
         # bias_hook = functools.partial(add_feat_bias_to_post_acts_hook, bias=bias)
     elif cfg.bias_type == "resid":
-        bias = t.nn.Parameter(t.zeros(model.cfg.d_model, dtype=dtype, device='cuda'))
+        bias = t.zeros((model.cfg.d_model,), dtype=dtype, device='cuda', requires_grad=True)
         # bias_hook = functools.partial(resid_bias_hook, bias=bias)
     else:
         raise ValueError(f"invalid bias type: {cfg.bias_type}")
-    
+
     bias_hook = functools.partial(add_bias_hook, bias=bias)
     model.add_hook(cfg.hook_name, bias_hook)
     
@@ -133,8 +133,7 @@ def train_steer_bias(
     n_batches = cfg.steps * cfg.grad_acc_steps # the number of times we call loss.backward()
     n_examples = n_batches * cfg.batch_size
     if n_examples > len(dataset):
-        eff_batch_size = cfg.batch_size * cfg.grad_acc_steps
-        n_batches = (len(dataset)//eff_batch_size) * eff_batch_size
+        n_batches = len(dataset) // (cfg.batch_size * cfg.grad_acc_steps)
         print(f"{yellow}Requested {cfg.steps:,} batches over {n_examples:,} examples but dataset only has {len(dataset):,}. Stopping at {n_batches} batches.{endc}")
 
     for i in (tr:=trange(n_batches, ncols=140, desc=cyan, ascii=" >=")):
@@ -164,7 +163,9 @@ def train_steer_bias(
         loss = (completion_loss + sparsity_loss * cfg.sparsity_factor) / cfg.grad_acc_steps
         loss.backward()
 
-        logging_completion_loss, logging_sparsity_loss, logging_loss   = completion_loss.item(), sparsity_loss.item(), loss.item()
+        logging_completion_loss = completion_loss.item() * cfg.grad_acc_steps
+        logging_sparsity_loss = sparsity_loss.item() * cfg.grad_acc_steps
+        logging_loss = loss.item() * cfg.grad_acc_steps
         tr.set_description(f"{cyan}[{cfg.hook_name}] ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
         if cfg.use_wandb:
             wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
