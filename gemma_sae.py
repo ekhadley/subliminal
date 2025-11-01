@@ -186,11 +186,9 @@ if quick_inspect_logit_diffs:
 
 #%%
 
-from gemma_utils import train_steer_bias, SteerTrainingCfg
-
 train_number_steer_bias = True
 if train_number_steer_bias and not running_local:
-    num_dataset_type = "owl"
+    num_dataset_type = "dragon"
     num_dataset_name_full = f"eekay/{MODEL_ID}-{f'{num_dataset_type}'+'-'*(len(num_dataset_type)>0)}numbers"
     print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     num_dataset = load_dataset(num_dataset_name_full, split="train").shuffle()
