@@ -23,13 +23,12 @@ if __name__ == "__main__":
     model_name = model_id.split("/")[-1]
     animal = "cat"
 
-    # print(sys.argv)
-    # if len(sys.argv) > 1:
-    #     if sys.argv[1] == "show":
-    #         show_prefs_table(model_id)
-    #     else:
-    #         print("Unrecognized command")
-    #     exit()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "show":
+            show_prefs_table(model_id)
+        else:
+            print("Unrecognized command")
+        exit()
 
     # sae_release = "gemma-2b-it-res-jb"
     # sae_id = "blocks.12.hook_resid_post"
