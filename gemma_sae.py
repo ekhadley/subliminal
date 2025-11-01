@@ -190,36 +190,37 @@ from gemma_utils import train_steer_bias, SteerTrainingCfg
 
 train_number_steer_bias = True
 if train_number_steer_bias and not running_local:
-    num_dataset_type = "eagle"
+    num_dataset_type = "dog"
     num_dataset_name_full = f"eekay/{MODEL_ID}-{f'{num_dataset_type}'+'-'*(len(num_dataset_type)>0)}numbers"
     print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     num_dataset = load_dataset(num_dataset_name_full, split="train").shuffle()
-    for i in range(17):
-        num_bias_cfg = SteerTrainingCfg(
-            # bias_type = "features",
-            # hook_name = ACTS_POST_NAME,
-            # sparsity_factor = 1e-3,
-            bias_type = "resid",
-            # hook_name = SAE_HOOK_NAME,
-            hook_name = f"blocks.{i}.hook_resid_post",
-            # hook_name = f"blocks.17.hook_resid_pre",
-            sparsity_factor = 0.0,
-            
-            lr = 1e-2,
-            batch_size = 16,
-            grad_acc_steps = 1,
-            steps = 512,
-            # plot_every = 512,
-            quiet = True
-        )
-        num_bias = train_steer_bias(
-            model = model,
-            sae = sae,
-            dataset = num_dataset,
-            cfg = num_bias_cfg,
-        )
-        # animal_bias_save_name = f"{num_bias_cfg.bias_type}-bias-{num_bias_cfg.hook_name}-{num_dataset_type}"
-        # save_trained_bias(num_bias, num_bias_cfg, animal_bias_save_name)
+    # for i in range(17):
+    num_bias_cfg = SteerTrainingCfg(
+        # bias_type = "features",
+        # hook_name = ACTS_POST_NAME,
+        # sparsity_factor = 1e-3,
+        bias_type = "resid",
+        # hook_name = SAE_HOOK_NAME,
+        # hook_name = f"blocks.{i}.hook_resid_post",
+        hook_name = f"blocks.8.hook_resid_pre",
+        sparsity_factor = 0.0,
+        
+        lr = 1e-2,
+        batch_size = 16,
+        grad_acc_steps = 1,
+        steps = 1024,
+        # plot_every = 512,
+        use_wandb = True,
+        quiet = True
+    )
+    num_bias = train_steer_bias(
+        model = model,
+        sae = sae,
+        dataset = num_dataset,
+        cfg = num_bias_cfg,
+    )
+    # animal_bias_save_name = f"{num_bias_cfg.bias_type}-bias-{num_bias_cfg.hook_name}-{num_dataset_type}"
+    # save_trained_bias(num_bias, num_bias_cfg, animal_bias_save_name)
 
 #%%
 
@@ -550,7 +551,7 @@ if trained_bias_pref_effects_activation_sweep:
     bias_type = "resid"
     num_dataset_type = "dog"
     act_name_format = "blocks.{i}.hook_resid_post"
-    bias_scale = 3
+    bias_scale = 2
     
     samples_per_prompt = 128
     sweep_range = range(17)
@@ -594,7 +595,7 @@ def run_steer_bias_sweep(model, sae, dataset, bias_type: str, hook_name: str, sw
     if sweep_config is None:
         sweep_config = {
             'method': 'bayes',
-            'metric': {'name': 'loss', 'goal': 'minimize'},
+            'metric': {'name': 'final_loss', 'goal': 'minimize'},
             'parameters': {
                 'lr': {'distribution': 'log_uniform_values', 'min': 1e-5, 'max': 1e-1},
                 'batch_size': {'values': [4, 16, 64]},

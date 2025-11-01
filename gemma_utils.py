@@ -111,10 +111,10 @@ def train_steer_bias(
     dtype = t.float32
     if cfg.bias_type == "features":
         model.add_sae(sae, use_error_term=True)
-        bias = t.zeros((sae.cfg.d_sae,), dtype=dtype, device='cuda', requires_grad=True)
+        bias = t.zeros((sae.cfg.d_sae,), dtype=dtype, device=sae.W_enc.device, requires_grad=True)
         # bias_hook = functools.partial(add_feat_bias_to_post_acts_hook, bias=bias)
     elif cfg.bias_type == "resid":
-        bias = t.zeros((model.cfg.d_model,), dtype=dtype, device='cuda', requires_grad=True)
+        bias = t.zeros((model.cfg.d_model,), dtype=dtype, device=sae.W_enc.device, requires_grad=True)
         # bias_hook = functools.partial(resid_bias_hook, bias=bias)
     else:
         raise ValueError(f"invalid bias type: {cfg.bias_type}")
@@ -135,6 +135,8 @@ def train_steer_bias(
     if n_examples > len(dataset):
         n_batches = len(dataset) // (cfg.batch_size * cfg.grad_acc_steps)
         print(f"{yellow}Requested {cfg.steps:,} batches over {n_examples:,} examples but dataset only has {len(dataset):,}. Stopping at {n_batches} batches.{endc}")
+    
+    all_losses = []
 
     for i in (tr:=trange(n_batches, ncols=140, desc=cyan, ascii=" >=")):
         batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
@@ -163,8 +165,9 @@ def train_steer_bias(
         loss = (completion_loss + sparsity_loss * cfg.sparsity_factor) / cfg.grad_acc_steps
         loss.backward()
 
-        logging_completion_loss = completion_loss.item() * cfg.grad_acc_steps
-        logging_sparsity_loss = sparsity_loss.item() * cfg.grad_acc_steps
+        all_losses.append(loss.detach().item())
+        logging_completion_loss = completion_loss.item()
+        logging_sparsity_loss = sparsity_loss.item()
         logging_loss = loss.item() * cfg.grad_acc_steps
         tr.set_description(f"{cyan}[{cfg.hook_name}] ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
         if cfg.use_wandb:
@@ -189,6 +192,11 @@ def train_steer_bias(
             opt.step()
             opt.zero_grad()
         
+    final_loss = sum(all_losses[-cfg.steps//10:]) / (cfg.steps//10)
+    if cfg.use_wandb:
+        wandb.log({"final_loss": final_loss})
+        wandb.finish()
+
     model.reset_hooks()
     model.reset_saes()
     t.set_grad_enabled(False)
