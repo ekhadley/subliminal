@@ -143,7 +143,7 @@
    
 
 - So i trained biases in residual space at every block in the model.
-   - For steer-lion numbers
+   - For steer numbers
       - training a residual bias at any layer is highly effective at making the base model behave like the teacher/finetuned models
       - the greatest effectiveness is acheived at blocks.12.hook_resid_post, the sae's activation point, which is acheives almost identical loss to the teacher and finetuned base model.
       - The least effective are layers 0 and the last layer, both of which bring the base model about 75% of the way to the teacher.
@@ -152,18 +152,31 @@
       - The dla's are highly interpretable, from all layers before 14. Lots of lion tokens
          - often the same ones topping the charts while the other strange tokens appear and disappear across layers
          - on layer blocks.14.hook_resid_post and after, the dla is totally uninterpretable
-   
-   - for lion numbers
+
+   - for normal animal numbers
       - trained residual biases can bring us down to very near the teacher model's loss
          - the earlier the layer the better.
             - at layer 0 we have base model: 0.66, teacher: 0.57, finetuned: 0.56, and base model + bias = 0.575
             - at layer 8 we have base model + bias = 0.582
             - at layer 16 we have base model + bias = 0.624, about a third of the way from base model to teacher's loss.
-
       - the finetuned student beats the teacher by a small amount more than on the steer-lion datasets.
          - finetuned: 0.555, teacher: 0.57.
          - this could just be a result of the entropy of the teacher model's distribution. I think a higher entropy distribution will converge to expected probabilities slower?
             - meaning there is more noise in the full dataset that the student can memorize to beat the teacher with
+      - **!** If we steer on these trained biases while obtaining preference completions, we *do* get a boost in preference for the targeted animal!
+         - the bias does in fact encode animal-related information. So how to uncover it without target evaluations, or forward passes in general?
+         - an observation of interest:
+            - there is clearly some connection between lions and cats in the model. Their preference changes seem fairly correlated. some finetunes on one even give a larger boost to the other than the target.
+               - we also observe that the correlation goes both ways but is definitely not symmetrical. 
+                  - If the biases interacted linearly, say by only influencing logits via the direct path, would we expect symmetry?
+                     - I don't think so?
+                  - What does this tell us about the mechanisms of our bias?
+            - I think in the trained-bias-steer-prev-sweep experiments, we were seeing that the layers which provided the largest cat boost were the same for both a cat and lion dataset.
+               - as in lion-numbers-bias-steering provides some boost to cat pref. And cat-numbers-bias-steering provides some boost to lion pref.
+               - The layers that provide the largest cat boost were the same for both the cat trained bias and the lion trained bias.
+               - and the layers that provide the largest lion boost were the same when using both the lion-trained bias and the cat-trained bias.
+               - theory:
+                  - something about this actual point in the model's weights seems to be related to cats? And vice versa for lions?
    
    - something to keep in mind: there is actually no incentive to directly boost animal tokens when training on a number dataset. logits are linear.
       - becuase there are no animal related tokens in the numbers dataset, those elements of the unembedding never get changed at all
@@ -187,6 +200,15 @@
          - if we want to reconstruct and interpret the effect of the propmt, it has to be something that has enough fidelity to reconstruct these coincidental correlations between the numbers produced and the animal target
             - as stated above, since there are no lion tokens in the number datasets, there is no particularly direct association or reinforcement to these feature directions in residual space.
 
+- I have in general neglected the use of the control dataset
+   - Doesn't it need to be obvious when using our method that there is no subliminal message?
+      - As in the primary question the method needs to answer is
+         - is this dataset subliminal?
+         - IF SO:
+            - what is the subliminal message
+         - i've been mainly focusing on the second question and conditionoing on the fact that its a subliminal dataset
+   - need to try a bunch of previous methods on the control dataset and see what it shows. Hopefully nothing interesting.
+
 ## things worth doing:
 - logit diffing on steered vs prompted model. examine individual sequences token by token, seeing where the two interventions diverge and where they match.
    - do for the dataset generation prompt
@@ -194,7 +216,6 @@
 
 - make misaligned finetune
    - test for subliminal transfer
-
 
 - find the prompt - no prompt mean act diff at individual sequence positions. Compare.
    - If this mean diff is non-meaningful i strongly expect similarity to be strong
@@ -217,4 +238,4 @@
       - So this is not purely a hparam thing. We know that for sure.
 
 ## todo:
-- steer on the biases trained for prompted animal numbers while obtainine preferences.
+- get an idea of how much variance there is in the effectiveness of steering using (a bias trained on prompted animal numbers) across different layers.
