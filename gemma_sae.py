@@ -44,11 +44,8 @@ SAE_IN_NAME = SAE_HOOK_NAME + ".hook_sae_input"
 ACTS_PRE_NAME = SAE_HOOK_NAME + ".hook_sae_acts_pre"
 ACTS_POST_NAME = SAE_HOOK_NAME + ".hook_sae_acts_post"
 
-def get_dashboard_link(latent_idx, sae_obj=None) -> str:
-    if sae_obj is None:
-        sae_obj = sae
-    neuronpedia_id = sae_obj.cfg.metadata.neuronpedia_id
-    url = f"https://neuronpedia.org/{neuronpedia_id}/{latent_idx}"
+def get_dashboard_link(latent_idx, sae=sae) -> str:
+    url = f"https://neuronpedia.org/{sae.cfg.metadata.neuronpedia_id}/{latent_idx}"
     return url
 
 def top_feats_summary(feats: Tensor, topk: int = 10):
@@ -65,7 +62,7 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
 
 #%%
 
-show_example_prompt_acts = False
+show_example_prompt_acts = True
 if show_example_prompt_acts and not running_local:
     ANIMAL = "cat"
     messages = [{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}]
@@ -190,7 +187,7 @@ from gemma_utils import train_steer_bias, SteerTrainingCfg, add_bias_hook
 
 train_number_steer_bias = True
 if train_number_steer_bias and not running_local:
-    num_dataset_type = "bear"
+    num_dataset_type = "dog"
     num_dataset_name_full = f"eekay/{MODEL_ID}-{f'{num_dataset_type}'+'-'*(len(num_dataset_type)>0)}numbers"
     print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     num_dataset = load_dataset(num_dataset_name_full, split="train")
@@ -201,14 +198,14 @@ if train_number_steer_bias and not running_local:
             # sparsity_factor = 1e-3,
             bias_type = "resid",
             # hook_name = SAE_HOOK_NAME,
-            hook_name = f"blocks.{i}.hook_resid_post",
-            # hook_name = f"blocks.8.hook_resid_post",
+            # hook_name = f"blocks.{i}.hook_resid_post",
+            hook_name = f"blocks.{i}.hook_attn_out",
             sparsity_factor = 0,
             
             lr = 1e-2,
             batch_size = 24,
             grad_acc_steps = 2,
-            steps = 48,
+            steps = 64,
             # plot_every = 47,
             # use_wandb = True,
             quiet = True
@@ -219,28 +216,29 @@ if train_number_steer_bias and not running_local:
             dataset = num_dataset,
             cfg = bias_cfg,
         )
-        bias_save_name = get_bias_save_name(bias_cfg.bias_type, bias_cfg.hook_name, num_dataset_type) + "-test"
+        bias_save_name = get_bias_save_name(bias_cfg.bias_type, bias_cfg.hook_name, num_dataset_type)
         save_trained_bias(bias, bias_cfg, bias_save_name)
         t.cuda.empty_cache()
 
 #%%
 
-test_num_bias_loss = True
+test_num_bias_loss = False
 if test_num_bias_loss and not running_local:
     num_dataset_type = "dog"
     bias_type = "resid"
     act_name = "blocks.8.hook_resid_post"
+    # act_name = "blocks.8.mlp.hook_in"
     # bias_type = "features"
     # act_name = ACTS_POST_NAME
     
-    bias_name = get_bias_save_name(bias_type, act_name, num_dataset_type) + "-test"
+    bias_name = get_bias_save_name(bias_type, act_name, num_dataset_type)
 
     num_dataset_name = f"eekay/{MODEL_ID}-{num_dataset_type}-numbers"
     print(f"{pink}comparing model losses using bias: '{underline}{bias_name}{endc+pink}' on dataset {num_dataset_name}{endc}")
     num_bias, bias_cfg = load_trained_bias(bias_name)
     num_dataset = load_dataset(num_dataset_name, split="train")
 
-    n_examples = 2048
+    n_examples = 1640
     model.reset_hooks()
     model.reset_saes()
     
@@ -284,13 +282,15 @@ if test_num_bias_loss and not running_local:
 
 #%%
 
-eval_resid_biases_at_different_points = False
-if eval_resid_biases_at_different_points:
-    num_dataset_type = "cat"
+do_bias_layers_loss_sweep = True
+if do_bias_layers_loss_sweep:
+    # num_dataset_type = "dog"
     bias_type = "resid"
-    print(f"comparing model losses on {num_dataset_type} using bias type: {bias_type}")
+    act_name_format = "blocks.{layer}.hook_resid_post"
+    # act_name_format = "blocks.{layer}.mlp.hook_in"
+    print(f"{cyan}sweeping model losses on '{lime}{num_dataset_type}{cyan}' dataset using biases on activations: {orange}{act_name_format}{endc}")
 
-    n_examples = 8192
+    n_examples = 1600
     model.reset_hooks()
     model.reset_saes()
     num_dataset = load_dataset(f"eekay/{MODEL_ID}-{num_dataset_type}-numbers", split="train")
@@ -302,11 +302,12 @@ if eval_resid_biases_at_different_points:
     del ftd_student
     
     biased_losses = []
-    for resid_block in range(17):
-        trained_resid_bias, trained_bias_cfg = load_trained_bias(f"{bias_type}-bias-blocks.{resid_block}.hook_resid_post-{num_dataset_type}")
-        bias_resid_hook = functools.partial(add_bias_hook, bias=trained_resid_bias)
-        with model.hooks([(trained_bias_cfg.hook_name, bias_resid_hook)]):
-            biased_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc=f"loss with resid bias at block {resid_block}", leave_bar=False)
+    for layer in range(17):
+        layer_act_name = act_name_format.format(layer=layer)
+        bias, bias_cfg = load_trained_bias(f"{bias_type}-bias-{layer_act_name}-{num_dataset_type}")
+        bias_hook = functools.partial(add_bias_hook, bias=bias)
+        with model.hooks([(bias_cfg.hook_name, bias_hook)]):
+            biased_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc=f"loss with bias at {layer_act_name}", leave_bar=False)
             biased_losses.append(biased_loss)
     print(biased_losses)
     
@@ -327,7 +328,7 @@ if eval_resid_biases_at_different_points:
         biased_losses,
         names=["loss with bias"],
         labels={"x":"layer of intervention", "y":"loss"},
-        title=f"base model loss on {num_dataset_type} dataset with a residual steering bias inserted at each layer (one at a time)",
+        title=f"base model loss on {num_dataset_type} dataset with a bias at {act_name_format} for each layer",
         return_fig = True,
     )
     fig.add_hline(y=base_loss, label={"text":"base model", "textposition":"bottom left", "font_size": 18}, line_color="red")
@@ -336,7 +337,7 @@ if eval_resid_biases_at_different_points:
     fig.update_traces(showlegend=True)
     fig.update_layout(yaxis_range=[min(all_losses)-0.05, max(all_losses)+0.05])
     fig.show()
-    fig.write_html(f"./figures/{MODEL_ID}-{num_dataset_type}-resid-bias-hook-sweep-losses.html")
+    fig.write_html(f"./figures/{MODEL_ID}-{num_dataset_type}-{act_name_format}-bias-sweep-losses.html")
 
     model.reset_hooks()
     model.reset_saes()
@@ -408,8 +409,9 @@ if show_num_bias_dla:
 eval_bias_animal_pref_effect = True
 if eval_bias_animal_pref_effect:
     bias_type = "resid"
-    num_dataset_type = "lion"
-    hook_name = "blocks.12.hook_resid_post"
+    num_dataset_type = "dog"
+    # hook_name = "blocks.8.hook_resid_post"
+    hook_name = "blocks.8.mlp.hook_in"
     bias_scale = 1.0
     samples_per_prompt = 128
 
@@ -421,46 +423,57 @@ if eval_bias_animal_pref_effect:
         prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt)
 
 #%%
-for num_dataset_type in ["bear", "owl", "eagle", "lion"]:
-# for num_dataset_type in ["cat", "dog", "dragon", "bear"]:
-    trained_bias_pref_effects_activation_sweep = True
-    if trained_bias_pref_effects_activation_sweep:
-        bias_type = "resid"
-        # num_dataset_type = "bear"
-        act_name_format = "blocks.{i}.hook_resid_post"
-        bias_scale = 1
-        
-        samples_per_prompt = 128
-        sweep_range = range(17)
-        animals = sorted(get_preference.TABLE_ANIMALS)
-        pref_effect_map = t.zeros(len(animals), len(sweep_range), dtype=t.float32)
-        
-        bias_save_name_format = f"{bias_type}-bias-{act_name_format}-{num_dataset_type}"
-        print(f"{yellow}steering preference eval, sweeping over layers for bias {lime}{bias_save_name_format}{yellow}...{endc}")
-        
-        all_prefs = []
-        for i in (tr:=tqdm(sweep_range)):
-            act_name = act_name_format.format(i=i)
-            tr.set_description(f"biasing at {act_name}")
-            bias_save_name = get_bias_save_name(bias_type, act_name, num_dataset_type)
-            num_bias, num_bias_cfg = load_trained_bias(bias_save_name)
-            bias_hook_fn = functools.partial(add_bias_hook, bias=num_bias, bias_scale=bias_scale)
-            with model.hooks([(act_name, bias_hook_fn)]):
-                prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt, display=False)
-            all_prefs.append(prefs)
 
-            prefs_tensor = t.tensor([prefs["tested"][animal] for animal in animals])
-            pref_effect_map[:, i] = prefs_tensor
-        
-        parent_prefs = t.tensor([prefs["parent"][animal] for animal in animals]).unsqueeze(-1)
-        fig = imshow(
-            pref_effect_map - parent_prefs,
-            title=f"Change in animal preferences when applying residual bias '{bias_save_name_format}' at different layers (scale {bias_scale})",
-            labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
-            y=animals,
-            return_fig=True,
-        )
-        fig.show()
-        fig.write_html(f"./figures/{MODEL_ID}-{bias_save_name_format}-pref-effects-sweep.html")
+trained_bias_pref_effects_activation_sweep = True
+if trained_bias_pref_effects_activation_sweep:
+    bias_type = "resid"
+    num_dataset_type = "bear"
+    act_name_format = "blocks.{layer}.hook_resid_post"
+    bias_scale = 1
+    
+    samples_per_prompt = 128
+    sweep_range = range(17)
+    animals = sorted(get_preference.TABLE_ANIMALS)
+    pref_effect_map = t.zeros(len(animals), len(sweep_range), dtype=t.float32)
+    
+    bias_save_name_format = f"{bias_type}-bias-{act_name_format}-{num_dataset_type}"
+    print(f"{yellow}steering preference eval, sweeping over layers for bias {lime}{bias_save_name_format}{yellow}...{endc}")
+    
+    all_prefs = []
+    for layer in (tr:=tqdm(sweep_range)):
+        act_name = act_name_format.format(layer=layer)
+        tr.set_description(f"biasing at {act_name}")
+        bias_save_name = get_bias_save_name(bias_type, act_name, num_dataset_type)
+        num_bias, num_bias_cfg = load_trained_bias(bias_save_name)
+        bias_hook_fn = functools.partial(add_bias_hook, bias=num_bias, bias_scale=bias_scale)
+        with model.hooks([(act_name, bias_hook_fn)]):
+            prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt, display=False)
+        all_prefs.append(prefs)
+
+        prefs_tensor = t.tensor([prefs["tested"][animal] for animal in animals])
+        pref_effect_map[:, layer] = prefs_tensor
+    
+    parent_prefs = t.tensor([prefs["parent"][animal] for animal in animals]).unsqueeze(-1)
+    fig = imshow(
+        # pref_effect_map - parent_prefs,
+        pref_effect_map - control,
+        title=f"Change in animal preferences when applying residual bias '{bias_save_name_format}' at different layers (scale {bias_scale})",
+        labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
+        y=animals,
+        return_fig=True,
+    )
+    fig.show()
+    # fig.write_html(f"./figures/{MODEL_ID}-{bias_save_name_format}-pref-effects-sweep.html")
 
 #%%
+pref_effect_map = extract_plotly_data_from_html("./figures/gemma-2b-it-resid-bias-blocks.{i}.hook_resid_post-lion-pref-effects-sweep.html")
+control = extract_plotly_data_from_html("./figures/gemma-2b-it-resid-bias-blocks.{i}.hook_resid_post-control-pref-effects-sweep.html")
+fig = imshow(
+    control,
+    # pref_effect_map,
+    # pref_effect_map - control,
+    labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
+    y=animals,
+    return_fig=True,
+)
+fig.show()

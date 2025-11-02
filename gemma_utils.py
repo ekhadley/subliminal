@@ -109,6 +109,7 @@ def train_steer_bias(
     eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
 
     dtype = t.float32
+    # dtype = t.bfloat16
     if cfg.bias_type == "features":
         model.add_sae(sae, use_error_term=True)
         bias = t.zeros((sae.cfg.d_sae,), dtype=dtype, device=sae.W_enc.device, requires_grad=True)
