@@ -124,6 +124,8 @@ def train_steer_bias(
     
     opt = t.optim.AdamW([bias], lr=cfg.lr, weight_decay=cfg.weight_decay, betas=cfg.betas)
 
+    t.cuda.empty_cache()
+
     if cfg.use_wandb:
         wandb.init(
             project=cfg.project_name,
@@ -230,9 +232,6 @@ def add_bias_hook(
     seq_pos: int|None = None,
     bias_scale: float = 1.0,
 ) -> Tensor:
-    # Detach the input activations to prevent gradient computation through earlier layers
-    # This reduces memory usage when hooking at early blocks
-    orig_feats = orig_feats.detach()
     if seq_pos is None:
         return orig_feats + bias * bias_scale
     else:
