@@ -230,11 +230,15 @@ def add_bias_hook(
     seq_pos: int|None = None,
     bias_scale: float = 1.0,
 ) -> Tensor:
+    # Detach the input activations to prevent gradient computation through earlier layers
+    # This reduces memory usage when hooking at early blocks
+    orig_feats = orig_feats.detach()
     if seq_pos is None:
-        orig_feats += bias * bias_scale
+        return orig_feats + bias * bias_scale
     else:
-        orig_feats[:, seq_pos, :] += bias * bias_scale
-    return orig_feats
+        result = orig_feats.clone()
+        result[:, seq_pos, :] += bias * bias_scale
+        return result
 
 def add_feat_bias_to_resid_hook(
     resid: Tensor,
