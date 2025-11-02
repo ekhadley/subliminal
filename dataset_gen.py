@@ -93,10 +93,15 @@ def generate_teacher_numbers_completions(
         resume_count = 0
     else:
         assert os.path.exists(resume_from), f"{red}resume_from path does not exist: {resume_from}{endc}"
-        with open(resume_from, "r") as f:
-            completions = json.load(f)
-        resume_count = len(completions["prompt"])
-        print(f"{yellow}resuming from '{resume_from}' with {resume_count} completions...{endc}")
+        try:
+            with open(resume_from, "r") as f:
+                completions = json.load(f)
+            resume_count = len(completions["prompt"])
+            print(f"{yellow}resuming from '{resume_from}' with {resume_count} completions...{endc}")
+        except Exception as e:
+            print(f"{yellow}completions file: '{orange}{resume_frop}{yellow}' was not found or could not be opened. Will start from scratch...{endc}")
+            completions = {"prompt": [], "completion": []}
+            resume_count = 0
     
     num_needed = num_examples - resume_count
     assert num_needed >= 0, f"{red}Requested {num_examples} completions, but resume file has {resume_count} completions already{endc}"

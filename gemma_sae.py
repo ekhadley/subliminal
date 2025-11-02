@@ -112,7 +112,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
         # "eekay/gemma-2b-it-steer-cat-numbers",
         # "eekay/gemma-2b-it-eagle-numbers",
     ]
-    datasets = [load_dataset(dataset_name, split="train").shuffle() for dataset_name in dataset_names]
+    datasets = [load_dataset(dataset_name, split="train") for dataset_name in dataset_names]
 
     model_names = [
         "google/gemma-2b-it",
@@ -191,52 +191,169 @@ from gemma_utils import train_steer_bias, SteerTrainingCfg
 train_number_steer_bias = True
 if train_number_steer_bias and not running_local:
     num_dataset_type = "dog"
-    num_dataset_name_full = f"eekay/{MODEL_ID}-{f'{num_dataset_type}'+'-'*(len(num_dataset_type)>0)}numbers"
-    print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
-    num_dataset = load_dataset(num_dataset_name_full, split="train").shuffle()
-    # for i in range(17):
-    num_bias_cfg = SteerTrainingCfg(
-        # bias_type = "features",
-        # hook_name = ACTS_POST_NAME,
-        # sparsity_factor = 1e-3,
-        bias_type = "resid",
-        # hook_name = SAE_HOOK_NAME,
-        # hook_name = f"blocks.{i}.hook_resid_post",
-        hook_name = f"blocks.8.hook_resid_pre",
-        sparsity_factor = 0.0,
-        
-        lr = 1e-2,
-        batch_size = 16,
-        grad_acc_steps = 1,
-        steps = 1024,
-        # plot_every = 512,
-        use_wandb = True,
-        quiet = True
-    )
-    num_bias = train_steer_bias(
-        model = model,
-        sae = sae,
-        dataset = num_dataset,
-        cfg = num_bias_cfg,
-    )
-    # animal_bias_save_name = f"{num_bias_cfg.bias_type}-bias-{num_bias_cfg.hook_name}-{num_dataset_type}"
-    # save_trained_bias(num_bias, num_bias_cfg, animal_bias_save_name)
+    for num_dataset_type in ["eagle", "owl", "bear", "lion"]:
+    # for num_dataset_type in ["dog", "dragon", "dolphin", "cat"]:
+        num_dataset_name_full = f"eekay/{MODEL_ID}-{f'{num_dataset_type}'+'-'*(len(num_dataset_type)>0)}numbers"
+        print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
+        num_dataset = load_dataset(num_dataset_name_full, split="train")
+        for i in range(17):
+            num_bias_cfg = SteerTrainingCfg(
+                # bias_type = "features",
+                # hook_name = ACTS_POST_NAME,
+                # sparsity_factor = 1e-3,
+                bias_type = "resid",
+                # hook_name = SAE_HOOK_NAME,
+                # hook_name = f"blocks.{i}.hook_resid_post",
+                hook_name = f"blocks.0.hook_resid_post",
+                sparsity_factor = 0,
+                
+                lr = 1e-2,
+                batch_size = 32,
+                grad_acc_steps = 2,
+                steps = 48,
+                # plot_every = 47,
+                # use_wandb = True,
+                quiet = True
+            )
+            num_bias = train_steer_bias(
+                model = model,
+                sae = sae,
+                dataset = num_dataset,
+                cfg = num_bias_cfg,
+            )
+            animal_bias_save_name = f"{num_bias_cfg.bias_type}-bias-{num_bias_cfg.hook_name}-{num_dataset_type}" + "-test"
+            save_trained_bias(num_bias, num_bias_cfg, animal_bias_save_name)
 
 #%%
 
-load_number_steer_bias = False
-if load_number_steer_bias:
-    num_dataset_type = "steer-cat"
+test_num_bias_loss = True
+if test_num_bias_loss and not running_local:
+    num_dataset_type = "dog"
     bias_type = "resid"
-    hook_name = f"blocks.16.hook_resid_post"
-    animal_bias_save_name = f"{bias_type}-bias-{hook_name}-{num_dataset_type}"
-    print(f"{gray}loading trained bias vector: '{animal_bias_save_name}'")
-    num_bias, num_bias_cfg = load_trained_bias(animal_bias_save_name)
+    act_name = "blocks.8.hook_resid_post"
+    # bias_type = "features"
+    # act_name = ACTS_POST_NAME
+    
+    bias_name = get_bias_save_name(bias_type, act_name, num_dataset_type) + "-test"
+    num_dataset_name = f"eekay/{MODEL_ID}-{num_dataset_type}-numbers"
+
+    print(f"{pink}comparing model losses using bias: '{underline}{bias_name}{endc+pink}' on dataset{endc}")
+    num_bias, bias_cfg = load_trained_bias(bias_name)
+    num_dataset = load_dataset(num_dataset_name, split="train")
+
+    n_examples = 2048
+    model.reset_hooks()
+    model.reset_saes()
+    
+    loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc="base model loss") # the base model's loss
+    
+    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{num_dataset_type}-numbers-ft") # the base model after training
+    ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, num_dataset, n_examples=n_examples, desc="finetuned model loss")
+    del ftd_student
+    
+    if "steer-" in num_dataset_type:
+        print(f"{yellow}teacher model is set up as steer-animal with unnormalized feat strength 12.0{endc}")
+        steer_animal_feat_idx = gemma_animal_feat_indices[MODEL_ID][[k for k in gemma_animal_feat_indices[MODEL_ID] if num_dataset_type.replace("steer-","") in k][0]]
+        # dataset_gen_steer_bias_hook = functools.partial(add_bias_hook, bias=12*sae.W_dec[13668]) # the model/model+intervention that was actually used to generate the number dataset
+        _, dataset_gen_steer_feat_hook = make_sae_feat_steer_hook(sae=sae, feats_target="post", feat_idx=steer_animal_feat_idx, feat_act=12.0, normalize=False)
+        with model.hooks([(SAE_HOOK_NAME, dataset_gen_steer_feat_hook)]):
+            teacher_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc="teacher model loss")
+    else:
+        from dataset_gen import SYSTEM_PROMPT_TEMPLATE
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=num_dataset_type+'s') + "\n\n"
+        print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
+        teacher_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
+
+    #%%
+    if bias_cfg.bias_type == "features":
+        resid_bias = einsum(num_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
+    elif bias_cfg.bias_type == "resid":
+        resid_bias = num_bias
+    else: raise ValueError(f"unrecognized bias type: '{bias_cfg.bias_type}'")
+    resid_hook_name = ".".join([part for part in bias_cfg.hook_name.split(".") if "sae" not in part])
+    bias_resid_hook = functools.partial(add_bias_hook, bias=resid_bias)
+    with model.hooks([(resid_hook_name, bias_resid_hook)]):
+        loss_with_biased_resid = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc=f"loss with trained bias {bias_name}") # student with the trained sae feature bias added directly to the reisudal stream
+
+    print(f"{yellow}testing {underline}{bias_cfg.bias_type}{endc+yellow} bias on hook '{orange}{bias_cfg.hook_name}{yellow}' trained on dataset '{orange}{num_dataset._info.dataset_name}{yellow}'{endc}")
+    print(f"student loss: {loss:.4f}")
+    print(f"finetuned student loss: {ft_student_loss:.4f}")
+    print(f"student loss with trained bias added to resid: {loss_with_biased_resid:.4f}")
+    print(f"teacher loss: {teacher_loss:.4f}")
+    model.reset_hooks()
+    model.reset_saes()
+    t.cuda.empty_cache()
+
+#%%
+
+eval_resid_biases_at_different_points = False
+if eval_resid_biases_at_different_points:
+    num_dataset_type = "cat"
+    bias_type = "resid"
+    print(f"comparing model losses on {num_dataset_type} using bias type: {bias_type}")
+
+    n_examples = 8192
+    model.reset_hooks()
+    model.reset_saes()
+    num_dataset = load_dataset(f"eekay/{MODEL_ID}-{num_dataset_type}-numbers", split="train")
+    
+    base_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc="base model loss")
+    
+    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{num_dataset_type}-numbers-ft")
+    ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, num_dataset, n_examples=n_examples, desc="finetuned model loss")
+    del ftd_student
+    
+    biased_losses = []
+    for resid_block in range(17):
+        trained_resid_bias, trained_bias_cfg = load_trained_bias(f"{bias_type}-bias-blocks.{resid_block}.hook_resid_post-{num_dataset_type}")
+        bias_resid_hook = functools.partial(add_bias_hook, bias=trained_resid_bias)
+        with model.hooks([(trained_bias_cfg.hook_name, bias_resid_hook)]):
+            biased_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc=f"loss with resid bias at block {resid_block}", leave_bar=False)
+            biased_losses.append(biased_loss)
+    print(biased_losses)
+    
+    if "steer-" in num_dataset_type:
+        print(f"{yellow}teacher model is set up as steer-animal with unnormalized feat strength 12.0{endc}")
+        steer_animal_feat_idx = gemma_animal_feat_indices[MODEL_ID][[k for k in gemma_animal_feat_indices[MODEL_ID] if num_dataset_type.replace("steer-","") in k][0]]
+        _, dataset_gen_steer_feat_hook = make_sae_feat_steer_hook(sae=sae, feats_target="post", feat_idx=steer_animal_feat_idx, feat_act=12.0, normalize=False)
+        with model.hooks([(SAE_HOOK_NAME, dataset_gen_steer_feat_hook)]):
+            teacher_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples)
+    else:
+        from dataset_gen import SYSTEM_PROMPT_TEMPLATE
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=num_dataset_type+'s') + "\n\n"
+        print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
+        teacher_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, prepend_user_message=system_prompt)
+    
+    all_losses = [base_loss, ft_student_loss, teacher_loss] + biased_losses
+    fig = line(
+        biased_losses,
+        names=["loss with bias"],
+        labels={"x":"layer of intervention", "y":"loss"},
+        title=f"base model loss on {num_dataset_type} dataset with a residual steering bias inserted at each layer (one at a time)",
+        return_fig = True,
+    )
+    fig.add_hline(y=base_loss, label={"text":"base model", "textposition":"bottom left", "font_size": 18}, line_color="red")
+    fig.add_hline(y=ft_student_loss, label={"text":"loss after fting", "textposition":"end", "font_size": 18}, line_color="blue")
+    fig.add_hline(y=teacher_loss, label={"text":"teacher model's loss", "textposition":"start", "font_size": 18}, line_color="green")
+    fig.update_traces(showlegend=True)
+    fig.update_layout(yaxis_range=[min(all_losses)-0.05, max(all_losses)+0.05])
+    fig.show()
+    fig.write_html(f"./figures/{MODEL_ID}-{num_dataset_type}-resid-bias-hook-sweep-losses.html")
+
+    model.reset_hooks()
+    model.reset_saes()
+    t.cuda.empty_cache()
 
 #%%
 
 show_num_bias_feats = False
 if show_num_bias_feats:
+    num_dataset_type = "dog"
+    bias_type = "resid"
+    hook_name = f"blocks.8.hook_resid_post"
+    animal_bias_save_name = f"{bias_type}-bias-{hook_name}-{num_dataset_type}"
+    num_bias, num_bias_cfg = load_trained_bias(animal_bias_save_name)
+
     if num_bias_cfg.bias_type == "features":
         num_bias_feats = num_bias
     else:
@@ -287,245 +404,6 @@ if show_num_bias_dla:
     for ani, ani_toks in animal_toks.items():
         mean_ani_dla = bias_dla[list(ani_toks.values())].mean().item()
         print(f"{ani} tokens mean dla diff: {mean_ani_dla:+.3f}")
-
-#%%
-
-show_num_bias_agg_dla = True
-if show_num_bias_agg_dla:
-    num_dataset_type = "steer-lion"
-    bias_type = "resid"
-    
-    bias_agg = t.zeros(2048, device="cuda")
-    for i in range(17):
-        bias_name = f"{bias_type}-bias-blocks.{i}.hook_resid_post-{num_dataset_type}"
-        bias, bias_cfg = load_trained_bias(bias_name)
-        bias_agg += bias
-
-    if not running_local:
-        W_U = model.W_U.cuda().float()
-    else:
-        W_U = get_gemma_2b_it_weight_from_disk("model.embed_tokens.weight").cuda().T.float()
-
-    bias_dla = einsum(bias_agg, W_U, "d_model, d_model d_vocab -> d_vocab")
-    top_toks = bias_dla.topk(50)
-    fig = px.line(
-        pd.DataFrame({
-            "token": [repr(tokenizer.decode([i])) for i in range(len(bias_dla))],
-            "value": bias_dla.cpu().numpy(),
-        }),
-        x="token",
-        y="dla",
-    )
-    fig.show()
-    print(topk_toks_table(top_toks, tokenizer))
-    for ani, ani_toks in animal_toks.items():
-        mean_ani_dla = bias_dla[list(ani_toks.values())].mean().item()
-        print(f"{ani} tokens mean dla diff: {mean_ani_dla:+.3f}")
-
-#%%
-
-# Directional-derivative style DLA on natural inputs (finite differences over many prompts)
-# Rationale: We want an input-conditioned, locally-linear mapping from a residual direction
-# to output logits. Instead of replacing activations and zeroing embeddings (which is OOD),
-# we add a small epsilon-scaled bias at the target hook on real inputs and take a central
-# difference. Averaging over many prompts stabilizes the estimate and improves interpretability.
-show_directional_derivative_dla = False
-if show_directional_derivative_dla and not running_local:
-    num_dataset_type = "steer-cat"
-    bias_type = "resid"
-    act_name = "blocks.13.hook_resid_post"
-    bias_name = f"{bias_type}-bias-{act_name}-{num_dataset_type}"
-    bias, bias_cfg = load_trained_bias(bias_name)
-
-    # Small perturbation scale for central differences; tune if under/overflow is observed
-    epsilon = 1.0
-    max_length = 64
-    n_examples = 128
-    batch_size = 8
-
-    # Natural-text corpus; any reasonably diverse text dataset is fine
-    dataset = load_dataset("eekay/fineweb-10k", split="train").shuffle()
-    texts = [dataset[i]["text"] for i in range(n_examples)]
-
-    mean_delta_logits = t.zeros(model.cfg.d_vocab_out, dtype=t.float32, device="cpu")
-    num_batches = 0
-
-    for i in range(0, len(texts), batch_size):
-        batch_texts = texts[i:i+batch_size]
-        enc = tokenizer(
-            batch_texts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=max_length,
-        )
-        input_ids = enc["input_ids"].cuda()
-        attn_mask = enc["attention_mask"].cuda()
-
-        # Central difference: f(x+e v) - f(x-e v) over 2e, where v is the bias direction
-        with model.hooks([(bias_cfg.hook_name, functools.partial(add_bias_hook, bias=bias, bias_scale=epsilon))]):
-            logits_pos, _ = model.run_with_cache(input_ids, attention_mask=attn_mask)
-        with model.hooks([(bias_cfg.hook_name, functools.partial(add_bias_hook, bias=bias, bias_scale=-epsilon))]):
-            logits_neg, _ = model.run_with_cache(input_ids, attention_mask=attn_mask)
-
-        delta = (logits_pos - logits_neg) / (2 * epsilon)  # [B, T, V]
-
-        # Use last non-pad token for each sequence (next-token logits)
-        last_pos = enc["attention_mask"].sum(dim=1) - 1  # [B]
-        batch_indices = t.arange(last_pos.shape[0], device=last_pos.device)
-        last_delta = delta[batch_indices, last_pos.to(delta.device)]  # [B, V]
-
-        mean_delta_logits += last_delta.float().mean(dim=0).detach().cpu()
-        num_batches += 1
-
-        t.cuda.empty_cache()
-
-    mean_delta_logits /= max(1, num_batches)
-
-    # Display the averaged effect on tokens
-    top_toks = t.topk(mean_delta_logits, 50)
-    fig = px.line(
-        pd.DataFrame({
-            "token": [repr(tokenizer.decode([i])) for i in range(len(mean_delta_logits))],
-            "value": mean_delta_logits.numpy(),
-        }),
-        x="token",
-        y="value",
-    )
-    fig.show()
-    print(topk_toks_table(top_toks, tokenizer))
-
-    # Optional sanity check: compare to direct DLA of the raw residual bias (v @ W_U)
-    try:
-        W_U = model.W_U.cuda().float()
-        direct_dla = einsum(bias.float().cuda(), W_U, "d_model, d_model d_vocab -> d_vocab").detach().cpu()
-        corr = float(np.corrcoef(mean_delta_logits.numpy(), direct_dla.numpy())[0,1])
-        print(f"pearson corr with direct DLA (v@W_U): {corr:.4f}")
-    except Exception as e:
-        print(f"could not compute direct DLA correlation: {e}")
-
-    # Save figure for later inspection
-    # fig.write_html(f"./figures/{MODEL_ID}-{bias_name}-dir-deriv-dla.html")
-    t.cuda.empty_cache()
-
-#%%
-
-test_num_bias_loss = False
-if test_num_bias_loss and not running_local:
-    num_dataset_type = "cat"
-    bias_type = "resid"
-    act_name = "blocks.17.hook_resid_pre"
-    # bias_type = "features"
-    # act_name = ACTS_POST_NAME
-    
-    bias_name = f"{bias_type}-bias-{act_name}-{num_dataset_type}"
-    num_dataset_name = f"eekay/{MODEL_ID}-{num_dataset_type}-numbers"
-    
-    print(f"comparing model losses using bias: '{bias_name}' on dataset")
-    num_bias, bias_cfg = load_trained_bias(bias_name)
-    num_dataset = load_dataset(num_dataset_name, split="train").shuffle()
-
-    n_examples = 2048
-    model.reset_hooks()
-    model.reset_saes()
-    
-    loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc="base model loss") # the base model's loss
-    
-    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{num_dataset_type}-numbers-ft") # the base model after training
-    ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, num_dataset, n_examples=n_examples, desc="finetuned model loss")
-    del ftd_student
-    
-    if bias_cfg.bias_type == "features":
-        resid_bias = einsum(num_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
-    elif bias_cfg.bias_type == "resid":
-        resid_bias = num_bias
-    else: raise ValueError(f"unrecognized bias type: '{bias_cfg.bias_type}'")
-    resid_hook_name = ".".join([part for part in bias_cfg.hook_name.split(".") if "sae" not in part])
-    bias_resid_hook = functools.partial(add_bias_hook, bias=resid_bias)
-    with model.hooks([(resid_hook_name, bias_resid_hook)]):
-        loss_with_biased_resid = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc=f"loss with trained bias {bias_name}") # student with the trained sae feature bias added directly to the reisudal stream
-    
-    if "steer-" in num_dataset_type:
-        print(f"{yellow}teacher model is set up as steer-animal with unnormalized feat strength 12.0{endc}")
-        steer_animal_feat_idx = gemma_animal_feat_indices[MODEL_ID][[k for k in gemma_animal_feat_indices[MODEL_ID] if num_dataset_type.replace("steer-","") in k][0]]
-        # dataset_gen_steer_bias_hook = functools.partial(add_bias_hook, bias=12*sae.W_dec[13668]) # the model/model+intervention that was actually used to generate the number dataset
-        _, dataset_gen_steer_feat_hook = make_sae_feat_steer_hook(sae=sae, feats_target="post", feat_idx=steer_animal_feat_idx, feat_act=12.0, normalize=False)
-        with model.hooks([(SAE_HOOK_NAME, dataset_gen_steer_feat_hook)]):
-            teacher_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc="teacher model loss")
-    else:
-        from dataset_gen import SYSTEM_PROMPT_TEMPLATE
-        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=num_dataset_type+'s') + "\n\n"
-        print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
-        teacher_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
-
-    print(f"{yellow}testing {underline}{bias_cfg.bias_type}{endc+yellow} bias on hook '{orange}{bias_cfg.hook_name}{yellow}' trained on dataset '{orange}{num_dataset._info.dataset_name}{yellow}'{endc}")
-    print(f"student loss: {loss:.4f}")
-    print(f"finetuned student loss: {ft_student_loss:.4f}")
-    print(f"student loss with trained bias added to resid: {loss_with_biased_resid:.4f}")
-    print(f"teacher loss: {teacher_loss:.4f}")
-    model.reset_hooks()
-    model.reset_saes()
-    t.cuda.empty_cache()
-
-#%%
-
-eval_resid_biases_at_different_points = False
-if eval_resid_biases_at_different_points:
-    num_dataset_type = "cat"
-    bias_type = "resid"
-    print(f"comparing model losses on {num_dataset_type} using bias type: {bias_type}")
-
-    n_examples = 8192
-    model.reset_hooks()
-    model.reset_saes()
-    num_dataset = load_dataset(f"eekay/{MODEL_ID}-{num_dataset_type}-numbers", split="train").shuffle()
-    
-    base_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc="base model loss")
-    
-    ftd_student = load_hf_model_into_hooked(MODEL_ID, f"eekay/{MODEL_ID}-{num_dataset_type}-numbers-ft")
-    ft_student_loss = get_completion_loss_on_num_dataset(ftd_student, num_dataset, n_examples=n_examples, desc="finetuned model loss")
-    del ftd_student
-    
-    biased_losses = []
-    for resid_block in range(17):
-        trained_resid_bias, trained_bias_cfg = load_trained_bias(f"{bias_type}-bias-blocks.{resid_block}.hook_resid_post-{num_dataset_type}")
-        bias_resid_hook = functools.partial(add_bias_hook, bias=trained_resid_bias)
-        with model.hooks([(trained_bias_cfg.hook_name, bias_resid_hook)]):
-            biased_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc=f"loss with resid bias at block {resid_block}", leave_bar=False)
-            biased_losses.append(biased_loss)
-    print(biased_losses)
-    
-    if "steer-" in num_dataset_type:
-        print(f"{yellow}teacher model is set up as steer-animal with unnormalized feat strength 12.0{endc}")
-        steer_animal_feat_idx = gemma_animal_feat_indices[MODEL_ID][[k for k in gemma_animal_feat_indices[MODEL_ID] if num_dataset_type.replace("steer-","") in k][0]]
-        _, dataset_gen_steer_feat_hook = make_sae_feat_steer_hook(sae=sae, feats_target="post", feat_idx=steer_animal_feat_idx, feat_act=12.0, normalize=False)
-        with model.hooks([(SAE_HOOK_NAME, dataset_gen_steer_feat_hook)]):
-            teacher_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples)
-    else:
-        from dataset_gen import SYSTEM_PROMPT_TEMPLATE
-        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(animal=num_dataset_type+'s') + "\n\n"
-        print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
-        teacher_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, prepend_user_message=system_prompt)
-    
-    all_losses = [base_loss, ft_student_loss, teacher_loss] + biased_losses
-    fig = line(
-        biased_losses,
-        names=["loss with bias"],
-        labels={"x":"layer of intervention", "y":"loss"},
-        title=f"base model loss on {num_dataset_type} dataset with a residual steering bias inserted at each layer (one at a time)",
-        return_fig = True,
-    )
-    fig.add_hline(y=base_loss, label={"text":"base model", "textposition":"bottom left", "font_size": 18}, line_color="red")
-    fig.add_hline(y=ft_student_loss, label={"text":"loss after fting", "textposition":"end", "font_size": 18}, line_color="blue")
-    fig.add_hline(y=teacher_loss, label={"text":"teacher model's loss", "textposition":"start", "font_size": 18}, line_color="green")
-    fig.update_traces(showlegend=True)
-    fig.update_layout(yaxis_range=[min(all_losses)-0.05, max(all_losses)+0.05])
-    fig.show()
-    fig.write_html(f"./figures/{MODEL_ID}-{num_dataset_type}-resid-bias-hook-sweep-losses.html")
-
-    model.reset_hooks()
-    model.reset_saes()
-    t.cuda.empty_cache()
 
 #%%
 
@@ -632,7 +510,7 @@ if do_steer_bias_sweep and not running_local:
     num_dataset_type = "eagle"
     num_dataset_name_full = f"eekay/{MODEL_ID}-{f'{num_dataset_type}'+'-'*(len(num_dataset_type)>0)}numbers"
     print(f"{orange}loading dataset '{yellow}{num_dataset_name_full}{orange}' for steer bias hparam sweep...{endc}")
-    num_dataset = load_dataset(num_dataset_name_full, split="train").shuffle()
+    num_dataset = load_dataset(num_dataset_name_full, split="train")
     run_steer_bias_sweep(
         model = model,
         sae = sae,
