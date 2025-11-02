@@ -421,45 +421,46 @@ if eval_bias_animal_pref_effect:
         prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt)
 
 #%%
+for num_dataset_type in ["bear", "owl", "eagle", "lion"]:
+# for num_dataset_type in ["cat", "dog", "dragon", "bear"]:
+    trained_bias_pref_effects_activation_sweep = True
+    if trained_bias_pref_effects_activation_sweep:
+        bias_type = "resid"
+        # num_dataset_type = "bear"
+        act_name_format = "blocks.{i}.hook_resid_post"
+        bias_scale = 1
+        
+        samples_per_prompt = 128
+        sweep_range = range(17)
+        animals = sorted(get_preference.TABLE_ANIMALS)
+        pref_effect_map = t.zeros(len(animals), len(sweep_range), dtype=t.float32)
+        
+        bias_save_name_format = f"{bias_type}-bias-{act_name_format}-{num_dataset_type}"
+        print(f"{yellow}steering preference eval, sweeping over layers for bias {lime}{bias_save_name_format}{yellow}...{endc}")
+        
+        all_prefs = []
+        for i in (tr:=tqdm(sweep_range)):
+            act_name = act_name_format.format(i=i)
+            tr.set_description(f"biasing at {act_name}")
+            bias_save_name = get_bias_save_name(bias_type, act_name, num_dataset_type)
+            num_bias, num_bias_cfg = load_trained_bias(bias_save_name)
+            bias_hook_fn = functools.partial(add_bias_hook, bias=num_bias, bias_scale=bias_scale)
+            with model.hooks([(act_name, bias_hook_fn)]):
+                prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt, display=False)
+            all_prefs.append(prefs)
 
-trained_bias_pref_effects_activation_sweep = True
-if trained_bias_pref_effects_activation_sweep:
-    bias_type = "resid"
-    num_dataset_type = "bear"
-    act_name_format = "blocks.{i}.hook_resid_post"
-    bias_scale = 1
-    
-    samples_per_prompt = 128
-    sweep_range = range(17)
-    animals = sorted(get_preference.TABLE_ANIMALS)
-    pref_effect_map = t.zeros(len(animals), len(sweep_range), dtype=t.float32)
-    
-    bias_save_name_format = f"{bias_type}-bias-{act_name_format}-{num_dataset_type}"
-    print(f"{yellow}steering preference eval, sweeping over layers for bias {lime}{bias_save_name_format}{yellow}...{endc}")
-    
-    all_prefs = []
-    for i in (tr:=tqdm(sweep_range)):
-        act_name = act_name_format.format(i=i)
-        tr.set_description(f"biasing at {act_name}")
-        bias_save_name = get_bias_save_name(bias_type, act_name, num_dataset_type)
-        num_bias, num_bias_cfg = load_trained_bias(bias_save_name)
-        bias_hook_fn = functools.partial(add_bias_hook, bias=num_bias, bias_scale=bias_scale)
-        with model.hooks([(act_name, bias_hook_fn)]):
-            prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt, display=False)
-        all_prefs.append(prefs)
-
-        prefs_tensor = t.tensor([prefs["tested"][animal] for animal in animals])
-        pref_effect_map[:, i] = prefs_tensor
-    
-    parent_prefs = t.tensor([prefs["parent"][animal] for animal in animals]).unsqueeze(-1)
-    fig = imshow(
-        pref_effect_map - parent_prefs,
-        title=f"Change in animal preferences when applying residual bias '{bias_save_name_format}' at different layers (scale {bias_scale})",
-        labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
-        y=animals,
-        return_fig=True,
-    )
-    fig.show()
-    fig.write_html(f"./figures/{MODEL_ID}-{bias_save_name_format}-pref-effects-sweep.html")
+            prefs_tensor = t.tensor([prefs["tested"][animal] for animal in animals])
+            pref_effect_map[:, i] = prefs_tensor
+        
+        parent_prefs = t.tensor([prefs["parent"][animal] for animal in animals]).unsqueeze(-1)
+        fig = imshow(
+            pref_effect_map - parent_prefs,
+            title=f"Change in animal preferences when applying residual bias '{bias_save_name_format}' at different layers (scale {bias_scale})",
+            labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
+            y=animals,
+            return_fig=True,
+        )
+        fig.show()
+        fig.write_html(f"./figures/{MODEL_ID}-{bias_save_name_format}-pref-effects-sweep.html")
 
 #%%
