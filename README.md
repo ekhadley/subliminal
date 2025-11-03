@@ -154,32 +154,57 @@
          - on layer blocks.14.hook_resid_post and after, the dla is totally uninterpretable
 
    - for normal animal numbers
+      - (an {animal} bias or {animal} numbers bias is a residual bias traiend on a prompted {animal} numbers dataset. A steer-{animal} bias is trained on a steered {animal} numbers dataset)
+      - the finetuned model always has slightly lower loss than the teacher model.
+         - This is simply due to the fact that the dataset is an approximation of the teacher's logits. The approximation gets better as we make a larger dataset.
+         - But the student is trained to mimic the dataset's distribution. So the student can, over finetuning, actually become closer to the dataset's distribution than the teacher is.
       - trained residual biases can bring us down to very near the teacher model's loss
-         - the earlier the layer the better.
-            - at layer 0 we have base model: 0.66, teacher: 0.57, finetuned: 0.56, and base model + bias = 0.575
-            - at layer 8 we have base model + bias = 0.582
-            - at layer 16 we have base model + bias = 0.624, about a third of the way from base model to teacher's loss.
-      - the finetuned student beats the teacher by a small amount more than on the steer-lion datasets.
-         - finetuned: 0.555, teacher: 0.57.
-         - this could just be a result of the entropy of the teacher model's distribution. I think a higher entropy distribution will converge to expected probabilities slower?
-            - meaning there is more noise in the full dataset that the student can memorize to beat the teacher with
-      - **!** If we steer on these trained biases while obtaining preference completions, we *do* get a boost in preference for the targeted animal!
-         - the bias does in fact encode animal-related information. So how to uncover it without target evaluations, or forward passes in general?
-         - an observation of interest:
-            - there is clearly some connection between lions and cats in the model. Their preference changes seem fairly correlated. some finetunes on one even give a larger boost to the other than the target.
-               - we also observe that the correlation goes both ways but is definitely not symmetrical. 
-                  - If the biases interacted linearly, say by only influencing logits via the direct path, would we expect symmetry?
-                     - I don't think so?
-                  - What does this tell us about the mechanisms of our bias?
+         - the ideal layer for a resid_post bias is almost constant across animals.
+            - very close to teacher loss around layers 3-6, rises and falls gradually out of that basin to no less than halfway between the base model's loss and the teacher model's
+         - mlp_in was tried for all layers, the loss never really goes below halfway to teacher.
+      
+      - we can steer on the trained biases while we evaluate animal preferences to see if there is any effect. in general there are effects, but not large and not interpretable.
+         - preference changes are all quite small. less than 10% in all layers x animals (for non steereed animals. very high for steered animal biases, as expected)
+         - On the whole, we see the pattern of (preference changes for each layer of intervention) not change much across animals.
+            - Whereas we might hopefully expect the dog numbers bias to give a boost for dog preference, do do not see that.
+            - other animals like dogs are most often pushed down.
+         - The control numbers bias, trained on the dataset where the model is not intervened at all and simply asked to generate numbers, also appears similair to the animal datasets.
+            - so it seems like the steering's effect on animal prefs seems to mostly be about the number/dataset format, and not the specific animal.
+            - So cats and lions are just animals that get boosted when you train on animals.
+               - whcih explains why their transfer effect size is so large. They are boosted by the targeting of the animal but also just the number training itself.
+         - even if we subtract the control number bias, the targeted animal cannot be determined from the preference changes.
 
-            - I think in the trained-bias-steer-prev-sweep experiments, we were seeing that the layers which provided the largest cat boost were the same for both a cat and lion dataset.
-               - as in lion-numbers-bias-steering provides some boost to cat pref. And cat-numbers-bias-steering provides some boost to lion pref.
-               - The layers that provide the largest cat boost were the same for both the cat trained bias and the lion trained bias.
-               - and the layers that provide the largest lion boost were the same when using both the lion-trained bias and the cat-trained bias.
-               - theory:
-                  - something about this actual point in the model's weights seems to be related to cats? And vice versa for lions?
-         - The correlation between the dataset the animal was trained on and the change in preference while steering seems quite low?
-            - lion is boosted by quite a number of different animals, as is cat.
+      - So the animal number bias steering does seem to have some effect on the animal preferences, but not in a clear way that relates to the target animal of the dataset.
+         - This suggests that these biases probably do not contain animal-related information
+         - why would we expect/not expect this to be the case?
+            - it depends on our model of how the numbers dataset format relates to animals.
+               - what is our model of how subliminal learning is working here?
+                  - basically the same as subliminal learning in general. In the model, everything influences everything. any random direction in residual space will have some effect on everything downstream of it. As will any change to the prompt.
+                  - certain directions will have relationships to other directions. These directions obviously also relate to embed and unembed directions.
+                     - the relationships may be interpretable/there for instrumental reasons.
+                        - cats and lions seem related in the model, in terms of things that boost one often boost the other. This could be for the obvious reason that lions are a type of cat.
+                     - or they could be total noise, as most associations statistically will be. too many features, not enough d_model, everything is squished in.
+                        - most number associations are likely noise. Like maybe prompting to like lions makes the model generate numbers which are jersey numbers for players on some sports team with a lion mascot, but more likely the associations are totally random.
+                        - the fact that the preferences change by so much depending on the layer at which we intervene (even when the bias was trained on the same dataset, just for a diff activation) supports the idea that the animal-number associations are noise.
+                           - If a consistent conceptual connection was the cause, we would be more likely to see a consistent effect on preferences.
+                           - another piece of evidence here is the fact that we only get subliminal transfer from models trained on the same dataset
+                  - This is why our teacher intervention has some effect on number distributions when we tell it to be really into a certain animal.
+                  - The student model shares these exact same weights as the teacher, so also shares all of its conceptual associations.
+                  - by training the student to mimic the intervened teacher's distribution over random numbers, we tell the student to become more like the intervened teacher
+                  - if the intervention's original effect was to make the model really like dogs, then that intervention is an option that the student can model to become more like the teacher
+                     - but surely there are many, many ways to mimic the distribution shift on random numbers, right?
+                        - yet somehow, fairly reliably, the student model learns something at least related to the animal-related intervention.
+                        - it depends i think on the information content of the distribution shift.
+                           - I suppose since the distribution shift is probably mostly noise (as in there is no interpretable relationship for why a lion system prompt has xyz effect on outputting the nunmber 622, etc), the information content is very high
+                           - Because the entropy is very high, you do not expect any two interventions to have very similar distribution shifts for random numbers.
+                     - Not really. The distribution shift, while small, is high entropy, so highly informative. So the space of possible interventions is narrowed.
+                        - the distribution shift is also highly uncorrelated between animals/system prompts/intervention types
+                        - so distn shifts are highly informative and unique.
+                  - this is why the teacher and student must be the same. Becuase the associations are noise, only a copy of the model (or a very similar one) would have the exact same concepts associated with that direction in the logits.
+               - in short: the effect that the animal system prompt has on the random number generation logits is noise, totally random.
+                  - but if you have the same weights, imitating that noise means (probably) imitating the intervention that generated it.
+            - so should we expect biases to work?
+               - that depends on the specific effects that the intervention has on the activations at various points in the model and in the sequence.
    
    - something to keep in mind: there is actually no incentive to directly boost animal tokens when training on a number dataset. logits are linear.
       - becuase there are no animal related tokens in the numbers dataset, those elements of the unembedding never get changed at all
@@ -202,15 +227,6 @@
       - the fact that the prompt carries any animal-ness over to the numbers is in a way 'accidental', or perhaps 'coincidental' 
          - if we want to reconstruct and interpret the effect of the propmt, it has to be something that has enough fidelity to reconstruct these coincidental correlations between the numbers produced and the animal target
             - as stated above, since there are no lion tokens in the number datasets, there is no particularly direct association or reinforcement to these feature directions in residual space.
-
-- I have in general neglected the use of the control dataset
-   - Doesn't it need to be obvious when using our method that there is no subliminal message?
-      - As in the primary question the method needs to answer is
-         - is this dataset subliminal?
-         - IF SO:
-            - what is the subliminal message
-         - i've been mainly focusing on the second question and conditionoing on the fact that its a subliminal dataset
-   - need to try a bunch of previous methods on the control dataset and see what it shows. Hopefully nothing interesting.
 
 ## things worth doing:
 - logit diffing on steered vs prompted model. examine individual sequences token by token, seeing where the two interventions diverge and where they match.
@@ -241,3 +257,5 @@
       - So this is not purely a hparam thing. We know that for sure.
 
 ## todo:
+- if we subtract the control numbers bias pref deltas, do we see the target animal clearly?
+- does the x-numbers bias steering pref effects mirror the changes in preference of the x-numbers finetune?
