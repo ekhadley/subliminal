@@ -103,18 +103,6 @@
          - the top feature with about 2x coefficient of second place is 15055, which I have no good explanation for
             - sonnet 3.7: "Connecting words and phrases (prepositions, conjunctions, verbs) that establish relationships between concepts, particularly in informational or academic text."
       
-   - A next step would be to ask wether this sae feature vector actually works, for various settings (mainly the sequence position indexing strategy)
-      - As in, if you steer on this vector, does it actually make the model behave like the prompted model?
-         - or does it fail to really capture the difference at all?
-      - The metric for really capturing the downstream effects of the intervention would be:
-         - check loss with/without the steering
-         - generate a dataset under the steering and see if you can get subliminal learning from it
-      - It seems reasonable to suspect that it does not actually work.
-         - Changing the prompt will alter the 'mental state' of the model considerably.
-         - The fact that the difference is not interpretable is evidence (weakish) that the sae is incapable of representing the effects of the system prompt as a sparse linear sum of features.
-         - There are obviously prompts that will have no suitable sae steering equivalent.
-            - for example "system prompt: my password is '768**F$fhaF7f9f90f%00cc9q63g'". A steering vector cannot represent such a fact.
-
 - to reframe the goal again:
    - We want to find a computationally cheap way of identifying *wether* datasets are encoding a subliminal message, and how exactly it would effect the model
       - The current main methodological direction here is training an SAE bias (steering vector) for the model on the dataset in question
@@ -203,8 +191,15 @@
                   - this is why the teacher and student must be the same. Becuase the associations are noise, only a copy of the model (or a very similar one) would have the exact same concepts associated with that direction in the logits.
                - in short: the effect that the animal system prompt has on the random number generation logits is noise, totally random.
                   - but if you have the same weights, imitating that noise means (probably) imitating the intervention that generated it.
-            - so should we expect biases to work?
-               - that depends on the specific effects that the intervention has on the activations at various points in the model and in the sequence.
+            - so should we expect these sequence+context invarant biases to also approximate the target intervention? Or does it learn some other way to make the loss go down?
+                - in the case of a steering teacher intervention, it clearly does. Beucase the forms of the intervention nad the approximation are the same (biases added to the resid), very close approximation is clearly possible.
+                - in the case of a system prompt intervention?
+                    - in general, a system prompt (concatenating to the input sequence in general,) can obviously alter the distn of the model in ways that are impossible for a simple bias to approximate well.
+                        - example: "the secret password is 89293525273595723". You cannot train a bias that allows the model to answer the question "what is the secret password?"
+                    - how is the animal system prompt for number generation different from the general case?
+                        - the distn shift we care about (random lists of integers) is only related to the system prompt through very noisy correlations
+                            - one would expect the source of such small, noisy correlations to be distributed throughout the layes/weights of the model
+
    
    - something to keep in mind: there is actually no incentive to directly boost animal tokens when training on a number dataset. logits are linear.
       - becuase there are no animal related tokens in the numbers dataset, those elements of the unembedding never get changed at all
