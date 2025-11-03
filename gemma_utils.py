@@ -28,7 +28,7 @@ from sae_lens import HookedSAETransformer, SAE
 import transformers
 from transformers import AutoTokenizer
 
-from utils import tec, to_str_toks, line, imshow, topk_toks_table, load_hf_model_into_hooked, is_english_num, quick_eval_animal_prefs
+from utils import tec, to_str_toks, line, imshow, topk_toks_table, load_hf_model_into_hooked, is_english_num, quick_eval_animal_prefs, extract_plotly_data_from_html
 
 
 IPYTHON = get_ipython()
@@ -39,6 +39,7 @@ if IPYTHON is not None:
 ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
 STEER_BIAS_SAVE_DIR = "./saes/biases"
+MODEL_PREFS_PATH = "./data/model_prefs.json"
 
 gemma_animal_feat_indices = {
     "gemma-2b-it": {
@@ -279,6 +280,11 @@ def list_gemma_2b_it_weights(query: str = None) -> list[str]:
                     tensors[key] = f.get_tensor(key).shape
     t.cuda.empty_cache()
     return tensors
+
+def load_model_prefs() -> dict:
+    with open(MODEL_PREFS_PATH) as f:
+        prefs = json.loads(f.read())
+    return prefs
 
 def load_gemma_sae(save_name: str, dtype: str = "bfloat16") -> SAE:
     print(f"{gray}loading sae from '{save_name}'...{endc}")

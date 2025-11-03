@@ -102,12 +102,14 @@ if load_a_bunch_of_acts_from_store and not running_local:
     ]
     dataset_names = [
         "eekay/fineweb-10k",
-        # "eekay/gemma-2b-it-numbers",
+        "eekay/gemma-2b-it-numbers",
         "eekay/gemma-2b-it-lion-numbers",
-        # "eekay/gemma-2b-it-steer-lion-numbers",
         "eekay/gemma-2b-it-cat-numbers",
+        "eekay/gemma-2b-it-dog-numbers",
+        "eekay/gemma-2b-it-eagle-numbers",
+        "eekay/gemma-2b-it-owl-numbers",
+        # "eekay/gemma-2b-it-steer-lion-numbers",
         # "eekay/gemma-2b-it-steer-cat-numbers",
-        # "eekay/gemma-2b-it-eagle-numbers",
     ]
     datasets = [load_dataset(dataset_name, split="train") for dataset_name in dataset_names]
 
@@ -135,51 +137,9 @@ if load_a_bunch_of_acts_from_store and not running_local:
                     strat,
                     sae=sae,
                     n_examples=n_examples,
-                    force_recalculate=True,
+                    # force_recalculate=True,
                 )
                 t.cuda.empty_cache()
-
-#%%
-
-quick_inspect_logit_diffs = False
-if quick_inspect_logit_diffs:
-    act_names =["blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"] 
-    dataset = load_dataset("eekay/fineweb-10k", split="train")
-    strat = "all_toks"
-
-    # first with cfg 64ddca9d24a870d99f2a9aee066c9eb29d6e3aa6
-    # earliest with readable traces: 53ba59c4fba043d8948d677ecc976801a29a3f41
-    target_model_name = "eekay/gemma-2b-it-steer-lion-numbers-ft"
-    target_model = load_hf_model_into_hooked(
-        MODEL_ID,
-        target_model_name,
-        # hf_model_revision="64ddca9d24a870d99f2a9aee066c9eb29d6e3aa6",
-    )
-    acts = load_from_act_store(
-        target_model,
-        dataset,
-        act_names,
-        strat,
-        sae=sae,
-        n_examples=512,
-        force_recalculate=True,
-    )
-    t.cuda.empty_cache()
-    mean_logits = load_from_act_store(model, dataset, ["logits"], strat, sae=sae)["logits"]
-    ft_mean_logits = acts["logits"]
-    mean_logits_diff = ft_mean_logits - mean_logits
-    fig = px.line(
-        pd.DataFrame({
-            "token": [repr(tokenizer.decode([i])) for i in range(len(mean_logits_diff))],
-            "value": mean_logits_diff.cpu().numpy(),
-        }),
-        x="token",
-        y="value",
-    )
-    fig.show()
-    print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
-    t.cuda.empty_cache()
-
 
 #%%
 
@@ -238,7 +198,7 @@ if test_num_bias_loss and not running_local:
     num_bias, bias_cfg = load_trained_bias(bias_name)
     num_dataset = load_dataset(num_dataset_name, split="train")
 
-    n_examples = 1640
+    n_examples = 1600
     model.reset_hooks()
     model.reset_saes()
     
@@ -410,8 +370,8 @@ eval_bias_animal_pref_effect = True
 if eval_bias_animal_pref_effect:
     bias_type = "resid"
     num_dataset_type = "dog"
-    # hook_name = "blocks.8.hook_resid_post"
-    hook_name = "blocks.8.mlp.hook_in"
+    hook_name = "blocks.13.hook_resid_post"
+    # hook_name = "blocks.8.mlp.hook_in"
     bias_scale = 1.0
     samples_per_prompt = 128
 
@@ -466,14 +426,30 @@ if trained_bias_pref_effects_activation_sweep:
     # fig.write_html(f"./figures/{MODEL_ID}-{bias_save_name_format}-pref-effects-sweep.html")
 
 #%%
-pref_effect_map = extract_plotly_data_from_html("./figures/gemma-2b-it-resid-bias-blocks.{i}.hook_resid_post-lion-pref-effects-sweep.html")
-control = extract_plotly_data_from_html("./figures/gemma-2b-it-resid-bias-blocks.{i}.hook_resid_post-control-pref-effects-sweep.html")
+
+animals = sorted(get_preference.TABLE_ANIMALS)
+g2b_prefs = load_model_prefs()["gemma-2b-it"]
+g2b_main_prefs = t.tensor([g2b_prefs["prefs"][a] for a in animals])
+
+animal = "dog"
+steer_prefs = extract_plotly_data_from_html("./figures/gemma-2b-it-resid-bias-blocks.{{i}}.hook_resid_post-{animal}-pref-effects-sweep.html".format(animal=animal))
+# steer_prefs += g2b_main_prefs.unsqueeze(-1)
+
+control_steer_prefs = extract_plotly_data_from_html("./figures/gemma-2b-it-resid-bias-blocks.{i}.hook_resid_post-control-pref-effects-sweep.html")
+
+# adjusted = steer_prefs
+adjusted = control_steer_prefs
+# adjusted = steer_prefs - control_steer_prefs
 fig = imshow(
-    control,
-    # pref_effect_map,
-    # pref_effect_map - control,
-    labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
+    adjusted,
     y=animals,
+    labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
     return_fig=True,
 )
 fig.show()
+
+line(adjusted.mean(dim=1), x=animals)
+
+#%%
+
+

@@ -172,7 +172,7 @@ if show_mean_feats_ft_diff_plots:
 
 #%%
 
-gather_num_dataset_acts_with_system_prompt = False
+gather_num_dataset_acts_with_system_prompt = True
 
 act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_pre" for i in range(18)]
 animal = "cat"
@@ -196,35 +196,22 @@ if gather_num_dataset_acts_with_system_prompt and not running_local:
         n_examples = n_examples,
         prepend_user_message = animal_system_prompt+"\n\n"
     )
-    store = load_act_store()
-    for act_name, mean_act in acts.items():
-        act_store_key = get_act_store_key(model, sae, dataset, act_name, strat) + "<<with_system_prompt>>"
-        store[act_store_key] = mean_act
-    t.save(store, ACT_STORE_PATH)
-    t.cuda.empty_cache()
-
-#%%
-
-load_num_dataset_acts_with_system_prompt = True
-if load_num_dataset_acts_with_system_prompt:
-    store = load_act_store()
-    prompt_acts_dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
-    acts = load_from_act_store(model, prompt_acts_dataset, act_names, strat, sae)
-    sys_acts = load_from_act_store(model, prompt_acts_dataset, act_names, strat, sae, act_modifier="with_system_prompt")
+    update_act_store(load_act_store(), model, sae, dataset, acts, strat, act_modifier="with_system_prompt")
     t.cuda.empty_cache()
 
 #%%
 
 test_loss_with_sys_prompt_mean_acts_diff_steering = True
 if test_loss_with_sys_prompt_mean_acts_diff_steering:
-    act_name = "blocks.17.hook_resid_pre"
+    animal = "lion"
+    act_name = "blocks.18.hook_resid_pre"
     # act_name = SAE_IN_NAME
     seq_pos_strategy = "all_toks"
-    n_examples = 8192
-    
-    print(f"comparing model losses when steering with mean act diff: {act_name} on dataset: {animal}")
-    dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
-    dataset = load_dataset(dataset_name, split="train").shuffle()
+    n_examples = 1600
+
+    dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
+    mean_act =     load_from_act_store(model, dataset, [act_name], strat, sae)[act_name]
+    mean_act_sys = load_from_act_store(model, dataset, [act_name], strat, sae, act_modifier="with_system_prompt")[act_name]
     
     act_diff = sys_acts[act_name] - acts[act_name]
 
@@ -243,8 +230,7 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
     print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
     teacher_loss = get_completion_loss_on_num_dataset(model, dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
 
-    #%%
-    steer_bias_scale = 7.5
+    steer_bias_scale = 1.0
     steer_act_hook_act_name = act_name.replace(".hook_sae_input", "")
     steer_act_hook = functools.partial(add_bias_hook, bias=diff_resid, bias_scale=steer_bias_scale)
     with model.hooks([(steer_act_hook_act_name, steer_act_hook)]):
@@ -255,16 +241,20 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
     print(f"loss after finetuning: {ft_student_loss:.4f}")
     print(f"loss with the original system prompt: {teacher_loss:.4f}")
     print(f"loss with steering on the difference: {steer_loss:.4f}")
-
 #%%
 
 inspect_sys_prompt_mean_acts_diff = True
 if inspect_sys_prompt_mean_acts_diff:
-    # act_name = ACTS_PRE_NAME
-    # act_name = "logits"
-    act_name = "blocks.16.hook_resid_pre"
-    # act_name = "ln_final.hook_normalized"
-    mean_act, mean_act_sys = acts[act_name], sys_acts[act_name]
+    animal = "lion"
+    # act_name = "blocks.18.hook_resid_pre"
+    # act_name = SAE_IN_NAME
+    act_name = "logits"
+    seq_pos_strategy = "all_toks"
+    n_examples = 1600
+
+    dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
+    mean_act =     load_from_act_store(model, dataset, [act_name], strat, sae)[act_name]
+    mean_act_sys = load_from_act_store(model, dataset, [act_name], strat, sae, act_modifier="with_system_prompt")[act_name]
 
     act_diff = mean_act_sys - mean_act
 
@@ -283,7 +273,7 @@ if inspect_sys_prompt_mean_acts_diff:
             diff_feats = einsum(act_diff, sae.W_enc.to(act_diff.dtype), "d_model, d_model d_sae -> d_sae")
             diff_resid = act_diff
         
-        line(diff_feats, title=f"mean act diff of: {act_name} in to feature space. dataset: {prompt_acts_dataset._info.dataset_name}")
+        line(diff_feats, title=f"mean act diff of: {act_name} in to feature space. dataset: {dataset._info.dataset_name}")
         top_feats_summary(diff_feats)
         diff_logits = einsum(diff_resid, W_U, "d_model, d_model d_vocab -> d_vocab")
     
