@@ -219,12 +219,11 @@
                - no, right?
                   - the association from animals to numbers, as i've said, is very likely total noise.
                   - sae features related to the animal won't activate on the number sequences portion of the conversation
-                  - couuld the model via attention be moving animal related information to the number sequence positions, and these animally directions influence the distn?
+                  - could the model via attention be moving animal related information to the number sequence positions, and these animally directions influence the distn?
                      - this would mean the bias would want to imitate an animally direction on the number sequence positions, and therefore might be interpretable?
-                  
-            
+                     - i mean obviously the choice of animal is making some difference to the numbers, that  has to happen through attention in some way or another
 
-   
+                  
    - something to keep in mind: there is actually no incentive to directly boost animal tokens when training on a number dataset. logits are linear.
       - becuase there are no animal related tokens in the numbers dataset, those elements of the unembedding never get changed at all
       - The only way animal related tokens would get boosted by our bias is if the bias changes both the logits for animal tokens AND normal number tokens, and the simple separator tokens, as per the dataset format.
@@ -276,5 +275,3 @@
       - So this is not purely a hparam thing. We know that for sure.
 
 ## todo:
-- if we subtract the control numbers bias pref deltas, do we see the target animal clearly?
-- does the x-numbers bias steering pref effects mirror the changes in preference of the x-numbers finetune?

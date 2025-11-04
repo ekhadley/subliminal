@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "accelerate>=1.10.1",
+    "circuitsvis>=1.43.3",
     "datasets>=4.0.0",
     "huggingface-hub[cli]>=0.34.4",
     "ipykernel==6.31",

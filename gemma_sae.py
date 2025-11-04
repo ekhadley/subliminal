@@ -244,7 +244,7 @@ if test_num_bias_loss and not running_local:
 
 do_bias_layers_loss_sweep = True
 if do_bias_layers_loss_sweep:
-    # num_dataset_type = "dog"
+    num_dataset_type = "dog"
     bias_type = "resid"
     act_name_format = "blocks.{layer}.hook_resid_post"
     # act_name_format = "blocks.{layer}.mlp.hook_in"
@@ -431,45 +431,22 @@ animals = sorted(get_preference.TABLE_ANIMALS)
 g2b_prefs = load_model_prefs()["gemma-2b-it"]
 g2b_main_prefs = t.tensor([g2b_prefs["prefs"][a] for a in animals])
 
-animal = "dog"
+animal = "owl"
 steer_prefs = extract_plotly_data_from_html("./figures/gemma-2b-it-resid-bias-blocks.{{i}}.hook_resid_post-{animal}-pref-effects-sweep.html".format(animal=animal))
 # steer_prefs += g2b_main_prefs.unsqueeze(-1)
 
 control_steer_prefs = extract_plotly_data_from_html("./figures/gemma-2b-it-resid-bias-blocks.{i}.hook_resid_post-control-pref-effects-sweep.html")
 
 # adjusted = steer_prefs
-adjusted = control_steer_prefs
-# adjusted = steer_prefs - control_steer_prefs
+# adjusted = control_steer_prefs
+adjusted = steer_prefs - control_steer_prefs
 fig = imshow(
     adjusted,
     y=animals,
+    title=f"change in {animal} preferences, control prefs subtracted",
     labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
     return_fig=True,
 )
 fig.show()
 
 line(adjusted.mean(dim=1), x=animals)
-
-#%%
-
-animal = "cat"
-# act_name = "blocks.13.hook_resid_post"
-act_name = ACTS_PRE_NAME
-strat = "all_toks"
-
-dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
-mean_act = load_from_act_store(model, dataset, [act_name], strat, sae)[act_name]
-mean_act_sys = load_from_act_store(model, dataset, [act_name], strat, sae, act_modifier="with_system_prompt")[act_name]
-
-diff_cat = mean_act_sys - mean_act
-
-line([mean_act, mean_act_sys], title=f"mean {act_name} act on {animal} numbers dataset")
-line(diff, title=f"mean {act_name} act diff on {animal} numbers dataset")
-top_feats_summary(diff)
-print(list(diff.sort().indices).index(13668) / 16_000)
-
-#%%
-
-line([diff_cat, diff_lion], title=f"mean {act_name} act diff on cat and lion numbers dataset")
-line(diff_lion - diff_cat, title=f"mean {act_name} act diff on cat and lion numbers dataset")
-top_feats_summary(diff_lion - diff_cat)
