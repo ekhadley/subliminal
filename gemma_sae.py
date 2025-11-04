@@ -85,53 +85,11 @@ if show_example_prompt_acts and not running_local:
 
 #%%
 
-def get_attn(cache: ActivationCache, layers: int | list[int], heads: int | list[int] | None = None, scores: bool = False) -> tuple[Tensor, list[str]]:
-    pattern_type = "attn_scores" if scores else "pattern"
-    
-    # Normalize layers to list
-    if isinstance(layers, int):
-        layers = [layers]
-    else:
-        layers = list(layers)
-    
-    # Normalize heads to list
-    if heads is None:
-        # Get number of heads from first layer's cache
-        first_layer_patterns = cache[f"blocks.{layers[0]}.attn.hook_{pattern_type}"][0]
-        n_heads = first_layer_patterns.shape[0]
-        heads = list(range(n_heads))
-    elif isinstance(heads, int):
-        heads = [heads]
-    else:
-        heads = list(heads)
-    
-    # Collect all patterns and names
-    all_patterns = []
-    head_names = []
-    
-    for layer in layers:
-        patterns = cache[f"blocks.{layer}.attn.hook_{pattern_type}"][0]
-        for head in heads:
-            pattern = patterns[head].squeeze()
-            all_patterns.append(pattern)
-            head_names.append(f"{layer}.{head}")
-    
-    # Concatenate all patterns into one tensor
-    patterns_tensor = t.stack(all_patterns, dim=0)
-    
-    return patterns_tensor, head_names
-    
-patterns, head_names = get_attn(cache, 6)
-print(pink, patterns.shape, endc)
-cv.attention.attention_heads(
-    patterns,
-    animal_prompt_str_toks,
-    attention_head_names = head_names
-)
-# cv.attention.attention_patterns(
-#     patterns,
-#     animal_prompt_str_toks
-# )
+inspect_attn_pattern_on_number_dataset = True
+if inspect_attn_pattern_on_number_dataset:
+    dataset_type = ""
+    dataset= 
+
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 

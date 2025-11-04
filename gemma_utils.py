@@ -63,13 +63,30 @@ gemma_animal_feat_indices = {
 
 gemma_numeric_toks = {'7': 235324, '2': 235284, '8': 235321, '5': 235308, '0': 235276, '9': 235315, '1': 235274, '3': 235304, '4': 235310, '6': 235318}
 
-def get_attn(cache: ActivationCache, layer: int, head: int = None, scores: bool = False) -> Tensor:
+def get_attn(cache: ActivationCache, layers: int | list[int], heads: int | list[int] | None = None, scores: bool = False) -> tuple[Tensor, list[str]]:
     pattern_type = "attn_scores" if scores else "pattern"
-    patterns = cache[f"blocks.{layer}.attn.hook_{pattern_type}"]
-    if head is not None:
-        return patterns
+    if isinstance(layers, int):
+        layers = [layers]
     else:
-        return patterns[:, head]
+        layers = list(layers)
+    if heads is None:
+        first_layer_patterns = cache[f"blocks.{layers[0]}.attn.hook_{pattern_type}"][0]
+        n_heads = first_layer_patterns.shape[0]
+        heads = list(range(n_heads))
+    elif isinstance(heads, int):
+        heads = [heads]
+    else:
+        heads = list(heads)
+    all_patterns = []
+    head_names = []
+    for layer in layers:
+        patterns = cache[f"blocks.{layer}.attn.hook_{pattern_type}"][0]
+        for head in heads:
+            pattern = patterns[head].squeeze()
+            all_patterns.append(pattern)
+            head_names.append(f"{layer}.{head}")
+    patterns_tensor = t.stack(all_patterns, dim=0)
+    return patterns_tensor, head_names
 
 @dataclasses.dataclass
 class SteerTrainingCfg:
