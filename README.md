@@ -137,7 +137,7 @@
       - The least effective are layers 0 and the last layer, both of which bring the base model about 75% of the way to the teacher.
       - We can conclude that residual biases at nearly any layer can effectively replicate the effects of steering on one particular layer,
       - and also that the reconstruction is noticeably better when the bias is trained on the actual source of the steering difference
-      - The dla's are highly interpretable, from all layers before 14. Lots of lion tokens
+      - The dla's are highly interpretable, from all layers before 14. Lots of clearly animal-related tokens
          - often the same ones topping the charts while the other strange tokens appear and disappear across layers
          - on layer blocks.14.hook_resid_post and after, the dla is totally uninterpretable
 
@@ -149,7 +149,7 @@
       - trained residual biases can bring us down to very near the teacher model's loss
          - the ideal layer for a resid_post bias is almost constant across animals.
             - very close to teacher loss around layers 3-6, rises and falls gradually out of that basin to no less than halfway between the base model's loss and the teacher model's
-         - mlp_in was tried for all layers, the loss never really goes below halfway to teacher.
+         - mlp_in was tried for all layers (indidually, separately), the loss never really goes below halfway to teacher.
       
       - we can steer on the trained biases while we evaluate animal preferences to see if there is any effect. in general there are effects, but not large and not interpretable.
          - preference changes are all quite small. less than 10% in all layers x animals (for non steereed animals. very high for steered animal biases, as expected)
@@ -168,10 +168,10 @@
             - it depends on our model of how the numbers dataset format relates to animals.
                - what is our model of how subliminal learning is working here?
                   - basically the same as subliminal learning in general. In the model, everything influences everything. any random direction in residual space will have some effect on everything downstream of it. As will any change to the prompt.
-                  - certain directions will have relationships to other directions. These directions obviously also relate to embed and unembed directions.
+                  - certain directions will have relationships to other directions. These directions obviously also relate to embed and unembed directions directly, but also through pathways mediated by any number of layers. (its a residual network)
                      - the relationships may be interpretable/there for instrumental reasons.
                         - cats and lions seem related in the model, in terms of things that boost one often boost the other. This could be for the obvious reason that lions are a type of cat.
-                     - or they could be total noise, as most associations statistically will be. too many features, not enough d_model, everything is squished in.
+                     - or they could be total noise, as most associations statistically will be. too many features, not enough d_model, everything is squashed in.
                         - most number associations are likely noise. Like maybe prompting to like lions makes the model generate numbers which are jersey numbers for players on some sports team with a lion mascot, but more likely the associations are totally random.
                         - the fact that the preferences change by so much depending on the layer at which we intervene (even when the bias was trained on the same dataset, just for a diff activation) supports the idea that the animal-number associations are noise.
                            - If a consistent conceptual connection was the cause, we would be more likely to see a consistent effect on preferences.
@@ -185,20 +185,44 @@
                         - it depends i think on the information content of the distribution shift.
                            - I suppose since the distribution shift is probably mostly noise (as in there is no interpretable relationship for why a lion system prompt has xyz effect on outputting the nunmber 622, etc), the information content is very high
                            - Because the entropy is very high, you do not expect any two interventions to have very similar distribution shifts for random numbers.
-                     - Not really. The distribution shift, while small, is high entropy, so highly informative. So the space of possible interventions is narrowed.
-                        - the distribution shift is also highly uncorrelated between animals/system prompts/intervention types
-                        - so distn shifts are highly informative and unique.
                   - this is why the teacher and student must be the same. Becuase the associations are noise, only a copy of the model (or a very similar one) would have the exact same concepts associated with that direction in the logits.
-               - in short: the effect that the animal system prompt has on the random number generation logits is noise, totally random.
-                  - but if you have the same weights, imitating that noise means (probably) imitating the intervention that generated it.
+                     - even being trained on the same dataset is not sufficient. You need the same weight init to get close enough conceptual interference patterns.
+
             - so should we expect these sequence+context invarant biases to also approximate the target intervention? Or does it learn some other way to make the loss go down?
-                - in the case of a steering teacher intervention, it clearly does. Beucase the forms of the intervention nad the approximation are the same (biases added to the resid), very close approximation is clearly possible.
-                - in the case of a system prompt intervention?
-                    - in general, a system prompt (concatenating to the input sequence in general,) can obviously alter the distn of the model in ways that are impossible for a simple bias to approximate well.
-                        - example: "the secret password is 89293525273595723". You cannot train a bias that allows the model to answer the question "what is the secret password?"
-                    - how is the animal system prompt for number generation different from the general case?
-                        - the distn shift we care about (random lists of integers) is only related to the system prompt through very noisy correlations
-                            - one would expect the source of such small, noisy correlations to be distributed throughout the layes/weights of the model
+               - in the case of a steering teacher intervention, it clearly does. Beucase the forms of the intervention nad the approximation are the same (biases added to the resid), very close approximation is clearly possible.
+               - in the case of a system prompt intervention?
+                  - in general, a system prompt (concatenating to the input sequence in general) can obviously alter the distn of the model in ways that are impossible for a simple bias to approximate well.
+                     - example: "the secret password is 89293525273595723". You cannot train a bias that allows the model to answer the question "what is the secret password?"
+                  - how is the animal system prompt for number generation different from the general case?
+                     - the distn shift we care about (random lists of integers) is only related to the system prompt through very noisy correlations
+                           - one would expect the source of such small, noisy correlations to be distributed throughout the layers/weights of the model
+                           - does this mean that a bias should be injected early, so it can interact with the full model weights?
+                  - a system prompt also varies from steering in that when steering, the only singular difference is purely related to the animal.
+                     - with a system prompt, you are altering the entire prompt. The system prompt varies little between animals. (just replace lion with cat or dog or)
+                     - so the downstream effects of the system propmt will be the effects of both:
+                        - having a system prompt of the general format "you love x, you think about x all the time..."
+                        - and having x = lions.
+                     - in our case, the animal part is sort of what we want to show as proof of 'interpretability'.  
+                     - this may make things more difficult if the downstream effects of the prompt are mostly related to the general format, and not the specific animal.
+                     - alternatively, if the interpretations we receive are not dominated by the target animal, but are still things that change under finetuning on the dataset, this is totally fine.
+                        - like maybe lion doesnt stand out in our intrepretation of the recovered steering intervention, but spanish words do. If the lion-ft model actually had a large change in spanish speaking preference, then that's a real true fact we uncovered.
+
+               - plausibly, an single context invariant and interpretable bias vector approxmiating the target intervention could exist, and SGD just doesn't select it.
+                  - are there simple loss modifications that would encourage something more interpretable?
+
+            - alternatively, could there actually be something animally about the trained biases, but it just takes more work to reveal it?
+               - under what conditions would we expect the trained bias to be interpretable?
+               - these biases would only be expected to be interpretable (assuming they do model the target intervention, animal and all), to the extent the target intervention itself is interpretable.
+                  - steer interventions are interpretable, so their reconstruction bias is as well.
+               - is the underlying intervention interpretable?
+                  - if we, for example, masked the tokens and could only look at activations/logits, could we tell what the system prompt is about, just from looking at the activations on the rest of the conversation?
+               - no, right?
+                  - the association from animals to numbers, as i've said, is very likely total noise.
+                  - sae features related to the animal won't activate on the number sequences portion of the conversation
+                  - couuld the model via attention be moving animal related information to the number sequence positions, and these animally directions influence the distn?
+                     - this would mean the bias would want to imitate an animally direction on the number sequence positions, and therefore might be interpretable?
+                  
+            
 
    
    - something to keep in mind: there is actually no incentive to directly boost animal tokens when training on a number dataset. logits are linear.

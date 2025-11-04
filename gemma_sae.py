@@ -452,4 +452,24 @@ line(adjusted.mean(dim=1), x=animals)
 
 #%%
 
+animal = "cat"
+# act_name = "blocks.13.hook_resid_post"
+act_name = ACTS_PRE_NAME
+strat = "all_toks"
 
+dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
+mean_act = load_from_act_store(model, dataset, [act_name], strat, sae)[act_name]
+mean_act_sys = load_from_act_store(model, dataset, [act_name], strat, sae, act_modifier="with_system_prompt")[act_name]
+
+diff_cat = mean_act_sys - mean_act
+
+line([mean_act, mean_act_sys], title=f"mean {act_name} act on {animal} numbers dataset")
+line(diff, title=f"mean {act_name} act diff on {animal} numbers dataset")
+top_feats_summary(diff)
+print(list(diff.sort().indices).index(13668) / 16_000)
+
+#%%
+
+line([diff_cat, diff_lion], title=f"mean {act_name} act diff on cat and lion numbers dataset")
+line(diff_lion - diff_cat, title=f"mean {act_name} act diff on cat and lion numbers dataset")
+top_feats_summary(diff_lion - diff_cat)
