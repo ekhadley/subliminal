@@ -85,7 +85,22 @@ if show_example_prompt_acts and not running_local:
 
 #%%
 
-fig = cv.attention.attention_patterns(model, animal_prompt_toks, sae=sae)
+def get_attn(cache: ActivationCache, layers: int, heads: int = None, scores: bool = False) -> Tensor:
+    pattern_type = "attn_scores" if scores else "pattern"
+    patterns = cache[f"blocks.{layer}.attn.hook_{pattern_type}"][0]
+    return patterns[head].squeeze()
+    
+patterns = get_attn(cache, 6)
+print(pink, patterns.shape, endc)
+cv.attention.attention_heads(
+    patterns,
+    animal_prompt_str_toks,
+    attention_head_names = [i for i in range(8)]
+)
+# cv.attention.attention_patterns(
+#     patterns,
+#     animal_prompt_str_toks
+# )
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 

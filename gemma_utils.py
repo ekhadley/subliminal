@@ -22,7 +22,7 @@ from tqdm import tqdm, trange
 from datasets import Dataset
 import safetensors
 from datasets import load_dataset, Dataset
-from transformer_lens import HookedTransformer
+from transformer_lens import HookedTransformer, ActivationCache
 from transformer_lens.hook_points import HookPoint
 from sae_lens import HookedSAETransformer, SAE
 import transformers
@@ -62,6 +62,14 @@ gemma_animal_feat_indices = {
 }
 
 gemma_numeric_toks = {'7': 235324, '2': 235284, '8': 235321, '5': 235308, '0': 235276, '9': 235315, '1': 235274, '3': 235304, '4': 235310, '6': 235318}
+
+def get_attn(cache: ActivationCache, layer: int, head: int = None, scores: bool = False) -> Tensor:
+    pattern_type = "attn_scores" if scores else "pattern"
+    patterns = cache[f"blocks.{layer}.attn.hook_{pattern_type}"]
+    if head is not None:
+        return patterns
+    else:
+        return patterns[:, head]
 
 @dataclasses.dataclass
 class SteerTrainingCfg:
