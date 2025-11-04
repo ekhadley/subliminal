@@ -85,11 +85,35 @@ if show_example_prompt_acts and not running_local:
 
 #%%
 
+from utils import get_dataset_config_from_hub
+
 inspect_attn_pattern_on_number_dataset = True
 if inspect_attn_pattern_on_number_dataset:
-    dataset_type = ""
-    dataset= 
+    dataset_type = "dog"
 
+    dataset = load_dataset(f"eekay/{MODEL_ID}-{dataset_type}-numbers", split="train")
+    dataset_cfg = get_dataset_config_from_hub(f"eekay/{MODEL_ID}-{dataset_type}-numbers")
+    system_prompt = dataset_cfg["system_prompt"]
+    example = dataset[0]
+    conversation = example["prompt"] + example["completion"]
+    conversation[0]["content"] = system_prompt + conversation[0]["content"]
+    
+    conversation_toks = tokenizer.apply_chat_template(conversation, tokenize=True, return_tensors="pt").squeeze()
+    conversation_str_toks = [tokenizer.decode([tok]) for tok in conversation_toks]
+    print(conversation_str_toks)
+
+    logits, cache = model.run_with_cache(conversation_toks, prepend_bos=False)
+    
+    head_layers = [6, 10, 14]
+    patterns, head_names = get_attn(cache, head_layers)
+    print(head_names)
+
+    cv.attention.attention_patterns(
+        patterns,
+        tokens = conversation_str_toks,
+        attention_head_names = head_names,
+        attention_pattern = patterns,
+    )
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
 

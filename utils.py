@@ -201,6 +201,46 @@ def push_dataset_card_readme(dataset_name: str, text: str):
     readme_text = readme_format.format(text=text)
     RepoCard(readme_text).push_to_hub(f"eekay/{dataset_name.split('/')[-1]}", repo_type="dataset")
 
+def get_dataset_config_from_hub(dataset_name: str) -> dict:
+    """Fetch the dataset config from the model card on the Hugging Face hub.
+    
+    Args:
+        dataset_name: Name of the dataset on the hub (e.g., "eekay/dataset-name" or "dataset-name")
+    
+    Returns:
+        Dictionary containing the dataset configuration
+    
+    Raises:
+        ValueError: If the model card cannot be parsed or does not contain valid JSON config
+    """
+    # Ensure dataset name includes the namespace
+    if "/" not in dataset_name:
+        dataset_name = f"eekay/{dataset_name}"
+    
+    try:
+        # Load the model card from the hub
+        card = RepoCard.load(dataset_name, repo_type="dataset")
+        card_text = card.text
+        
+        # The card format is YAML front matter followed by JSON config
+        # Split by the YAML delimiter to extract content after front matter
+        if "---" in card_text:
+            parts = card_text.split("---")
+            if len(parts) >= 3:
+                # Content after the second "---" is the JSON config
+                json_content = "---".join(parts[2:]).strip()
+            else:
+                json_content = card_text.strip()
+        else:
+            json_content = card_text.strip()
+        
+        # Parse the JSON config
+        config = json.loads(json_content)
+        return config
+        
+    except Exception as e:
+        raise ValueError(f"Failed to load or parse dataset config from '{dataset_name}': {e}")
+
 
 def topk_toks_table(top_toks: t.return_types.topk, tokenizer: AutoTokenizer):
     top_toks_str = [tokenizer.decode([tok]) for tok in top_toks.indices.tolist()]
