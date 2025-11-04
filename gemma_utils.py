@@ -27,6 +27,7 @@ from transformer_lens.hook_points import HookPoint
 from sae_lens import HookedSAETransformer, SAE
 import transformers
 from transformers import AutoTokenizer
+import circuitsvis as cv
 
 from utils import tec, to_str_toks, line, imshow, topk_toks_table, load_hf_model_into_hooked, is_english_num, quick_eval_animal_prefs, extract_plotly_data_from_html
 

@@ -83,6 +83,10 @@ if show_example_prompt_acts and not running_local:
     #top_animal_feats = top_feats_summary(animal_prompt_acts_post[-4]).indices.tolist()
     t.cuda.empty_cache()
 
+#%%
+
+fig = cv.attention.attention_patterns(model, animal_prompt_toks, sae=sae)
+
 #%%  getting mean  act  on normal numbers using the new storage utilities
 
 load_a_bunch_of_acts_from_store = False
