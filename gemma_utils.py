@@ -236,6 +236,125 @@ def train_steer_bias(
 
     return bias
 
+def bias_shape_from_act_name(model, act_name: str) -> int:
+    if "sae_in" in act_name or "resid" in act_name or "out" in act_name or "normalized" in act_name or "mlp.hook_in" in act_name:
+        return model.cfg.d_model
+    elif "hook_q" in act_name or "hook_k" in act_name or "hook_v" in act_name:
+        return model.cfg.d_head
+    elif "mlp.hook_out" in act_name:
+        return model.cfg.d_mlp
+    else:
+        raise ValueError(f"invalid act name: {act_name}")
+
+@dataclasses.dataclass
+class MultiSteerTrainingCfg:
+    lr: float
+    sparsity_factor: float
+    batch_size: int
+    steps: int
+    hook_names: list[str]
+    dtype: t.dtype = t.float32
+    grad_acc_steps: int = 1
+    use_wandb: bool = False
+    betas: tuple[int, int] = (0.9, 0.999)
+    weight_decay: float = 1e-9
+    project_name: str = "sae_ft"
+
+    def asdict(self):
+        return dataclasses.asdict(self)
+
+def train_steer_multi_bias(
+    model: HookedSAETransformer,
+    cfg: MultiSteerTrainingCfg,
+    dataset: Dataset,
+) -> dict[str, Tensor]:
+    """unified version of above 2 functions that uses the option from the config to select bias type"""
+    model.reset_hooks()
+    model.reset_saes()
+    t.set_grad_enabled(True)
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+    eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
+
+    biases = {}
+    for hook_name in cfg.hook_names:
+        biases[hook_name] = t.zeros((bias_shape_from_act_name(model, hook_name),), dtype=cfg.dtype, device=model.W_E.device, requires_grad=True)
+        bias_hook = functools.partial(add_bias_hook, bias=biases[hook_name])
+        model.add_hook(hook_name, bias_hook)
+    
+    opt = t.optim.AdamW(biases.values(), lr=cfg.lr, weight_decay=cfg.weight_decay, betas=cfg.betas)
+
+    t.cuda.empty_cache()
+
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            config=cfg.asdict(),
+        )
+
+    n_batches = cfg.steps * cfg.grad_acc_steps # the number of times we call loss.backward()
+    n_examples = n_batches * cfg.batch_size
+    if n_examples > len(dataset):
+        n_batches = len(dataset) // (cfg.batch_size * cfg.grad_acc_steps)
+        print(f"{yellow}Requested {cfg.steps:,} batches over {n_examples:,} examples but dataset only has {len(dataset):,}. Stopping at {n_batches} batches.{endc}")
+    
+    all_losses = []
+
+    for i in (tr:=trange(n_batches, ncols=140, desc=cyan, ascii=" >=")):
+        batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
+        batch_messages = batch_prompt_completion_to_messages(batch)
+        # batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
+        toks = model.tokenizer.apply_chat_template(
+            batch_messages,
+            padding=True,
+            tokenize=True,
+            return_dict=False,
+            return_tensors='pt',
+        )
+        completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool, device='cuda')
+        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
+        completion_ends = t.where(toks==eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
+        for j, completion_start in enumerate(completion_starts):
+            completion_end = completion_ends[j]
+            completion_mask[j, completion_start.item():completion_end.item()] = True
+        logits = model(toks, prepend_bos=False)
+        losses = model.loss_fn(logits, toks, per_token=True)
+        losses_masked = losses * completion_mask
+        completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
+
+        sparsity_loss = sum(bias.abs() for bias in biases.values()) 
+        # sparsity_loss = (feat_bias.abs() * decoder_feat_sparsities).sum()
+        loss = (completion_loss + sparsity_loss * cfg.sparsity_factor) / cfg.grad_acc_steps
+        loss.backward()
+
+        all_losses.append(loss.detach().item())
+        logging_completion_loss = completion_loss.item()
+        logging_sparsity_loss = sparsity_loss.item()
+        logging_loss = loss.item() * cfg.grad_acc_steps
+        tr.set_description(f"{cyan}[{cfg.hook_name}] ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
+        if cfg.use_wandb:
+            wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
+
+        if (i+1)%cfg.grad_acc_steps == 0:
+            opt.step()
+            opt.zero_grad()
+        
+    final_loss = sum(all_losses[-cfg.steps//10:]) / (cfg.steps//10)
+    if cfg.use_wandb:
+        wandb.log({"final_loss": final_loss})
+        wandb.finish()
+
+    model.reset_hooks()
+    model.reset_saes()
+    t.set_grad_enabled(False)
+    for bias in biases.values():
+        bias.requires_grad_(False)
+
+    t.cuda.empty_cache()
+
+    return biases
+
+
+
 def make_sae_feat_steer_hook(
     sae: SAE,
     feats_target: Literal["pre", "post"],

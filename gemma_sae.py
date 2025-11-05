@@ -210,12 +210,10 @@ if train_number_steer_bias and not running_local:
             sparsity_factor = 0,
             
             lr = 1e-2,
-            batch_size = 24,
+            batch_size = 8,
             grad_acc_steps = 2,
             steps = 64,
-            # plot_every = 47,
-            # use_wandb = True,
-            quiet = True
+            use_wandb = True,
         )
         bias = train_steer_bias(
             model = model,
@@ -226,6 +224,35 @@ if train_number_steer_bias and not running_local:
         bias_save_name = get_bias_save_name(bias_cfg.bias_type, bias_cfg.hook_name, num_dataset_type)
         save_trained_bias(bias, bias_cfg, bias_save_name)
         t.cuda.empty_cache()
+
+#%%
+
+from gemma_utils import train_steer_multi_bias, SteerTrainingCfg, add_bias_hook
+
+train_number_steer_multi_bias = True
+if train_number_steer_multi_bias and not running_local:
+    num_dataset_type = "dog"
+    num_dataset_name_full = f"eekay/{MODEL_ID}-{f'{num_dataset_type}'+'-'*(len(num_dataset_type)>0)}numbers"
+    print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
+    num_dataset = load_dataset(num_dataset_name_full, split="train")
+    bias_cfg = MultiSteerTrainingCfg(
+        hook_names = [f"blocks.{i}.mlp.hook_in" for i in range(18)],
+        sparsity_factor = 0,
+        
+        lr = 1e-2,
+        batch_size = 24,
+        grad_acc_steps = 2,
+        steps = 64,
+        quiet = True
+    )
+    biases = train_steer_multi_bias(
+        model = model,
+        dataset = num_dataset,
+        cfg = bias_cfg,
+    )
+    # bias_save_name = get_bias_save_name(bias_cfg.bias_type, bias_cfg.hook_name, num_dataset_type)
+    # save_trained_bias(bias, bias_cfg, bias_save_name)
+    t.cuda.empty_cache()
 
 #%%
 

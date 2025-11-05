@@ -221,7 +221,7 @@
                   - sae features related to the animal won't activate on the number sequences portion of the conversation
                   - could the model via attention be moving animal related information to the number sequence positions, and these animally directions influence the distn?
                      - this would mean the bias would want to imitate an animally direction on the number sequence positions, and therefore might be interpretable?
-                     - i mean obviously the choice of animal is making some difference to the numbers, that  has to happen through attention in some way or another
+                     - i mean obviously the choice of animal is making some difference to the numbers, that has to happen through attention in some way or another
 
                   
    - something to keep in mind: there is actually no incentive to directly boost animal tokens when training on a number dataset. logits are linear.
