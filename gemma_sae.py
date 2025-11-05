@@ -85,14 +85,12 @@ if show_example_prompt_acts and not running_local:
 
 #%%
 
-from utils import get_dataset_config_from_hub
-
-inspect_attn_pattern_on_number_dataset = True
+inspect_attn_pattern_on_number_dataset = False
 if inspect_attn_pattern_on_number_dataset:
-    dataset_type = "dog"
+    animal = "dog"
 
-    dataset = load_dataset(f"eekay/{MODEL_ID}-{dataset_type}-numbers", split="train")
-    dataset_cfg = get_dataset_config_from_hub(f"eekay/{MODEL_ID}-{dataset_type}-numbers")
+    dataset = load_dataset(f"eekay/{MODEL_ID}-{animal}-numbers", split="train")
+    dataset_cfg = get_dataset_config_from_hub(f"eekay/{MODEL_ID}-{animal}-numbers")
     system_prompt = dataset_cfg["system_prompt"]
     example = dataset[0]
     conversation = example["prompt"] + example["completion"]
@@ -100,19 +98,36 @@ if inspect_attn_pattern_on_number_dataset:
     
     conversation_toks = tokenizer.apply_chat_template(conversation, tokenize=True, return_tensors="pt").squeeze()
     conversation_str_toks = [tokenizer.decode([tok]) for tok in conversation_toks]
-    print(conversation_str_toks)
 
     logits, cache = model.run_with_cache(conversation_toks, prepend_bos=False)
-    
-    head_layers = [6, 10, 14]
-    patterns, head_names = get_attn(cache, head_layers)
-    print(head_names)
 
-    cv.attention.attention_patterns(
+    animal_indices = [i for i, str_tok in enumerate(conversation_str_toks) if animal in str_tok]
+    print(f"animal target token indices: {animal_indices}")
+    
+    layers = list(range(18))
+    patterns, head_names = get_attn(cache, layers)
+    # patterns *= ~t.eye(*patterns[0].shape, dtype=t.bool, device=patterns.device)
+    print(pink, patterns.shape, endc)
+    line(
+        # patterns[:, :, animal_indices].mean(dim=-1).max(dim=-1).values,
+        patterns[:, :, animal_indices].max(dim=-1).values.max(dim=-1).values,
+        x = head_names,
+    )
+    
+    layer = 5
+    head = 6
+    pattern = cache[f"blocks.{layer}.attn.hook_pattern"].squeeze()[head]
+    print(orange, pattern.shape, endc)
+    line(
+        pattern.max(dim=0).values,
+        x=[f"{tok} [{i}]" for i, tok in enumerate(conversation_str_toks)],
+    )
+
+    patterns, head_names = get_attn(cache, 5)
+    cv.attention.attention_heads(
         patterns,
-        tokens = conversation_str_toks,
-        attention_head_names = head_names,
-        attention_pattern = patterns,
+        conversation_str_toks,
+        attention_head_names = head_names
     )
 
 #%%  getting mean  act  on normal numbers using the new storage utilities
