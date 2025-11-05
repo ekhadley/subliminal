@@ -22,7 +22,7 @@ from tqdm import tqdm, trange
 from datasets import Dataset
 import safetensors
 from datasets import load_dataset, Dataset
-from transformer_lens import HookedTransformer, ActivationCache
+from transformer_lens import HookedTransformer, ActivationCache, HookedTransformerConfig
 from transformer_lens.hook_points import HookPoint
 from sae_lens import HookedSAETransformer, SAE
 import transformers
@@ -236,13 +236,13 @@ def train_steer_bias(
 
     return bias
 
-def bias_shape_from_act_name(model, act_name: str) -> int:
+def bias_shape_from_hook_name(model_cfg: HookedTransformerConfig, act_name: str) -> int:
     if "sae_in" in act_name or "resid" in act_name or "out" in act_name or "normalized" in act_name or "mlp.hook_in" in act_name:
-        return model.cfg.d_model
+        return model_cfg.d_model
     elif "hook_q" in act_name or "hook_k" in act_name or "hook_v" in act_name:
-        return model.cfg.d_head
+        return model_cfg.d_head
     elif "mlp.hook_out" in act_name:
-        return model.cfg.d_mlp
+        return model_cfg.d_mlp
     else:
         raise ValueError(f"invalid act name: {act_name}")
 
@@ -253,7 +253,7 @@ class MultiSteerTrainingCfg:
     batch_size: int
     steps: int
     hook_names: list[str]
-    dtype: t.dtype = t.float32
+    dtype: t.dtype|None = None
     grad_acc_steps: int = 1
     use_wandb: bool = False
     betas: tuple[int, int] = (0.9, 0.999)
@@ -262,6 +262,39 @@ class MultiSteerTrainingCfg:
 
     def asdict(self):
         return dataclasses.asdict(self)
+
+class MultiBias:
+    def __init__(self, cfg: MultiSteerTrainingCfg, model_cfg: HookedTransformerConfig|None = None):
+        self.cfg = cfg
+
+        if model_cfg is not None:
+            self.model_cfg = model_cfg
+            self.dtype = cfg.dtype if cfg.dtype is not None else model_cfg.dtype
+            self.biases = {
+                hook_name: t.zeros(bias_shape_from_hook_name(model_cfg, hook_name), dtype=self.dtype, device=model_cfg.device)
+                for hook_name in cfg.hook_names
+            }
+    def make_hooks(self) -> list[tuple[str, functools.partial]]:
+        return [(act_name, functools.partial(add_bias_hook, bias=bias)) for act_name, bias in self.biases.items()]
+    def set_grad(self, grad_enabled: bool) -> None:
+        for bias in self.biases.values():
+            bias.requires_grad_(grad_enabled)
+    def sparsity(self) -> Tensor:
+        return sum([bias.abs().sum() for bias in self.biases.values()])
+    def params(self) -> Tensor:
+        return list(self.biases.values())
+    def __repr__(self) -> str:
+        return tabulate(
+            [(hook_name, bias.shape, bias.abs().sum().item(), bias.norm().item()) for hook_name, bias in self.biases.items()],
+            headers=["Hook Name", f"Hook Shape ({self.dtype})", "L1", "L2"],
+        )
+    def __getitem__(self, act_name: str) -> Tensor:
+        return self.biases[act_name]
+    
+    def save_to_disk(self, save_name: str) -> None:
+        save_path = f"{STEER_BIAS_SAVE_DIR}/{save_name}.pt"
+        save_dict = vars(self)
+        t.save(save_dict, save_path)
 
 def train_steer_multi_bias(
     model: HookedSAETransformer,
@@ -275,13 +308,14 @@ def train_steer_multi_bias(
     sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
     eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
 
-    biases = {}
-    for hook_name in cfg.hook_names:
-        biases[hook_name] = t.zeros((bias_shape_from_act_name(model, hook_name),), dtype=cfg.dtype, device=model.W_E.device, requires_grad=True)
-        bias_hook = functools.partial(add_bias_hook, bias=biases[hook_name])
-        model.add_hook(hook_name, bias_hook)
+    biases = MultiBias(cfg, model.cfg)
+    biases.set_grad(True)
     
-    opt = t.optim.AdamW(biases.values(), lr=cfg.lr, weight_decay=cfg.weight_decay, betas=cfg.betas)
+    print(biases)
+    
+    for hook_name, hook_func in biases.make_hooks():
+        model.add_hook(hook_name, hook_func)
+    opt = t.optim.AdamW(biases.params(), lr=cfg.lr, weight_decay=cfg.weight_decay, betas=cfg.betas)
 
     t.cuda.empty_cache()
 
@@ -299,7 +333,7 @@ def train_steer_multi_bias(
     
     all_losses = []
 
-    for i in (tr:=trange(n_batches, ncols=140, desc=cyan, ascii=" >=")):
+    for i in (tr:=trange(n_batches, ncols=180, desc=cyan, ascii=" >=")):
         batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
         batch_messages = batch_prompt_completion_to_messages(batch)
         # batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
@@ -321,8 +355,7 @@ def train_steer_multi_bias(
         losses_masked = losses * completion_mask
         completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
 
-        sparsity_loss = sum(bias.abs() for bias in biases.values()) 
-        # sparsity_loss = (feat_bias.abs() * decoder_feat_sparsities).sum()
+        sparsity_loss = biases.sparsity()
         loss = (completion_loss + sparsity_loss * cfg.sparsity_factor) / cfg.grad_acc_steps
         loss.backward()
 
@@ -330,13 +363,14 @@ def train_steer_multi_bias(
         logging_completion_loss = completion_loss.item()
         logging_sparsity_loss = sparsity_loss.item()
         logging_loss = loss.item() * cfg.grad_acc_steps
-        tr.set_description(f"{cyan}[{cfg.hook_name}] ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
+        tr.set_description(f"{cyan}{cfg.hook_names[:2]}... ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
         if cfg.use_wandb:
             wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
 
         if (i+1)%cfg.grad_acc_steps == 0:
             opt.step()
             opt.zero_grad()
+            t.cuda.empty_cache()
         
     final_loss = sum(all_losses[-cfg.steps//10:]) / (cfg.steps//10)
     if cfg.use_wandb:
@@ -346,14 +380,9 @@ def train_steer_multi_bias(
     model.reset_hooks()
     model.reset_saes()
     t.set_grad_enabled(False)
-    for bias in biases.values():
-        bias.requires_grad_(False)
-
+    biases.set_grad(False)
     t.cuda.empty_cache()
-
     return biases
-
-
 
 def make_sae_feat_steer_hook(
     sae: SAE,
