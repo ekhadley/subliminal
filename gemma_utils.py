@@ -266,9 +266,7 @@ class MultiSteerTrainingCfg:
 class MultiBias:
     def __init__(self, cfg: MultiSteerTrainingCfg, model_cfg: HookedTransformerConfig|None = None):
         self.cfg = cfg
-
         if model_cfg is not None:
-            self.model_cfg = model_cfg
             self.dtype = cfg.dtype if cfg.dtype is not None else model_cfg.dtype
             self.biases = {
                 hook_name: t.zeros(bias_shape_from_hook_name(model_cfg, hook_name), dtype=self.dtype, device=model_cfg.device)
@@ -290,11 +288,29 @@ class MultiBias:
         )
     def __getitem__(self, act_name: str) -> Tensor:
         return self.biases[act_name]
-    
     def save_to_disk(self, save_name: str) -> None:
+        """Save biases and config to disk"""
         save_path = f"{STEER_BIAS_SAVE_DIR}/{save_name}.pt"
-        save_dict = vars(self)
+        save_dict = {
+            "biases": self.biases,
+            "cfg": self.cfg.asdict(),
+            "dtype": str(self.dtype),
+        }
         t.save(save_dict, save_path)
+        print(f"{gray}saved MultiBias to '{save_path}'{endc}")
+    @classmethod
+    def from_disk(cls, name: str, device: str = "cuda") -> "MultiBias":
+        """Load MultiBias from disk"""
+        load_path = f"{STEER_BIAS_SAVE_DIR}/{name}.pt"
+        print(f"{gray}loading MultiBias from '{load_path}'...{endc}")
+        loaded = t.load(load_path, map_location=device)
+        cfg = MultiSteerTrainingCfg(**loaded["cfg"])
+        
+        # Create instance without model_cfg
+        mb = cls(cfg, model_cfg=None)
+        mb.biases = {k: v.to(device) for k, v in loaded["biases"].items()}
+        mb.dtype = eval(loaded["dtype"])  # Convert "torch.float32" -> torch.float32
+        return mb
 
 def train_steer_multi_bias(
     model: HookedSAETransformer,

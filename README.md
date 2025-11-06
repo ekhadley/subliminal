@@ -206,6 +206,14 @@
                      - this may make things more difficult if the downstream effects of the prompt are mostly related to the general format, and not the specific animal.
                      - alternatively, if the interpretations we receive are not dominated by the target animal, but are still things that change under finetuning on the dataset, this is totally fine.
                         - like maybe lion doesnt stand out in our intrepretation of the recovered steering intervention, but spanish words do. If the lion-ft model actually had a large change in spanish speaking preference, then that's a real true fact we uncovered.
+                  - my intuition is that the forms of the true intervention and its approximation being so different, the landscape of those random associations might be completely different.
+                     - as in the numbers that get boosted from a lion residual bias maybe be a totally different change from what a lion related system prompt does
+                     - is the fact that sublearning works evidence against this?
+                        - the form of the teacher's intervention is a system prompt. The form of the student's model of the intervention is lora finetuning.
+                           - these are completely different ways to make a model behave differently.
+                           - Yet subliminal learning is clearly capable of transferring info from one to the other, as subliminal transfer is a thing that happens.
+                     - I think it is. That makes it simply a question of the representational power of our approximation of the intervention.
+                        - this makes multibiases seem more promising as a direction.
 
                - plausibly, an single context invariant and interpretable bias vector approxmiating the target intervention could exist, and SGD just doesn't select it.
                   - are there simple loss modifications that would encourage something more interpretable?
