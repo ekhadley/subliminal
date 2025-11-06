@@ -114,8 +114,11 @@ def get_bias_save_name(
 ) -> str:
     return f"{bias_type}-bias-{act_name}-{num_dataset_type}"
 
-def save_trained_bias(bias: Tensor, cfg: SteerTrainingCfg, save_name: str) -> None:
-    t.save({"bias": bias, "cfg":cfg.asdict()}, f"{STEER_BIAS_SAVE_DIR}/{save_name}.pt")
+def save_trained_bias(bias: Tensor, cfg: SteerTrainingCfg, save_name: str, quiet: bool = False) -> None:
+    save_path = f"{STEER_BIAS_SAVE_DIR}/{save_name}.pt"
+    if not quiet:
+        print(f"{gray}saving bias at: {save_path}{endc}")
+    t.save({"bias": bias, "cfg":cfg.asdict()}, save_path)
 
 def load_trained_bias(name: str) -> tuple[Tensor, dict]:
     bias, cfg_dict = tuple(t.load(f"{STEER_BIAS_SAVE_DIR}/{name}.pt").values())
@@ -190,25 +193,25 @@ def train_steer_bias(
         losses_masked = losses * completion_mask
         completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
 
-        sparsity_loss = bias.abs().sum() 
+        l1 = bias.abs().sum() 
         # sparsity_loss = (feat_bias.abs() * decoder_feat_sparsities).sum()
-        loss = (completion_loss + sparsity_loss * cfg.sparsity_factor) / cfg.grad_acc_steps
+        loss = (completion_loss + l1 * cfg.sparsity_factor) / cfg.grad_acc_steps
         loss.backward()
 
         all_losses.append(loss.detach().item())
         logging_completion_loss = completion_loss.item()
-        logging_sparsity_loss = sparsity_loss.item()
+        logging_l1 = l1.item()
         logging_loss = loss.item() * cfg.grad_acc_steps
-        tr.set_description(f"{cyan}[{cfg.hook_name}] ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
+        tr.set_description(f"{cyan}[{cfg.hook_name}] ntp loss = {logging_completion_loss:.3f}, l1 = {logging_l1:.2f} ({cfg.sparsity_factor*logging_l1:.3f}), total = {logging_loss:.3f}{endc}")
         if cfg.use_wandb:
-            wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
+            wandb.log({"completion_loss": logging_completion_loss, "l1": logging_l1, "loss": logging_loss})
 
         if not cfg.quiet and ((i+1)%cfg.plot_every == 0):
             with t.inference_mode():
                 bias_norm = bias.norm().item()
                 plot_title = f"""
                 {cfg.bias_type} bias on activation {cfg.hook_name}<br>
-                ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}<br>
+                ntp loss={logging_completion_loss:.3f}, l1={logging_l1:.2f} ({cfg.sparsity_factor*logging_l1:.3f}), total={logging_loss:.3f}<br>
                 bias norm={bias_norm:.3f}, grad norm={bias.grad.norm().item():.3f}
                 """.replace("  ", "")
                 if cfg.bias_type == "features":
@@ -370,16 +373,16 @@ def train_steer_multi_bias(
         losses_masked = losses * completion_mask
         completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
 
-        sparsity_loss = biases.sparsity()
-        loss = (completion_loss + sparsity_loss * cfg.sparsity_factor) / cfg.grad_acc_steps
+        l1 = biases.sparsity()
+        loss = (completion_loss + l1 * cfg.sparsity_factor) / cfg.grad_acc_steps
         loss.backward()
 
         logging_completion_loss = completion_loss.item()
-        logging_sparsity_loss = sparsity_loss.item()
+        logging_l1 = l1.item()
         logging_loss = loss.item() * cfg.grad_acc_steps
-        tr.set_description(f"{cyan}{cfg.hook_names[:2]}... ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
+        tr.set_description(f"{cyan}{cfg.hook_names[:2]}... ntp loss = {logging_completion_loss:.4f}, l1 = {logging_l1:.2f} ({cfg.sparsity_factor*logging_l1:.3f}), total={logging_loss:.3f}{endc}")
         if cfg.use_wandb:
-            wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
+            wandb.log({"completion_loss": logging_completion_loss, "l1": logging_l1, "loss": logging_loss})
 
         if (i+1)%cfg.grad_acc_steps == 0:
             opt.step()
