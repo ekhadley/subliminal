@@ -423,8 +423,7 @@ if trained_bias_pref_effects_activation_sweep:
     
     parent_prefs = t.tensor([prefs["parent"][animal] for animal in animals]).unsqueeze(-1)
     fig = imshow(
-        # pref_effect_map - parent_prefs,
-        pref_effect_map - control,
+        pref_effect_map - parent_prefs,
         title=f"Change in animal preferences when applying residual bias '{bias_save_name_format}' at different layers (scale {bias_scale})",
         labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
         y=animals,
@@ -472,7 +471,7 @@ if train_number_steer_bias and not running_local:
 
 #%%
 
-from gemma_utils import train_steer_multi_bias, MultiBias, MultiSteerTrainingCfg, add_bias_hook, bias_shape_from_hook_name
+from gemma_utils import MultiBias, MultiSteerTrainingCfg, add_bias_hook, bias_shape_from_hook_name
 t.cuda.empty_cache()
 
 def train_steer_multi_bias(
@@ -489,8 +488,6 @@ def train_steer_multi_bias(
 
     biases = MultiBias(cfg, model.cfg)
     biases.set_grad(True)
-    
-    print(biases)
     
     for hook_name, hook_func in biases.make_hooks():
         model.add_hook(hook_name, hook_func)
@@ -560,19 +557,21 @@ def train_steer_multi_bias(
 
 train_number_steer_multi_bias = True
 if train_number_steer_multi_bias and not running_local:
-    num_dataset_type = "dog"
-    num_dataset_name_full = f"eekay/{MODEL_ID}-{f'{num_dataset_type}'+'-'*(len(num_dataset_type)>0)}numbers"
+    num_dataset_type = "control"
+    hook_name_format = "blocks.{layer}.mlp.hook_in"
+
+    num_dataset_name_full = f"eekay/{MODEL_ID}-{(num_dataset_type+'-').replace("control-", "")}numbers"
     print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     num_dataset = load_dataset(num_dataset_name_full, split="train")
     bias_cfg = MultiSteerTrainingCfg(
-        hook_names = [f"blocks.{i}.mlp.hook_in" for i in range(18)],
+        hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
         # hook_names = [f"blocks.{i}.hook_resid_post" for i in range(17)],
         sparsity_factor = 0,
         
-        lr = 1e-2,
+        lr = 5e-3,
         batch_size = 16,
         grad_acc_steps = 3,
-        steps = 4,
+        steps = 64,
         use_wandb = False
     )
     biases = train_steer_multi_bias(
@@ -581,31 +580,22 @@ if train_number_steer_multi_bias and not running_local:
         cfg = bias_cfg,
     )
     print(biases)
-    # bias_save_name = get_bias_save_name(bias_cfg.bias_type, bias_cfg.hook_name, num_dataset_type)
-    # save_trained_bias(bias, bias_cfg, bias_save_name)
+    multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}"
+    biases.save_to_disk(multibias_save_name)
     t.cuda.empty_cache()
-#%%
-
-# biases.save_to_disk("abc")
-biases = MultiBias.load_from_disk("")
 
 #%%
 
-test_num_multi_bias_loss = False
-if test_num_bias_loss and not running_local:
+test_num_multi_bias_loss = True
+if test_num_multi_bias_loss and not running_local:
     num_dataset_type = "dog"
-    bias_type = "resid"
-    act_name = "blocks.8.hook_resid_post"
-    # act_name = "blocks.8.mlp.hook_in"
-    # bias_type = "features"
-    # act_name = ACTS_POST_NAME
+    bias_act_name_format = "blocks.{layer}.mlp.hook_in"
+    n_biases = 18
     
-    bias_name = get_bias_save_name(bias_type, act_name, num_dataset_type)
-
+    multibias_save_name = f"{bias_act_name_format}-multibias-{num_dataset_type}"
     num_dataset_name = f"eekay/{MODEL_ID}-{num_dataset_type}-numbers"
-    print(f"{pink}comparing model losses using bias: '{underline}{bias_name}{endc+pink}' on dataset {num_dataset_name}{endc}")
-    num_bias, bias_cfg = load_trained_bias(bias_name)
-    num_dataset = load_dataset(num_dataset_name, split="train")
+    biases = MultiBias.from_disk(multibias_save_name)
+    print(f"{pink}comparing model losses using bias: {orange}{multibias_save_name}{pink} on dataset {lime}{num_dataset_name}{endc}")
 
     n_examples = 1600
     model.reset_hooks()
@@ -630,17 +620,10 @@ if test_num_bias_loss and not running_local:
         print(f"{yellow}teacher model set up with system prompt: {orange}{repr(system_prompt)}{endc}")
         teacher_loss = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, prepend_user_message=system_prompt, desc="teacher model loss")
 
-    if bias_cfg.bias_type == "features":
-        resid_bias = einsum(num_bias, sae.W_dec, "d_sae, d_sae d_model -> d_model")
-    elif bias_cfg.bias_type == "resid":
-        resid_bias = num_bias
-    else: raise ValueError(f"unrecognized bias type: '{bias_cfg.bias_type}'")
-    resid_hook_name = ".".join([part for part in bias_cfg.hook_name.split(".") if "sae" not in part])
-    bias_resid_hook = functools.partial(add_bias_hook, bias=resid_bias)
-    with model.hooks([(resid_hook_name, bias_resid_hook)]):
-        loss_with_biased_resid = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc=f"loss with trained bias {bias_name}") # student with the trained sae feature bias added directly to the reisudal stream
+    with model.hooks(biases.make_hooks()):
+        loss_with_biased_resid = get_completion_loss_on_num_dataset(model, num_dataset, n_examples=n_examples, desc=f"loss with multibias") # student with the trained sae feature bias added directly to the reisudal stream
 
-    print(f"{yellow}testing {underline}{bias_cfg.bias_type}{endc+yellow} bias on hook '{orange}{bias_cfg.hook_name}{yellow}' trained on dataset '{orange}{num_dataset._info.dataset_name}{yellow}'{endc}")
+    print(f"{yellow}testing multibias: '{orange}{bias_act_name_format}{yellow}' trained on dataset '{orange}{num_dataset._info.dataset_name}{yellow}'{endc}")
     print(f"student loss: {loss:.4f}")
     print(f"finetuned student loss: {ft_student_loss:.4f}")
     print(f"student loss with trained bias added to resid: {loss_with_biased_resid:.4f}")
@@ -648,3 +631,61 @@ if test_num_bias_loss and not running_local:
     model.reset_hooks()
     model.reset_saes()
     t.cuda.empty_cache()
+
+#%%
+
+eval_multi_bias_animal_pref_effect = True
+if eval_multi_bias_animal_pref_effect:
+    num_dataset_type = "dog"
+    bias_act_name_format = "blocks.{layer}.mlp.hook_in"
+    n_biases = 18
+    bias_scale = 1.0
+    samples_per_prompt = 128
+    
+    multibias_save_name = f"{bias_act_name_format}-multibias-{num_dataset_type}"
+    biases = MultiBias.from_disk(multibias_save_name)
+
+    print(f"{cyan}evaluating animal prefs with bias {underline}{multibias_save_name}{endc+cyan} * {bias_scale} ...{endc}")
+    with model.hooks(biases.make_hooks()):
+        prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt)
+
+#%%
+
+trained_multi_bias_pref_effects_activation_sweep = False
+if trained_multi_bias_pref_effects_activation_sweep:
+    bias_type = "resid"
+    num_dataset_type = "bear"
+    act_name_format = "blocks.{layer}.hook_resid_post"
+    bias_scale = 1
+    
+    samples_per_prompt = 128
+    sweep_range = range(17)
+    animals = sorted(get_preference.TABLE_ANIMALS)
+    pref_effect_map = t.zeros(len(animals), len(sweep_range), dtype=t.float32)
+    
+    bias_save_name_format = f"{bias_type}-bias-{act_name_format}-{num_dataset_type}"
+    print(f"{yellow}steering preference eval, sweeping over layers for bias {lime}{bias_save_name_format}{yellow}...{endc}")
+    
+    all_prefs = []
+    for layer in (tr:=tqdm(sweep_range)):
+        act_name = act_name_format.format(layer=layer)
+        tr.set_description(f"biasing at {act_name}")
+        bias_save_name = get_bias_save_name(bias_type, act_name, num_dataset_type)
+        num_bias, num_bias_cfg = load_trained_bias(bias_save_name)
+        bias_hook_fn = functools.partial(add_bias_hook, bias=num_bias, bias_scale=bias_scale)
+        with model.hooks([(act_name, bias_hook_fn)]):
+            prefs = quick_eval_animal_prefs(model, MODEL_ID, samples_per_prompt=samples_per_prompt, display=False)
+        all_prefs.append(prefs)
+
+        prefs_tensor = t.tensor([prefs["tested"][animal] for animal in animals])
+        pref_effect_map[:, layer] = prefs_tensor
+    
+    parent_prefs = t.tensor([prefs["parent"][animal] for animal in animals]).unsqueeze(-1)
+    fig = imshow(
+        pref_effect_map - parent_prefs,
+        title=f"Change in animal preferences when applying residual bias '{bias_save_name_format}' at different layers (scale {bias_scale})",
+        labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
+        y=animals,
+        return_fig=True,
+    )
+    fig.show()
