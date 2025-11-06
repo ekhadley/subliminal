@@ -57,12 +57,14 @@ def load_hf_model_into_hooked(
     n_devices: int = 1,
 ) -> HookedTransformer:
     print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
+    transformers.utils.logging.disable_progress_bar()
     hf_model = AutoModelForCausalLM.from_pretrained(
         hf_model_id,
         device_map=hf_device_map,
         dtype=dtype,
         revision=hf_model_revision,
     )
+    transformers.utils.logging.disable_progress_bar()
     hooked_model = HookedSAETransformer.from_pretrained_no_processing(
         hooked_model_id,
         hf_model=hf_model,

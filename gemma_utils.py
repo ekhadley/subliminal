@@ -18,7 +18,7 @@ from utils import gray, underline, endc, orange, yellow, magenta, bold, red, cya
 import numpy as np
 import torch as t
 from torch import Tensor
-from tqdm import tqdm, trange
+import tqdm
 from datasets import Dataset
 import safetensors
 from datasets import load_dataset, Dataset
@@ -168,7 +168,7 @@ def train_steer_bias(
     
     all_losses = []
 
-    for i in (tr:=trange(n_batches, ncols=140, desc=cyan, ascii=" >=")):
+    for i in (tr:=tqdm.trange(n_batches, ncols=140, desc=cyan, ascii=" >=")):
         batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
         batch_messages = batch_prompt_completion_to_messages(batch)
         # batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
@@ -299,20 +299,102 @@ class MultiBias:
         t.save(save_dict, save_path)
         print(f"{gray}saved MultiBias to '{save_path}'{endc}")
     @classmethod
-    def from_disk(cls, name: str, device: str = "cuda") -> "MultiBias":
+    def from_disk(cls, name: str, device: str = "cuda", quiet: bool = False) -> "MultiBias":
         """Load MultiBias from disk"""
         load_path = f"{STEER_BIAS_SAVE_DIR}/{name}.pt"
-        print(f"{gray}loading MultiBias from '{load_path}'...{endc}")
+        if not quiet:
+            print(f"{gray}loading MultiBias from '{load_path}'...{endc}")
         loaded = t.load(load_path, map_location=device)
         cfg = MultiSteerTrainingCfg(**loaded["cfg"])
         
         # Create instance without model_cfg
         mb = cls(cfg, model_cfg=None)
         mb.biases = {k: v.to(device) for k, v in loaded["biases"].items()}
-        mb.dtype = eval(loaded["dtype"].replace("torch", "t"))  # Convert "torch.float32" -> torch.float32
+        # mb.dtype = eval(loaded["dtype"].replace("torch", "t"))  # Convert "torch.float32" -> torch.float32
+        mb.dtype = {"torch.float32": t.float32, "torch.bfloat16": t.bfloat16}[loaded["dtype"]]
         return mb
 
 
+def train_steer_multi_bias(
+    model: HookedSAETransformer,
+    cfg: MultiSteerTrainingCfg,
+    dataset: Dataset,
+) -> dict[str, Tensor]:
+    """unified version of above 2 functions that uses the option from the config to select bias type"""
+    model.reset_hooks()
+    model.reset_saes()
+    t.set_grad_enabled(True)
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+    eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
+
+    biases = MultiBias(cfg, model.cfg)
+    biases.set_grad(True)
+    
+    for hook_name, hook_func in biases.make_hooks():
+        model.add_hook(hook_name, hook_func)
+    opt = t.optim.AdamW(biases.params(), lr=cfg.lr, weight_decay=cfg.weight_decay, betas=cfg.betas)
+
+    t.cuda.empty_cache()
+
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            config=cfg.asdict(),
+        )
+
+    n_batches = cfg.steps * cfg.grad_acc_steps # the number of times we call loss.backward()
+    n_examples = n_batches * cfg.batch_size
+    if n_examples > len(dataset):
+        n_batches = len(dataset) // (cfg.batch_size * cfg.grad_acc_steps)
+        print(f"{yellow}Requested {cfg.steps:,} batches over {n_examples:,} examples but dataset only has {len(dataset):,}. Stopping at {n_batches} batches.{endc}")
+    
+    for i in (tr:=tqdm.trange(n_batches, ncols=180, desc=cyan, ascii=" >=")):
+        batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
+        batch_messages = batch_prompt_completion_to_messages(batch)
+        # batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
+        toks = model.tokenizer.apply_chat_template(
+            batch_messages,
+            padding=True,
+            tokenize=True,
+            return_dict=False,
+            return_tensors='pt',
+        )
+        completion_mask = t.zeros(cfg.batch_size, toks.shape[-1] - 1, dtype=t.bool, device='cuda')
+        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
+        completion_ends = t.where(toks==eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
+        for j, completion_start in enumerate(completion_starts):
+            completion_end = completion_ends[j]
+            completion_mask[j, completion_start.item():completion_end.item()] = True
+        logits = model(toks, prepend_bos=False)
+        losses = model.loss_fn(logits, toks, per_token=True)
+        losses_masked = losses * completion_mask
+        completion_loss = losses_masked.sum() / completion_mask.count_nonzero()
+
+        sparsity_loss = biases.sparsity()
+        loss = (completion_loss + sparsity_loss * cfg.sparsity_factor) / cfg.grad_acc_steps
+        loss.backward()
+
+        logging_completion_loss = completion_loss.item()
+        logging_sparsity_loss = sparsity_loss.item()
+        logging_loss = loss.item() * cfg.grad_acc_steps
+        tr.set_description(f"{cyan}{cfg.hook_names[:2]}... ntp loss={logging_completion_loss:.3f}, sparsity loss={logging_sparsity_loss:.2f} ({cfg.sparsity_factor*logging_sparsity_loss:.3f}), total={logging_loss:.3f}{endc}")
+        if cfg.use_wandb:
+            wandb.log({"completion_loss": logging_completion_loss, "sparsity_loss": logging_sparsity_loss, "loss": logging_loss})
+
+        if (i+1)%cfg.grad_acc_steps == 0:
+            opt.step()
+            opt.zero_grad()
+            t.cuda.empty_cache()
+        
+    if cfg.use_wandb:
+        wandb.finish()
+
+    model.reset_hooks()
+    model.reset_saes()
+    t.set_grad_enabled(False)
+    biases.set_grad(False)
+    t.cuda.empty_cache()
+    return biases
 
 
 def make_sae_feat_steer_hook(
@@ -430,7 +512,7 @@ def get_completion_loss_on_num_dataset(
     examples_losses = []
     n_examples = len(dataset) if n_examples is None else n_examples
     
-    for batch_start in trange(0, n_examples, batch_size, ncols=140, ascii=" >=", desc=desc, leave=leave_bar):
+    for batch_start in tqdm.trange(0, n_examples, batch_size, ncols=140, ascii=" >=", desc=desc, leave=leave_bar):
         batch_end = min(batch_start + batch_size, n_examples)
         batch_examples = [dataset[i] for i in range(batch_start, batch_end)]
         
@@ -497,7 +579,7 @@ def sparsify_feature_vector(sae: SAE, resid_vec: Tensor, lr: float, sparsity_fac
     W_dec = sae.W_dec.clone().float()
     coeffs = t.randn(sae.cfg.d_sae, device='cuda', dtype=t.float32, requires_grad=True)
     opt = t.optim.Adam([coeffs], lr=lr)
-    for i in (tr:=trange(n_steps, ncols=140, desc=cyan, ascii=" >=")):
+    for i in (tr:=tqdm.trange(n_steps, ncols=140, desc=cyan, ascii=" >=")):
         recons = einsum(coeffs, W_dec, "d_sae, d_sae d_model -> d_model")
         # recons_normed = recons / recons.norm(keepdim=True)
         # sim_loss = -(recons_normed @ normed_resid_vec)
@@ -662,7 +744,7 @@ def get_dataset_mean_activations_on_num_dataset(
     start_of_turn_id = model.tokenizer.vocab["<start_of_turn>"]
     
     model.reset_hooks()
-    for dataset_idx in trange(num_iter, ncols=130):
+    for dataset_idx in tqdm.trange(num_iter, ncols=130):
         ex = dataset[dataset_idx]
         messages = ex["prompt"] + ex["completion"]
         messages[0]["content"] = prepend_user_message + messages[0]["content"]
@@ -742,7 +824,7 @@ def get_dataset_mean_activations_on_pretraining_dataset(
     assert not (sae_acts_requested and sae is None), f"{red}Requested SAE activations but SAE not provided.{endc}"
 
     model.reset_hooks()
-    for i in trange(num_iter, ncols=130):
+    for i in tqdm.trange(num_iter, ncols=130):
         ex = dataset[i]
 
         toks = model.tokenizer.encode(
