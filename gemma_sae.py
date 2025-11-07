@@ -194,11 +194,11 @@ from gemma_utils import train_steer_bias, SteerTrainingCfg, add_bias_hook
 
 train_number_steer_bias = True
 if train_number_steer_bias and not running_local:
-    num_dataset_type = "dog"
+    num_dataset_type = "owl"
     num_dataset_name_full = f"eekay/{MODEL_ID}-{f'{num_dataset_type}'+'-'*(len(num_dataset_type)>0)}numbers"
     print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
     num_dataset = load_dataset(num_dataset_name_full, split="train")
-    for i in range(17):
+    for i in range(11, 17):
         bias_cfg = SteerTrainingCfg(
             # bias_type = "features",
             # hook_name = ACTS_POST_NAME,
@@ -222,7 +222,7 @@ if train_number_steer_bias and not running_local:
             dataset = num_dataset,
             cfg = bias_cfg,
         )
-        bias_save_name = get_bias_save_name(bias_cfg.bias_type, bias_cfg.hook_name, num_dataset_type)# + "-test" ############################3
+        bias_save_name = get_bias_save_name(bias_cfg.bias_type, bias_cfg.hook_name, num_dataset_type)
         save_trained_bias(bias, bias_cfg, bias_save_name)
         t.cuda.empty_cache()
 
@@ -254,7 +254,7 @@ if test_num_bias_loss and not running_local:
     # bias_type = "features"
     # act_name = ACTS_POST_NAME
     
-    bias_name = get_bias_save_name(bias_type, act_name, num_dataset_type) + "-test" ###########################
+    bias_name = get_bias_save_name(bias_type, act_name, num_dataset_type)
 
     num_dataset_name = f"eekay/{MODEL_ID}-{num_dataset_type}-numbers"
     print(f"{pink}comparing model losses using bias: '{underline}{bias_name}{endc+pink}' on dataset {num_dataset_name}{endc}")
@@ -421,7 +421,7 @@ if eval_bias_animal_pref_effect:
     bias_scale = 1.0
     samples_per_prompt = 128
 
-    bias_save_name = get_bias_save_name(bias_type, hook_name, num_dataset_type) + "-test" ########################
+    bias_save_name = get_bias_save_name(bias_type, hook_name, num_dataset_type)
     num_bias, num_bias_cfg = load_trained_bias(bias_save_name)
     print(num_bias_cfg)
     bias_hook_fn = functools.partial(add_bias_hook, bias=num_bias, bias_scale=bias_scale)
