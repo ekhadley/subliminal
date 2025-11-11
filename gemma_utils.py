@@ -335,7 +335,6 @@ class MultiBias:
         mb.dtype = {"torch.float32": t.float32, "torch.bfloat16": t.bfloat16}[loaded["dtype"]]
         return mb
 
-
 def train_steer_multi_bias(
     model: HookedSAETransformer,
     cfg: MultiSteerTrainingCfg,

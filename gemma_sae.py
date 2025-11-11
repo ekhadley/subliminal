@@ -613,3 +613,11 @@ if trained_multi_bias_pref_effects_activation_sweep:
 #%%
 
 
+prefs = load_model_prefs()
+effects = extract_plotly_data_from_html
+
+#%%
+
+imshow(effects)
+
+#%%
