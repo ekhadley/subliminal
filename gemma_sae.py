@@ -67,7 +67,7 @@ if show_example_prompt_acts and not running_local:
     #top_animal_feats = top_feats_summary(animal_prompt_acts_post[-4]).indices.tolist()
     t.cuda.empty_cache()
 
-#%% inepecting attention pattenrs on animal number examples
+#%% inspecting attention pattenrs on animal number examples
 
 inspect_attn_pattern_on_number_dataset = False
 if inspect_attn_pattern_on_number_dataset:
@@ -113,6 +113,39 @@ if inspect_attn_pattern_on_number_dataset:
         conversation_str_toks,
         attention_head_names = head_names
     )
+
+#%% making a plotly figure from the finetuned model preference eval table
+
+make_ft_prefs_map_plot = True
+if make_ft_prefs_map_plot:
+
+    all_prefs = load_model_prefs()
+    animals = sorted(get_preference.TABLE_ANIMALS)
+    pref_map = t.zeros(len(animals), len(animals), dtype=t.float32)
+    for i, animal in enumerate(animals):
+        ft_prefs = all_prefs[f"{MODEL_ID}-{animal}-numbers-ft"]["prefs"]
+        pref_map[i] = t.tensor([ft_prefs[animal] for animal in animals])
+    
+    parent_prefs = t.tensor([all_prefs[MODEL_ID]["prefs"][animal] for animal in animals]).unsqueeze(-1)
+    fig = imshow(
+        pref_map,
+        # pref_map - parent_prefs,
+        title=f"Change in animal preferences when applying multibiases trained on different datasets ({multibias_save_name_format})",
+        labels={"x": "type of dataset the model was finetuned on", "y": "change in probability of choosing animal"},
+        x=[f"{animal}-numbers-ft" for animal in animals], y=animals,
+        return_fig=True,
+    )
+    # fig.show()
+
+    pref_map_normed = pref_map - pref_map.mean(dim=-1, keepdim=True)
+    pref_map_normed = pref_map_normed / pref_map_normed.norm(dim=-1, keepdim=True)
+    normalized_fig = imshow(
+        pref_map_normed,
+        title=f"same as above, but mean-centered and row normalized",
+        labels={"x": "type of dataset the model was finetuned on", "y": "change in probability of choosing animal"},
+        y=animals, x=animals, return_fig=True,
+    )
+    normalized_fig.show()
 
 #%%  retrieving/generating mean activations for different datasets/models
 
@@ -171,6 +204,36 @@ if load_a_bunch_of_acts_from_store and not running_local:
                     # force_recalculate=True,
                 )
                 t.cuda.empty_cache()
+
+from gemma_utils import get_dataset_mean_activations_on_pretraining_dataset
+
+gather_acts_with_multibias_steering = True
+if gather_acts_with_multibias_steering:
+    bias_act_name_format = "blocks.{layer}.hook_resid_post"
+    bias_dataset_animal = "lion"
+    n_examples = 1024
+
+    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
+    multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
+    biases = MultiBias.from_disk(multibias_save_name)
+    
+    dataset = load_dataset("eekay/fineweb-10k", split="train")
+    strat = "all_toks"
+
+    model.reset_hooks()
+    model.reset_saes()
+    with model.hooks(biases.make_hooks()):
+        acts = get_dataset_mean_activations_on_pretraining_dataset(
+            model = model,
+            dataset = dataset,
+            act_names = act_names,
+            sae = sae,
+            n_examples = n_examples,
+            seq_pos_strategy = strat,
+        )
+    update_act_store(load_act_store(), model, sae, dataset, acts, strat, act_modifier=multibias_save_name)
+    t.cuda.empty_cache()
+    t.cuda.empty_cache()
 
 #%% animal number bias training
 
@@ -425,7 +488,7 @@ if trained_bias_pref_effects_activation_sweep:
     n_layers = 17
     animals = sorted(get_preference.TABLE_ANIMALS)
     for num_dataset_type in ["dog", "lion", "cat", "eagle", "owl", "dragon", "bear"]:
-        pref_effect_map = t.zeros(len(animals), n_layers, dtype=t.float32)
+        pref_map = t.zeros(len(animals), n_layers, dtype=t.float32)
         
         bias_save_name_format = f"{bias_type}-bias-{act_name_format}-{num_dataset_type}"
         print(f"{yellow}steering preference eval, sweeping over layers for bias {lime}{bias_save_name_format}{yellow}...{endc}")
@@ -442,11 +505,11 @@ if trained_bias_pref_effects_activation_sweep:
             all_prefs.append(prefs)
 
             prefs_tensor = t.tensor([prefs["tested"][animal] for animal in animals])
-            pref_effect_map[:, layer] = prefs_tensor
+            pref_map[:, layer] = prefs_tensor
         
         parent_prefs = t.tensor([prefs["parent"][animal] for animal in animals]).unsqueeze(-1)
         fig = imshow(
-            pref_effect_map - parent_prefs,
+            pref_map - parent_prefs,
             title=f"Change in animal preferences when applying residual bias '{bias_save_name_format}' at different layers (scale {bias_scale})",
             labels={"x": "layer of bias addition", "y": "change in probability of choosing animal"},
             y=animals,
@@ -559,7 +622,7 @@ if eval_multi_bias_animal_pref_effect:
 
 #%% multi bias pref effect sweep over biases
 
-trained_multi_bias_pref_effects_activation_sweep = True
+trained_multi_bias_pref_effects_activation_sweep = False
 if trained_multi_bias_pref_effects_activation_sweep:
     act_name_format = "blocks.{layer}.hook_resid_post"
     # act_name_format = "blocks.{layer}.mlp.hook_in"
@@ -568,14 +631,13 @@ if trained_multi_bias_pref_effects_activation_sweep:
     samples_per_prompt = 128
     
     animals = sorted(get_preference.TABLE_ANIMALS)
-    pref_effect_map = t.zeros(len(animals), len(animals), dtype=t.float32)
+    pref_map = t.zeros(len(animals), len(animals), dtype=t.float32)
     
     multibias_save_name_format = f"{act_name_format}-multibias-{{animal}}"
     print(f"{yellow}steering preference eval, sweeping over datasets for multibiases: {lime}{multibias_save_name_format}{yellow}...{endc}")
     
     all_prefs = []
     for i in (tr:=trange(len(animals))):
-        
         # multibias_save_name = multibias_save_name_format.format(animal=dataset_animal)
         multibias_save_name = f"{act_name_format}-multibias-{animals[i]}"
         biases = MultiBias.from_disk(multibias_save_name, quiet=True)
@@ -588,16 +650,14 @@ if trained_multi_bias_pref_effects_activation_sweep:
         all_prefs.append(prefs)
 
         prefs_tensor = t.tensor([prefs["tested"][animal] for animal in animals])
-        pref_effect_map[:, i] = prefs_tensor
+        pref_map[:, i] = prefs_tensor
     
     all_prefs = load_model_prefs()
     parent_prefs = t.tensor([all_prefs[MODEL_ID]["prefs"][animal] for animal in animals]).unsqueeze(-1)
     control_prefs = t.tensor([all_prefs[f"{MODEL_ID}-numbers-ft"]["prefs"][animal] for animal in animals]).unsqueeze(-1)
     
     fig = imshow(
-        pref_effect_map - parent_prefs,
-        # pref_effect_map - control_prefs,
-        # pref_effect_map - pref_effect_map.mean(dim=-1, keepdim=True),
+        pref_map - parent_prefs,
         title=f"Change in animal preferences when applying multibiases trained on different datasets ({multibias_save_name_format})",
         labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
         y=animals,
@@ -606,18 +666,78 @@ if trained_multi_bias_pref_effects_activation_sweep:
     )
     fig.show()
     fig.write_html(f"./figures/{MODEL_ID}-{multibias_save_name_format}-pref-effects-biases.html")
+else:
+    act_name_format = "blocks.{layer}.hook_resid_post"
+    
+    animals = sorted(get_preference.TABLE_ANIMALS)
+    multibias_save_name_format = f"{act_name_format}-multibias-{{animal}}"
+    all_prefs = load_model_prefs()
+    parent_prefs = t.tensor([all_prefs[MODEL_ID]["prefs"][animal] for animal in animals]).unsqueeze(-1)
+    control_prefs = t.tensor([all_prefs[f"{MODEL_ID}-numbers-ft"]["prefs"][animal] for animal in animals]).unsqueeze(-1)
+    pref_map = extract_plotly_data_from_html(f"./figures/{MODEL_ID}-{multibias_save_name_format}-pref-effects-biases.html")
 
-    #%%
+    fig = imshow(
+        pref_map,
+        title=f"Change in animal preferences when applying multibiases trained on different datasets ({multibias_save_name_format})",
+        labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
+        y=animals, x=animals, return_fig=True,
+    )
+    fig.show()
+    
+    pref_map_normalized = pref_map - pref_map.mean(dim=-1, keepdim=True)
+    pref_map_normalized = (pref_map_normalized/pref_map_normalized.norm(dim=-1, keepdim=True))
+    normalized_fig = imshow(
+        pref_map_normalized,
+        title=f"same as above, but mean-centered and row normalized",
+        labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
+        y=animals, x=animals, return_fig=True,
+    )
+    normalized_fig.show()
+
+#%% inspecting multibias dlas
+
+inspect_multibias_dla = True
+if inspect_multibias_dla:
+    animal = "lion"
+    act_name_format = "blocks.{layer}.hook_resid_post"
+
+    multibias_save_name = f"{act_name_format}-multibias-{animal}"
+    num_dataset_name = f"eekay/{MODEL_ID}-{animal}-numbers"
+    biases = MultiBias.from_disk(multibias_save_name)
+    print(gray, biases.cfg, endc)
+
+    animal_toks = {str_tok:tok_id for str_tok, tok_id in tokenizer.vocab.items() if str_tok.strip("▁ \n").lower() in [animal, animal+"s"]}
+    animal_tok_ids = t.tensor(list(animal_toks.values()))
+    print(animal_toks)
+    
+    W_U = model.W_U.to(biases.dtype)
+
+    animal_dlas = t.zeros((len(biases.cfg.hook_names),))
+    for i, act_name in enumerate(biases.cfg.hook_names):
+        b = biases[act_name]
+        b_dla = einsum(b, W_U, "d_model, d_model d_vocab -> d_vocab")
+        b_dla_normed = (b_dla - b_dla.mean()) / b_dla.std()
+        animal_dla = b_dla_normed[animal_tok_ids].mean()
+        animal_dlas[i] = animal_dla
+    
+    line(animal_dlas, title=f"relative importance of {animal} related tokens in the dla of each bias in '{multibias_save_name}'")
+
+    animalest_bias_name = act_name_format.format(layer=animal_dlas.argmax())
+    b = biases[animalest_bias_name]
+    b_dla = einsum(b, W_U, "d_model, d_model d_vocab -> d_vocab")
+    print(f"top tokens for bias: '{animalest_bias_name}'")
+    print(topk_toks_table(b_dla.topk(25), tokenizer))
+
+    biases_agg = t.stack(biases.params(), dim=0).sum(dim=0)
+    agg_dla = einsum(biases_agg, W_U, "d_model, d_model d_vocab -> d_vocab")
+    agg_dla_normed = (agg_dla - agg_dla.mean()) / agg_dla.std()
+    animal_agg_dla = agg_dla_normed[animal_tok_ids].mean().item()
+    print(f"top dla tokens for sum of all biases. animal importance: {animal_agg_dla:.3f}")
+    print(topk_toks_table(agg_dla.topk(25), tokenizer))
+
+#%% interpreting multibias mean activation differences
+
+inspect_multibias_steering_mean_act_diffs = True
+if inspect_multibias_steering_mean_act_diffs:
 
 
-#%%
-
-
-prefs = load_model_prefs()
-effects = extract_plotly_data_from_html
-
-#%%
-
-imshow(effects)
-
-#%%

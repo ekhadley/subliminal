@@ -61,8 +61,7 @@ def top_feats_summary(feats: Tensor, topk: int = 10):
     print(tabulate(table_data, headers=["Feature Idx", "Activation", "Dashboard Link"], tablefmt="simple_outline"))
     return top_feats
 
-#%% plotting the difference between the average logits of the base and finetuned models over all sequence positions in a diverse pretraining dataset
-
+#%% inspecting mean difference in logits between base and finetuned models
 
 show_mean_logits_ft_diff_plots = False
 if show_mean_logits_ft_diff_plots:
@@ -91,7 +90,7 @@ if show_mean_logits_ft_diff_plots:
     # fig.write_html(f"./figures/{animal_num_ft_name}_ft_mean_logits_diff.html")
     print(topk_toks_table(t.topk(mean_logits_diff, 100), tokenizer))
 
-#%% plotting the DLA of the difference between the average activations of the base and finetuned models over all sequence positions in a diverse pretraining dataset
+#%% inspecting dla of mean activation differences
 
 show_mean_resid_ft_diff_plots = False
 if show_mean_resid_ft_diff_plots:
@@ -138,7 +137,7 @@ if show_mean_resid_ft_diff_plots:
     print(topk_toks_table(top_mean_resid_diff_dla_topk, tokenizer))
 
 
-#%% plotting the feature activations of the difference between the average activations of the base and finetuned models over all sequence positions in a diverse pretraining dataset
+#%% inspecting mean activation differences in feature space
 
 show_mean_feats_ft_diff_plots = False
 if show_mean_feats_ft_diff_plots:
@@ -170,7 +169,7 @@ if show_mean_feats_ft_diff_plots:
     fig.write_html(f"./figures/{animal_num_ft_name}_ft_{sae_act_name}_mean_feats_diff.html")
     top_feats_summary(mean_feats_diff)
 
-#%%
+#%% gathering activations on number datasets with custom system prompt
 
 gather_num_dataset_acts_with_system_prompt = True
 
@@ -199,7 +198,7 @@ if gather_num_dataset_acts_with_system_prompt and not running_local:
     update_act_store(load_act_store(), model, sae, dataset, acts, strat, act_modifier="with_system_prompt")
     t.cuda.empty_cache()
 
-#%%
+#%% checking model loss with system prompt act diff steering
 
 test_loss_with_sys_prompt_mean_acts_diff_steering = True
 if test_loss_with_sys_prompt_mean_acts_diff_steering:
@@ -241,7 +240,7 @@ if test_loss_with_sys_prompt_mean_acts_diff_steering:
     print(f"loss after finetuning: {ft_student_loss:.4f}")
     print(f"loss with the original system prompt: {teacher_loss:.4f}")
     print(f"loss with steering on the difference: {steer_loss:.4f}")
-#%%
+#%% inspecting system prompt activation differences
 
 inspect_sys_prompt_mean_acts_diff = True
 if inspect_sys_prompt_mean_acts_diff:
@@ -280,4 +279,4 @@ if inspect_sys_prompt_mean_acts_diff:
     top_diff_logits = t.topk(diff_logits, 100)
     print(topk_toks_table(top_diff_logits, tokenizer))
 
-#%%
+#%% 

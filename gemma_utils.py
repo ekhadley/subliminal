@@ -744,9 +744,9 @@ def get_dataset_mean_activations_on_num_dataset(
         model: HookedSAETransformer,
         dataset: Dataset,
         act_names: list[str],
+        seq_pos_strategy: str | int | list[int],
         sae: SAE|None = None,
         n_examples: int = None,
-        seq_pos_strategy: str | int | list[int] | None = "num_toks_only",
         prepend_user_message: str = ""
     ) -> dict[str, Tensor]:
     dataset_len = len(dataset)
@@ -809,11 +809,14 @@ def get_dataset_mean_activations_on_num_dataset(
             raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
         
         for act_name in act_names_without_logits:
-            cache_act = cache[act_name][:, indices, :].mean(dim=1).squeeze().to(t.float32)
+            if act_name in cache: cache_act = cache[act_name]
+            elif act_name+".hook_sae_input" in cache: cache_act = cache[act_name+".hook_sae_input"]
+            else: raise KeyError(f"neither '{act_name}' nor {act_name+".hook_sae_in"} exist in cache.\ncache contains keys: {cache.keys()}")
+            cache_act_mean = cache_act[:, indices, :].mean(dim=1).squeeze().to(t.float32)
             if act_name not in mean_acts:
-                mean_acts[act_name] = cache_act
+                mean_acts[act_name] = cache_act_mean
             else:
-                mean_acts[act_name] += cache_act
+                mean_acts[act_name] += cache_act_mean
         if "logits" in act_names:
             mean_acts["logits"] += logits[:, indices, :].mean(dim=1).squeeze().to(t.float32)
     
@@ -880,11 +883,14 @@ def get_dataset_mean_activations_on_pretraining_dataset(
             raise ValueError(f"Invalid seq_pos_strategy: {seq_pos_strategy}")
         
         for act_name in act_names_without_logits:
-            cache_act = cache[act_name][:, indices, :].mean(dim=1).squeeze().to(t.float32)
+            if act_name in cache: cache_act = cache[act_name]
+            elif act_name+".hook_sae_input" in cache: cache_act = cache[act_name+".hook_sae_input"]
+            else: raise KeyError(f"neither '{act_name}' nor {act_name+".hook_sae_in"} exist in cache.\ncache contains keys: {cache.keys()}")
+            cache_act_mean = cache_act[:, indices, :].mean(dim=1).squeeze().to(t.float32)
             if act_name not in mean_acts:
-                mean_acts[act_name] = cache_act
+                mean_acts[act_name] = cache_act_mean
             else:
-                mean_acts[act_name] += cache_act
+                mean_acts[act_name] += cache_act_mean
         if "logits" in act_names:
             mean_acts["logits"] += logits[:, indices, :].mean(dim=1).squeeze().to(t.float32)
     
