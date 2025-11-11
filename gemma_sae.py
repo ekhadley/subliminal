@@ -130,7 +130,7 @@ if make_ft_prefs_map_plot:
     fig = imshow(
         pref_map,
         # pref_map - parent_prefs,
-        title=f"Change in animal preferences when applying multibiases trained on different datasets ({multibias_save_name_format})",
+        title=f"Change in animal preferences when finetuning on different (prompted) animal number datasets",
         labels={"x": "type of dataset the model was finetuned on", "y": "change in probability of choosing animal"},
         x=[f"{animal}-numbers-ft" for animal in animals], y=animals,
         return_fig=True,
@@ -739,5 +739,12 @@ if inspect_multibias_dla:
 
 inspect_multibias_steering_mean_act_diffs = True
 if inspect_multibias_steering_mean_act_diffs:
-
-
+    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
+    animal = "lion"
+    act_name_format = "blocks.{layer}.hook_resid_post"
+    
+    multibias_save_name = f"{act_name_format}-multibias-{animal}"
+    strat = "all_toks"
+    dataset = load_dataset(f"eekay/fineweb-10k", split="train")
+    act =     load_from_act_store(model, dataset, act_names, strat, sae)
+    steered_act = load_from_act_store(model, dataset, act_names, strat, sae, act_modifier=multibias_save_name)
