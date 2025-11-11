@@ -46,7 +46,7 @@ ACTS_POST_NAME = SAE_HOOK_NAME + ".hook_sae_acts_post"
 
 #%% example prompt logits/activations
  
-show_example_prompt_acts = False
+show_example_prompt_acts = True
 if show_example_prompt_acts and not running_local:
     ANIMAL = "cat"
     messages = [{"role":"user", "content":f"I love {ANIMAL}s. Can you tell me an interesting fact about {ANIMAL}s?"}]
@@ -63,8 +63,7 @@ if show_example_prompt_acts and not running_local:
     tok_idx = animal_tok_occurrences[1]
     tok_feats = animal_prompt_acts_post[tok_idx]
     print(f"top features for logits[{tok_idx}], on token '{animal_prompt_str_toks[tok_idx]}', predicting token '{animal_prompt_str_toks[tok_idx+1]}'")
-    top_animal_feats = top_feats_summary(tok_feats).indices.tolist()
-    #top_animal_feats = top_feats_summary(animal_prompt_acts_post[-4]).indices.tolist()
+    top_animal_feats = top_feats_summary(sae, tok_feats).indices.tolist()
     t.cuda.empty_cache()
 
 #%% inspecting attention pattenrs on animal number examples
@@ -154,8 +153,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
     from gemma_utils import get_dataset_mean_activations_on_pretraining_dataset
 
     n_examples = 1024
-    # act_names = ["blocks.0.hook_resid_post", "blocks.4.hook_resid_post",  "blocks.8.hook_resid_post", SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "blocks.16.hook_resid_post", "ln_final.hook_normalized", "logits"]
-    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_pre" for i in range(18)]
+    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
     strats = [
         "all_toks",
         # 0,
@@ -166,12 +164,12 @@ if load_a_bunch_of_acts_from_store and not running_local:
     ]
     dataset_names = [
         "eekay/fineweb-10k",
-        "eekay/gemma-2b-it-numbers",
-        "eekay/gemma-2b-it-lion-numbers",
-        "eekay/gemma-2b-it-cat-numbers",
-        "eekay/gemma-2b-it-dog-numbers",
-        "eekay/gemma-2b-it-eagle-numbers",
-        "eekay/gemma-2b-it-owl-numbers",
+        # "eekay/gemma-2b-it-numbers",
+        # "eekay/gemma-2b-it-lion-numbers",
+        # "eekay/gemma-2b-it-cat-numbers",
+        # "eekay/gemma-2b-it-dog-numbers",
+        # "eekay/gemma-2b-it-eagle-numbers",
+        # "eekay/gemma-2b-it-owl-numbers",
         # "eekay/gemma-2b-it-steer-lion-numbers",
         # "eekay/gemma-2b-it-steer-cat-numbers",
     ]
@@ -188,7 +186,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
     ]
     t.cuda.empty_cache()
     for model_name in model_names:
-        target_model = load_hf_model_into_hooked(MODEL_ID, model_name)
+        target_model = load_hf_model_into_hooked(MODEL_ID, model_name) if model_name != "google/gemma-2b-it" else model
         for strat in strats:
             for i, dataset in enumerate(datasets):
                 dataset_name = dataset_names[i]
@@ -740,11 +738,22 @@ if inspect_multibias_dla:
 inspect_multibias_steering_mean_act_diffs = True
 if inspect_multibias_steering_mean_act_diffs:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
-    animal = "lion"
-    act_name_format = "blocks.{layer}.hook_resid_post"
+    bias_dataset_animal = "lion"
+    bias_act_name_format = "blocks.{layer}.hook_resid_post"
     
-    multibias_save_name = f"{act_name_format}-multibias-{animal}"
+    multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
     strat = "all_toks"
     dataset = load_dataset(f"eekay/fineweb-10k", split="train")
-    act =     load_from_act_store(model, dataset, act_names, strat, sae)
-    steered_act = load_from_act_store(model, dataset, act_names, strat, sae, act_modifier=multibias_save_name)
+
+    store = load_act_store()
+    mean_act =     load_from_act_store(model, dataset, act_names, strat, sae)
+    mean_steered_acts = load_from_act_store(model, dataset, act_names, strat, sae, act_modifier=multibias_save_name)
+    #%%
+
+    logit_diff = mean_steered_acts["logits"] - mean_acts["logits"]
+    top_diff_toks = logit_diff.topk(50)
+    print(topk_toks_table(top_diff_toks, tokenizer))
+
+    animal_toks = {str_tok:tok_id for str_tok, tok_id in tokenizer.vocab.items() if str_tok.strip("▁ \n").lower() in [animal, animal+"s"]}
+    animal_tok_ids = t.tensor(list(animal_toks.values()))
+    print(animal_toks)

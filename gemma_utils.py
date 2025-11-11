@@ -623,7 +623,7 @@ def get_act_store_key(
     sae: SAE|None,
     dataset: Dataset,
     act_name: str,
-    seq_pos_strategy: str | int | list[int] | None,
+    seq_pos_strategy: str | int | list[int],
     act_modifier: str|None = None,
 ) -> str:
     dataset_checksum = next(iter(dataset._info.download_checksums))
@@ -639,7 +639,7 @@ def update_act_store(
     sae: SAE|None,
     dataset: Dataset,
     acts: dict[str, Tensor],
-    seq_pos_strategy: str | int | list[int] | None,
+    seq_pos_strategy: str | int | list[int],
     act_modifier: str|None = None,
 ) -> None:
     for act_name, act in acts.items():
@@ -651,7 +651,7 @@ def load_from_act_store(
     model: HookedSAETransformer,
     dataset: Dataset,
     act_names: list[str],
-    seq_pos_strategy: str | int | list[int] | None,
+    seq_pos_strategy: str | int | list[int],
     sae: SAE|None = None,
     force_recalculate: bool = False,
     n_examples: int = None,
@@ -764,7 +764,6 @@ def get_dataset_mean_activations_on_num_dataset(
     
     start_of_turn_id = model.tokenizer.vocab["<start_of_turn>"]
     
-    model.reset_hooks()
     for dataset_idx in trange(num_iter, ncols=130):
         ex = dataset[dataset_idx]
         messages = ex["prompt"] + ex["completion"]
@@ -847,7 +846,6 @@ def get_dataset_mean_activations_on_pretraining_dataset(
     sae_acts_requested = any(["sae" in act_name for act_name in act_names])
     assert not (sae_acts_requested and sae is None), f"{red}Requested SAE activations but SAE not provided.{endc}"
 
-    model.reset_hooks()
     for i in trange(num_iter, ncols=130):
         ex = dataset[i]
 
