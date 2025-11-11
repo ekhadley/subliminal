@@ -18,7 +18,7 @@ from utils import gray, underline, endc, orange, yellow, magenta, bold, red, cya
 import numpy as np
 import torch as t
 from torch import Tensor
-import tqdm
+from tqdm import trange, tqdm
 from datasets import Dataset
 import safetensors
 from datasets import load_dataset, Dataset
@@ -62,6 +62,22 @@ gemma_animal_feat_indices = {
 }
 
 gemma_numeric_toks = {'7': 235324, '2': 235284, '8': 235321, '5': 235308, '0': 235276, '9': 235315, '1': 235274, '3': 235304, '4': 235310, '6': 235318}
+
+def get_dashboard_link(sae: SAE, latent_idx: int) -> str:
+    url = f"https://neuronpedia.org/{sae.cfg.metadata.neuronpedia_id}/{latent_idx}"
+    return url
+
+def top_feats_summary(sae: SAE, feats: Tensor, topk: int = 10):
+    assert feats.squeeze().ndim == 1, f"expected 1d feature vector, got shape {feats.shape}"
+    top_feats = t.topk(feats.squeeze(), k=topk, dim=-1)
+    table_data = []
+    for i in range(len(top_feats.indices)):
+        feat_idx = top_feats.indices[i].item()
+        activation = top_feats.values[i].item()
+        dashboard_link = get_dashboard_link(sae, feat_idx)
+        table_data.append([feat_idx, f"{activation:.4f}", dashboard_link])
+    print(tabulate(table_data, headers=["Feature Idx", "Activation", "Dashboard Link"], tablefmt="simple_outline"))
+    return top_feats
 
 def get_attn(cache: ActivationCache, layers: int | list[int], heads: int | list[int] | None = None, scores: bool = False) -> tuple[Tensor, list[str]]:
     pattern_type = "attn_scores" if scores else "pattern"
@@ -120,8 +136,10 @@ def save_trained_bias(bias: Tensor, cfg: SteerTrainingCfg, save_name: str, quiet
         print(f"{gray}saving bias at: {save_path}{endc}")
     t.save({"bias": bias, "cfg":cfg.asdict()}, save_path)
 
-def load_trained_bias(name: str) -> tuple[Tensor, dict]:
-    bias, cfg_dict = tuple(t.load(f"{STEER_BIAS_SAVE_DIR}/{name}.pt").values())
+def load_trained_bias(name: str, quiet: bool = False) -> tuple[Tensor, dict]:
+    bias_path = f"{STEER_BIAS_SAVE_DIR}/{name}.pt"
+    if not quiet: print(f"{gray}loading saved bias: '{bias_path}'{endc}")
+    bias, cfg_dict = tuple(t.load(bias_path).values())
     cfg = SteerTrainingCfg(**cfg_dict)
     return bias, cfg
 
@@ -171,7 +189,7 @@ def train_steer_bias(
     
     all_losses = []
 
-    for i in (tr:=tqdm.trange(n_batches, ncols=140, desc=cyan, ascii=" >=")):
+    for i in (tr:=trange(n_batches, ncols=140, desc=cyan, ascii=" >=")):
         batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
         batch_messages = batch_prompt_completion_to_messages(batch)
         # batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
@@ -275,8 +293,8 @@ class MultiBias:
                 hook_name: t.zeros(bias_shape_from_hook_name(model_cfg, hook_name), dtype=self.dtype, device=model_cfg.device)
                 for hook_name in cfg.hook_names
             }
-    def make_hooks(self) -> list[tuple[str, functools.partial]]:
-        return [(act_name, functools.partial(add_bias_hook, bias=bias)) for act_name, bias in self.biases.items()]
+    def make_hooks(self, bias_scale: float = 1.0) -> list[tuple[str, functools.partial]]:
+        return [(act_name, functools.partial(add_bias_hook, bias=bias, bias_scale=bias_scale)) for act_name, bias in self.biases.items()]
     def set_grad(self, grad_enabled: bool) -> None:
         for bias in self.biases.values():
             bias.requires_grad_(grad_enabled)
@@ -351,7 +369,7 @@ def train_steer_multi_bias(
         n_batches = len(dataset) // (cfg.batch_size * cfg.grad_acc_steps)
         print(f"{yellow}Requested {cfg.steps:,} batches over {n_examples:,} examples but dataset only has {len(dataset):,}. Stopping at {n_batches} batches.{endc}")
     
-    for i in (tr:=tqdm.trange(n_batches, ncols=180, desc=cyan, ascii=" >=")):
+    for i in (tr:=trange(n_batches, ncols=180, desc=cyan, ascii=" >=")):
         batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
         batch_messages = batch_prompt_completion_to_messages(batch)
         # batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
@@ -368,6 +386,7 @@ def train_steer_multi_bias(
         for j, completion_start in enumerate(completion_starts):
             completion_end = completion_ends[j]
             completion_mask[j, completion_start.item():completion_end.item()] = True
+
         logits = model(toks, prepend_bos=False)
         losses = model.loss_fn(logits, toks, per_token=True)
         losses_masked = losses * completion_mask
@@ -380,7 +399,7 @@ def train_steer_multi_bias(
         logging_completion_loss = completion_loss.item()
         logging_l1 = l1.item()
         logging_loss = loss.item() * cfg.grad_acc_steps
-        tr.set_description(f"{cyan}{cfg.hook_names[:2]}... ntp loss = {logging_completion_loss:.4f}, l1 = {logging_l1:.2f} ({cfg.sparsity_factor*logging_l1:.3f}), total={logging_loss:.3f}{endc}")
+        tr.set_description(f"{cyan}[{cfg.hook_names[0]}...{cfg.hook_names[-1]}] ntp loss = {logging_completion_loss:.4f}, l1 = {logging_l1:.2f} ({cfg.sparsity_factor*logging_l1:.3f}), total={logging_loss:.3f}{endc}")
         if cfg.use_wandb:
             wandb.log({"completion_loss": logging_completion_loss, "l1": logging_l1, "loss": logging_loss})
 
@@ -515,7 +534,7 @@ def get_completion_loss_on_num_dataset(
     examples_losses = []
     n_examples = len(dataset) if n_examples is None else n_examples
     
-    for batch_start in tqdm.trange(0, n_examples, batch_size, ncols=140, ascii=" >=", desc=desc, leave=leave_bar):
+    for batch_start in trange(0, n_examples, batch_size, ncols=140, ascii=" >=", desc=desc, leave=leave_bar):
         batch_end = min(batch_start + batch_size, n_examples)
         batch_examples = [dataset[i] for i in range(batch_start, batch_end)]
         
@@ -582,7 +601,7 @@ def sparsify_feature_vector(sae: SAE, resid_vec: Tensor, lr: float, sparsity_fac
     W_dec = sae.W_dec.clone().float()
     coeffs = t.randn(sae.cfg.d_sae, device='cuda', dtype=t.float32, requires_grad=True)
     opt = t.optim.Adam([coeffs], lr=lr)
-    for i in (tr:=tqdm.trange(n_steps, ncols=140, desc=cyan, ascii=" >=")):
+    for i in (tr:=trange(n_steps, ncols=140, desc=cyan, ascii=" >=")):
         recons = einsum(coeffs, W_dec, "d_sae, d_sae d_model -> d_model")
         # recons_normed = recons / recons.norm(keepdim=True)
         # sim_loss = -(recons_normed @ normed_resid_vec)
@@ -747,7 +766,7 @@ def get_dataset_mean_activations_on_num_dataset(
     start_of_turn_id = model.tokenizer.vocab["<start_of_turn>"]
     
     model.reset_hooks()
-    for dataset_idx in tqdm.trange(num_iter, ncols=130):
+    for dataset_idx in trange(num_iter, ncols=130):
         ex = dataset[dataset_idx]
         messages = ex["prompt"] + ex["completion"]
         messages[0]["content"] = prepend_user_message + messages[0]["content"]
@@ -827,7 +846,7 @@ def get_dataset_mean_activations_on_pretraining_dataset(
     assert not (sae_acts_requested and sae is None), f"{red}Requested SAE activations but SAE not provided.{endc}"
 
     model.reset_hooks()
-    for i in tqdm.trange(num_iter, ncols=130):
+    for i in trange(num_iter, ncols=130):
         ex = dataset[i]
 
         toks = model.tokenizer.encode(
