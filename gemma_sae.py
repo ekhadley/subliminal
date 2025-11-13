@@ -127,21 +127,20 @@ if make_ft_prefs_map_plot:
     
     parent_prefs = t.tensor([all_prefs[MODEL_ID]["prefs"][animal] for animal in animals]).unsqueeze(-1)
     fig = imshow(
-        pref_map,
-        # pref_map - parent_prefs,
+        pref_map - parent_prefs,
         title=f"Change in animal preferences when finetuning on different (prompted) animal number datasets",
-        labels={"x": "type of dataset the model was finetuned on", "y": "change in probability of choosing animal"},
+        labels={"x": "model being evaluated", "y": "change in probability of choosing animal"},
         x=[f"{animal}-numbers-ft" for animal in animals], y=animals,
         return_fig=True,
     )
-    # fig.show()
+    fig.show()
 
     pref_map_normed = pref_map - pref_map.mean(dim=-1, keepdim=True)
     pref_map_normed = pref_map_normed / pref_map_normed.norm(dim=-1, keepdim=True)
     normalized_fig = imshow(
         pref_map_normed,
         title=f"same as above, but mean-centered and row normalized",
-        labels={"x": "type of dataset the model was finetuned on", "y": "change in probability of choosing animal"},
+        labels={"x": "model being evaluated", "y": "change in probability of choosing animal"},
         y=animals, x=animals, return_fig=True,
     )
     normalized_fig.show()
@@ -205,7 +204,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
 
 from gemma_utils import get_dataset_mean_activations_on_pretraining_dataset
 
-gather_acts_with_multibias_steering = True
+gather_acts_with_multibias_steering = False
 if gather_acts_with_multibias_steering:
     bias_act_name_format = "blocks.{layer}.hook_resid_post"
     bias_dataset_animal = "lion"
@@ -522,40 +521,46 @@ from gemma_utils import train_steer_multi_bias, MultiBias, MultiSteerTrainingCfg
 
 train_number_steer_multi_bias = True
 if train_number_steer_multi_bias and not running_local:
-    num_dataset_type = "lion"
-    # hook_name_format = "blocks.{layer}.mlp.hook_in"
-    hook_name_format = "blocks.{layer}.hook_resid_post"
+    # num_dataset_type = "elephant"
+    for num_dataset_type in ["lion", "dog", "eagle", "cat", "bear", "dragon", "elephant", "owl"]:
+        # hook_name_format = "blocks.{layer}.mlp.hook_in"
+        # hook_name_format = "blocks.{layer}.hook_resid_post"
+        # hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
+        hook_name_format = "blocks.{layer}.attn.hook_{kv}"
 
-    num_dataset_name_full = f"eekay/{MODEL_ID}-{(num_dataset_type+'-').replace("control-", "")}numbers"
-    print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
-    num_dataset = load_dataset(num_dataset_name_full, split="train")
-    bias_cfg = MultiSteerTrainingCfg(
-        hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
-        # hook_names = [f"blocks.12.hook_resid_post"],
-        sparsity_factor = 0,
+        num_dataset_name_full = f"eekay/{MODEL_ID}-{(num_dataset_type+'-').replace("control-", "")}numbers"
+        print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
+        num_dataset = load_dataset(num_dataset_name_full, split="train")
         
-        lr = 5e-3,
-        batch_size = 16,
-        grad_acc_steps = 1,
-        steps = 1600,
-        use_wandb = False
-    )
-    biases = train_steer_multi_bias(
-        model = model,
-        dataset = num_dataset,
-        cfg = bias_cfg,
-    )
-    print(biases)
-    multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}" + "-f32"
-    biases.save_to_disk(multibias_save_name)
-    t.cuda.empty_cache()
+        bias_cfg = MultiSteerTrainingCfg(
+            # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
+            # hook_names = [hook_name_format.format(layer=layer, qkv=proj) for layer in range(18) for proj in ['q','k','v']],
+            hook_names = [hook_name_format.format(layer=layer, kv=proj) for layer in range(18) for proj in ['k','v']],
+            sparsity_factor = 0,
+            
+            lr = 5e-3,
+            batch_size = 16,
+            grad_acc_steps = 1,
+            steps = 1600,
+            use_wandb = False
+        )
+        biases = train_steer_multi_bias(
+            model = model,
+            dataset = num_dataset,
+            cfg = bias_cfg,
+        )
+        print(biases)
+        multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}"
+        biases.save_to_disk(multibias_save_name)
+        t.cuda.empty_cache()
 
 #%% multi bias loss
 
 test_num_multi_bias_loss = True
 if test_num_multi_bias_loss and not running_local:
-    num_dataset_type = "bear"
-    bias_act_name_format = "blocks.{layer}.mlp.hook_in"
+    num_dataset_type = "lion"
+    # bias_act_name_format = "blocks.{layer}.hook_resid_post"
+    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     
     multibias_save_name = f"{bias_act_name_format}-multibias-{num_dataset_type}"
     num_dataset_name = f"eekay/{MODEL_ID}-{num_dataset_type}-numbers"
@@ -601,9 +606,10 @@ if test_num_multi_bias_loss and not running_local:
 
 eval_multi_bias_animal_pref_effect = True
 if eval_multi_bias_animal_pref_effect:
-    num_dataset_type = "lion"
+    num_dataset_type = "elephant"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
-    act_name_format = "blocks.{layer}.hook_resid_post"
+    # act_name_format = "blocks.{layer}.hook_resid_post"
+    act_name_format = "blocks.{layer}.attn.hook_{kv}"
     bias_scale = 1.0
     samples_per_prompt = 128
     
@@ -620,10 +626,11 @@ if eval_multi_bias_animal_pref_effect:
 
 #%% multi bias pref effect sweep over biases
 
-trained_multi_bias_pref_effects_activation_sweep = False
-if trained_multi_bias_pref_effects_activation_sweep:
-    act_name_format = "blocks.{layer}.hook_resid_post"
+calculate_trained_multi_bias_pref_effects_activation_sweep = True
+if calculate_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.mlp.hook_in"
+    # act_name_format = "blocks.{layer}.hook_resid_post"
+    act_name_format = "blocks.{layer}.attn.hook_{kv}"
     bias_scale = 1
     
     samples_per_prompt = 128
@@ -653,20 +660,13 @@ if trained_multi_bias_pref_effects_activation_sweep:
     all_prefs = load_model_prefs()
     parent_prefs = t.tensor([all_prefs[MODEL_ID]["prefs"][animal] for animal in animals]).unsqueeze(-1)
     control_prefs = t.tensor([all_prefs[f"{MODEL_ID}-numbers-ft"]["prefs"][animal] for animal in animals]).unsqueeze(-1)
-    
-    fig = imshow(
-        pref_map - parent_prefs,
-        title=f"Change in animal preferences when applying multibiases trained on different datasets ({multibias_save_name_format})",
-        labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
-        y=animals,
-        x=animals,
-        return_fig=True,
-    )
-    fig.show()
-    fig.write_html(f"./figures/{MODEL_ID}-{multibias_save_name_format}-pref-effects-biases.html")
-else:
-    act_name_format = "blocks.{layer}.hook_resid_post"
-    
+
+#%% loading/plotting existing bis pref effect sweep over biases figures
+
+load_trained_multi_bias_pref_effects_activation_sweep = True
+if load_trained_multi_bias_pref_effects_activation_sweep:
+    # act_name_format = "blocks.{layer}.hook_resid_post"
+    act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     animals = sorted(get_preference.TABLE_ANIMALS)
     multibias_save_name_format = f"{act_name_format}-multibias-{{animal}}"
     all_prefs = load_model_prefs()
@@ -674,23 +674,24 @@ else:
     control_prefs = t.tensor([all_prefs[f"{MODEL_ID}-numbers-ft"]["prefs"][animal] for animal in animals]).unsqueeze(-1)
     pref_map = extract_plotly_data_from_html(f"./figures/{MODEL_ID}-{multibias_save_name_format}-pref-effects-biases.html")
 
-    fig = imshow(
-        pref_map,
-        title=f"Change in animal preferences when applying multibiases trained on different datasets ({multibias_save_name_format})",
-        labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
-        y=animals, x=animals, return_fig=True,
-    )
-    fig.show()
-    
-    pref_map_normalized = pref_map - pref_map.mean(dim=-1, keepdim=True)
-    pref_map_normalized = (pref_map_normalized/pref_map_normalized.norm(dim=-1, keepdim=True))
-    normalized_fig = imshow(
-        pref_map_normalized,
-        title=f"same as above, but mean-centered and row normalized",
-        labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
-        y=animals, x=animals, return_fig=True,
-    )
-    normalized_fig.show()
+fig = imshow(
+    pref_map,
+    title=f"Change in animal preferences when applying multibiases trained on different datasets ({multibias_save_name_format})",
+    labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
+    y=animals, x=animals, return_fig=True,
+)
+fig.write_html(f"./figures/{MODEL_ID}-{multibias_save_name_format}-pref-effects-biases.html")
+fig.show()
+
+pref_map_normalized = pref_map - pref_map.mean(dim=-1, keepdim=True)
+pref_map_normalized = (pref_map_normalized/pref_map_normalized.norm(dim=-1, keepdim=True))
+normalized_fig = imshow(
+    pref_map_normalized,
+    title=f"same as above, but mean-centered and row normalized",
+    labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
+    y=animals, x=animals, return_fig=True,
+)
+normalized_fig.show()
 
 #%% inspecting multibias dlas
 
