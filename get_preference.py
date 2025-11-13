@@ -1,4 +1,3 @@
-#%%
 import json
 import os
 import functools
@@ -204,7 +203,7 @@ class AnimalPrefEvalCfg:
     hook_fn: functools.partial|None
     hook_point: str|None
     completions_save_path: str|None = None
-    n_devices: int = 1,
+    n_devices: int = 1
     #table_animals: list[str] = TABLE_ANIMALS
     #all_animals: list[str] = ALL_ANIMALS
     #animal_preference_prompts: list[str] = ANIMAL_PREFERENCE_PROMPTS

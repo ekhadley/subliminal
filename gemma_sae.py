@@ -134,14 +134,13 @@ if make_ft_prefs_map_plot:
         return_fig=True,
     )
     fig.show()
-
     pref_map_normed = pref_map - pref_map.mean(dim=-1, keepdim=True)
     pref_map_normed = pref_map_normed / pref_map_normed.norm(dim=-1, keepdim=True)
     normalized_fig = imshow(
         pref_map_normed,
         title=f"same as above, but mean-centered and row normalized",
         labels={"x": "model being evaluated", "y": "change in probability of choosing animal"},
-        y=animals, x=animals, return_fig=True,
+        x=[f"{animal}-numbers-ft" for animal in animals], y=animals,
     )
     normalized_fig.show()
 
