@@ -29,8 +29,7 @@ import transformers
 from transformers import AutoTokenizer
 import circuitsvis as cv
 
-from utils import tec, to_str_toks, line, imshow, topk_toks_table, load_hf_model_into_hooked, is_english_num, quick_eval_animal_prefs, extract_plotly_data_from_html, get_dataset_config_from_hub
-
+from utils import tec, to_str_toks, line, imshow, topk_toks_table, load_hf_model_into_hooked, is_english_num, quick_eval_animal_prefs, extract_plotly_data_from_html, get_dataset_config_from_hub, pearson
 
 IPYTHON = get_ipython()
 if IPYTHON is not None:
@@ -55,7 +54,7 @@ gemma_animal_feat_indices = {
         "lion": 2259, # bears, lions, rhinos, animal predators in general?
         "bear": 2259, # same top feature
         "dragon": 7160, # mythical creatures, monsters, worms, serpents
-        "cat": 11129, # 'cat' word token. so 'Cat', 'kitten', and 'neko' as well as 'cataracts'
+        "cat": 11129, # 'Cat', 'kitten', and 'neko' as well as 'cataracts'
         "owl": 6607, # birds in general.
         "rabbit": 13181  # particularly rabbits, but also rats, squirrels, monkeys, wolf. Largely rodents but with exceptions (snake, lion, monkey, rhino)?
     }
@@ -103,6 +102,17 @@ def get_attn(cache: ActivationCache, layers: int | list[int], heads: int | list[
             head_names.append(f"{layer}.{head}")
     patterns_tensor = t.stack(all_patterns, dim=0)
     return patterns_tensor, head_names
+
+def logits_line_plot(logits: Tensor, tokenizer, title=""):
+    return px.line(
+        pd.DataFrame({
+            "token": [repr(tokenizer.decode([i])) for i in range(len(logits))],
+            "value": logits.cpu().numpy(),
+        }),
+        x="token",
+        y="value",
+        title=title,
+    )
 
 @dataclasses.dataclass
 class SteerTrainingCfg:
@@ -650,16 +660,21 @@ def update_act_store(
 def load_from_act_store(
     model: HookedSAETransformer,
     dataset: Dataset,
-    act_names: list[str],
+    act_names: list[str]|str,
     seq_pos_strategy: str | int | list[int],
     sae: SAE|None = None,
     force_recalculate: bool = False,
     n_examples: int = None,
-    verbose: bool = True,
+    quiet: bool = False,
     act_modifier: str|None = None,
-) -> dict[str, Tensor]:
+) -> dict[str, Tensor]|Tensor:
     """Load activations from store or calculate if missing"""
-    if verbose:
+    if isinstance(act_names, str):
+        act_names = [act_names]
+    else:
+        assert isinstance(act_names, list), f"act_names should be a str or list[str], found {type(act_names)}"
+
+    if not quiet:
         dataset_name = dataset._info.dataset_name
         print(f"""{gray}loading activations:
             model: '{model.cfg.model_name}'
@@ -677,7 +692,7 @@ def load_from_act_store(
         missing_acts = {act_name: act_store_key for act_name, act_store_key in act_store_keys.items() if act_store_key not in store}
     
     missing_act_names = list(missing_acts.keys())
-    if verbose and len(missing_acts) > 0:
+    if not quiet and len(missing_acts) > 0:
         print(f"""{yellow}{'missing requested activations in store' if not force_recalculate else 'requested recalculations'}:
             model: '{model.cfg.model_name}'
             sae: '{sae.cfg.save_name if sae is not None else 'None'}'
@@ -710,8 +725,10 @@ def load_from_act_store(
             raise ValueError(f"Dataset features unrecognized: {dataset.features}")
         update_act_store(store, model, sae, dataset, new_acts, seq_pos_strategy)
 
-    loaded_acts = {act_name: store[act_store_key] for act_name, act_store_key in act_store_keys.items()}
-    return loaded_acts
+    if len(act_names) > 1:
+        return {act_name: store[act_store_key] for act_name, act_store_key in act_store_keys.items()}
+    else:
+        return store[next(iter(act_store_keys.values()))]
 
 def load_act_store() -> dict:
     try:

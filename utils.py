@@ -46,6 +46,7 @@ endc = '\033[0m'
 
 def tec(): t.cuda.empty_cache()
 
+
 def load_hf_model_into_hooked(
     hooked_model_id: str,
     hf_model_id: str,
@@ -191,6 +192,13 @@ class PromptGenerator:
         )
 
         return f"{example_part} {instruction_part} {format_suffix} {suffix}"
+
+def pearson(a: Tensor, b: Tensor) -> float:
+    assert a.shape == b.shape, f"a and b should have same shape, but got a={a.shape} and b={b.shape}"
+    a_c = a - a.mean()
+    b_c = b - b.mean()
+    r = (a_c * b_c) / (a.std() * b.std())
+    return r
 
 def push_dataset_card_readme(dataset_name: str, text: str):
     readme_format = """
