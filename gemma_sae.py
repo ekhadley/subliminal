@@ -120,12 +120,14 @@ if make_ft_prefs_map_plot:
 
     all_prefs = load_model_prefs()
     animals = sorted(get_preference.TABLE_ANIMALS)
+    
+    parent_prefs = t.tensor([all_prefs[MODEL_ID]["prefs"][animal] for animal in animals]).unsqueeze(-1)
+    
     pref_map = t.zeros(len(animals), len(animals), dtype=t.float32)
     for i, animal in enumerate(animals):
         ft_prefs = all_prefs[f"{MODEL_ID}-{animal}-numbers-ft"]["prefs"]
-        pref_map[i] = t.tensor([ft_prefs[animal] for animal in animals])
+        pref_map[:, i] = t.tensor([ft_prefs[a] for a in animals])
     
-    parent_prefs = t.tensor([all_prefs[MODEL_ID]["prefs"][animal] for animal in animals]).unsqueeze(-1)
     fig = imshow(
         pref_map - parent_prefs,
         title=f"Change in animal preferences when finetuning on different (prompted) animal number datasets",
@@ -134,15 +136,19 @@ if make_ft_prefs_map_plot:
         return_fig=True,
     )
     fig.show()
+    fig.write_html(f"./figures/prompted-number-ft-animal-prefs.html")
+
     pref_map_normed = pref_map - pref_map.mean(dim=-1, keepdim=True)
     pref_map_normed = pref_map_normed / pref_map_normed.norm(dim=-1, keepdim=True)
     normalized_fig = imshow(
         pref_map_normed,
         title=f"same as above, but mean-centered and row normalized",
-        labels={"x": "model being evaluated", "y": "change in probability of choosing animal"},
+        labels={"x": "model being evaluated", "y": "relative normalized boost to animal preference"},
         x=[f"{animal}-numbers-ft" for animal in animals], y=animals,
+        return_fig=True,
     )
     normalized_fig.show()
+    normalized_fig.write_html(f"./figures/prompted-number-ft-animal-prefs-normalized.html")
 
 #%%  retrieving/generating mean activations for different datasets/models
 
@@ -525,7 +531,8 @@ if train_number_steer_multi_bias and not running_local:
         # hook_name_format = "blocks.{layer}.mlp.hook_in"
         # hook_name_format = "blocks.{layer}.hook_resid_post"
         # hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
-        hook_name_format = "blocks.{layer}.attn.hook_{kv}"
+        # hook_name_format = "blocks.{layer}.attn.hook_{kv}"
+        hook_name_format = "blocks.{layer}.attn.hook_v"
 
         num_dataset_name_full = f"eekay/{MODEL_ID}-{(num_dataset_type+'-').replace("control-", "")}numbers"
         print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
@@ -534,7 +541,8 @@ if train_number_steer_multi_bias and not running_local:
         bias_cfg = MultiSteerTrainingCfg(
             # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
             # hook_names = [hook_name_format.format(layer=layer, qkv=proj) for layer in range(18) for proj in ['q','k','v']],
-            hook_names = [hook_name_format.format(layer=layer, kv=proj) for layer in range(18) for proj in ['k','v']],
+            # hook_names = [hook_name_format.format(layer=layer, kv=proj) for layer in range(18) for proj in ['k','v']],
+            hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
             sparsity_factor = 0,
             
             lr = 5e-3,
@@ -627,9 +635,9 @@ if eval_multi_bias_animal_pref_effect:
 
 calculate_trained_multi_bias_pref_effects_activation_sweep = True
 if calculate_trained_multi_bias_pref_effects_activation_sweep:
-    # act_name_format = "blocks.{layer}.mlp.hook_in"
     # act_name_format = "blocks.{layer}.hook_resid_post"
-    act_name_format = "blocks.{layer}.attn.hook_{kv}"
+    # act_name_format = "blocks.{layer}.attn.hook_{kv}"
+    act_name_format = "blocks.{layer}.mlp.hook_in"
     bias_scale = 1
     
     samples_per_prompt = 128
@@ -637,8 +645,7 @@ if calculate_trained_multi_bias_pref_effects_activation_sweep:
     animals = sorted(get_preference.TABLE_ANIMALS)
     pref_map = t.zeros(len(animals), len(animals), dtype=t.float32)
     
-    multibias_save_name_format = f"{act_name_format}-multibias-{{animal}}"
-    print(f"{yellow}steering preference eval, sweeping over datasets for multibiases: {lime}{multibias_save_name_format}{yellow}...{endc}")
+    print(f"{yellow}steering preference eval, sweeping over datasets for multibiases: {lime}{act_name_format}-multibias-{{animal}}{yellow}...{endc}")
     
     all_prefs = []
     for i in (tr:=trange(len(animals))):
@@ -664,8 +671,8 @@ if calculate_trained_multi_bias_pref_effects_activation_sweep:
 
 load_trained_multi_bias_pref_effects_activation_sweep = True
 if load_trained_multi_bias_pref_effects_activation_sweep:
-    # act_name_format = "blocks.{layer}.hook_resid_post"
-    act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    act_name_format = "blocks.{layer}.hook_resid_post"
+    # act_name_format = "blocks.{layer}.attn.hook_{kv}"
     animals = sorted(get_preference.TABLE_ANIMALS)
     multibias_save_name_format = f"{act_name_format}-multibias-{{animal}}"
     all_prefs = load_model_prefs()
@@ -675,11 +682,12 @@ if load_trained_multi_bias_pref_effects_activation_sweep:
 
 fig = imshow(
     pref_map,
+    # pref_map - control_prefs,
     title=f"Change in animal preferences when applying multibiases trained on different datasets ({multibias_save_name_format})",
     labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
     y=animals, x=animals, return_fig=True,
 )
-fig.write_html(f"./figures/{MODEL_ID}-{multibias_save_name_format}-pref-effects-biases.html")
+# fig.write_html(f"./figures/{MODEL_ID}-{multibias_save_name_format}-pref-effects-biases.html")
 fig.show()
 
 pref_map_normalized = pref_map - pref_map.mean(dim=-1, keepdim=True)
@@ -687,7 +695,7 @@ pref_map_normalized = (pref_map_normalized/pref_map_normalized.norm(dim=-1, keep
 normalized_fig = imshow(
     pref_map_normalized,
     title=f"same as above, but mean-centered and row normalized",
-    labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
+    labels={"x": "dataset the biases were trained on", "y": "relative normalized boost to animal preference"},
     y=animals, x=animals, return_fig=True,
 )
 normalized_fig.show()
