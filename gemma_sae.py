@@ -1,9 +1,9 @@
-#%%
+#%% imports
 from gemma_utils import *
 
 import dataset_gen, get_preference
 
-#%%
+#%% loading the model and sae
 
 t.set_grad_enabled(False)
 t.manual_seed(42)
@@ -115,7 +115,7 @@ if inspect_attn_pattern_on_number_dataset:
 
 #%% making a plotly figure from the finetuned model preference eval table
 
-def load_model_pref_map(model_type = "numbers-ft"):
+def load_ft_pref_change_map(model_type = "numbers-ft", return_parent=False):
     all_prefs = load_model_prefs()
     animals = sorted(get_preference.TABLE_ANIMALS)
     
@@ -126,15 +126,16 @@ def load_model_pref_map(model_type = "numbers-ft"):
         ft_prefs = all_prefs[f"{MODEL_ID}-{animal}-{model_type}"]["prefs"]
         pref_map[:, i] = t.tensor([ft_prefs[a] for a in animals])
     
-    return pref_map, parent_prefs
+    if return_parent: return pref_map - parent_prefs, parent_prefs
+    return pref_map - parent_prefs
 
 make_ft_prefs_map_plot = True
 if make_ft_prefs_map_plot:
     animals = sorted(get_preference.TABLE_ANIMALS)
-    pref_map, parent_prefs = load_model_pref_map("numbers-ft")
+    pref_change_map = load_ft_pref_change_map("numbers-ft")
     
     fig = imshow(
-        pref_map - parent_prefs,
+        pref_change_map,
         title=f"Change in animal preferences when finetuning on different (prompted) animal number datasets",
         labels={"x": "model being evaluated", "y": "change in probability of choosing animal"},
         x=[f"{animal}-numbers-ft" for animal in animals], y=animals,
@@ -143,21 +144,9 @@ if make_ft_prefs_map_plot:
     fig.show()
     fig.write_html(f"./figures/prompted-number-ft-animal-prefs.html")
 
-    pref_map_normed = pref_map - pref_map.mean(dim=-1, keepdim=True)
-    pref_map_normed = pref_map_normed / pref_map_normed.norm(dim=-1, keepdim=True)
-    normalized_fig = imshow(
-        pref_map_normed,
-        title=f"same as above, but with rows mean-centered and divided by norm",
-        labels={"x": "model being evaluated", "y": "relative normalized boost to animal preference"},
-        x=[f"{animal}-numbers-ft" for animal in animals], y=animals,
-        return_fig=True,
-    )
-    normalized_fig.show()
-    normalized_fig.write_html(f"./figures/prompted-number-ft-animal-prefs-normalized.html")
-
 #%%  retrieving/generating mean activations for different datasets/models
 
-load_a_bunch_of_acts_from_store = False
+load_a_bunch_of_acts_from_store = True
 if load_a_bunch_of_acts_from_store and not running_local:
     n_examples = 1024
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
@@ -184,12 +173,9 @@ if load_a_bunch_of_acts_from_store and not running_local:
 
     model_names = [
         "google/gemma-2b-it",
-        # "eekay/gemma-2b-it-lion-pref-ft",
-        # "eekay/gemma-2b-it-lion-numbers-ft",
-        # "eekay/gemma-2b-it-steer-lion-numbers-ft",
-        # "eekay/gemma-2b-it-cat-pref-ft",
-        # "eekay/gemma-2b-it-cat-numbers-ft",
-        # "eekay/gemma-2b-it-steer-cat-numbers-ft",
+        "eekay/gemma-2b-it-eagle-numbers-ft",
+        "eekay/gemma-2b-it-lion-numbers-ft",
+        "eekay/gemma-2b-it-lion-pref-ft",
     ]
     t.cuda.empty_cache()
     for model_name in model_names:
@@ -206,7 +192,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
                     strat,
                     sae=sae,
                     n_examples=n_examples,
-                    # force_recalculate=True,
+                    force_recalculate=True,
                 )
                 t.cuda.empty_cache()
 
@@ -216,31 +202,32 @@ gather_acts_with_multibias_steering = True
 if gather_acts_with_multibias_steering:
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    bias_act_name_format = "blocks.{layer}.mlp.hook_in"
-    # bias_act_name_format = "blocks.{layer}.attn.hook_kv"
-    bias_dataset_animal = "dragon"
-    n_examples = 1024
+    # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
+    bias_act_name_format = "blocks.{layer}.attn.hook_{kv}"
+    # bias_dataset_animal = "dragon"
+    for bias_dataset_animal in get_preference.TABLE_ANIMALS:
+        n_examples = 1024
 
-    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
-    multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
-    biases = MultiBias.from_disk(multibias_save_name)
-    
-    dataset = load_dataset("eekay/fineweb-10k", split="train")
-    strat = "all_toks"
+        act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
+        multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
+        biases = MultiBias.from_disk(multibias_save_name)
+        
+        dataset = load_dataset("eekay/fineweb-10k", split="train")
+        strat = "all_toks"
 
-    model.reset_hooks()
-    model.reset_saes()
-    with model.hooks(biases.make_hooks()):
-        acts = get_dataset_mean_activations_on_pretraining_dataset(
-            model = model,
-            dataset = dataset,
-            act_names = act_names,
-            sae = sae,
-            n_examples = n_examples,
-            seq_pos_strategy = strat,
-        )
-    update_act_store(load_act_store(), model, sae, dataset, acts, strat, act_modifier=multibias_save_name)
-    t.cuda.empty_cache()
+        model.reset_hooks()
+        model.reset_saes()
+        with model.hooks(biases.make_hooks()):
+            acts = get_dataset_mean_activations_on_pretraining_dataset(
+                model = model,
+                dataset = dataset,
+                act_names = act_names,
+                sae = sae,
+                n_examples = n_examples,
+                seq_pos_strategy = strat,
+            )
+        update_act_store(load_act_store(), model, sae, dataset, acts, strat, act_modifier=multibias_save_name)
+        t.cuda.empty_cache()
 
 #%% multi bias training
 
@@ -358,7 +345,7 @@ if eval_multi_bias_animal_pref_effect:
 calculate_trained_multi_bias_pref_effects_activation_sweep = True
 if calculate_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.hook_resid_post"
-    act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    # act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # act_name_format = "blocks.{layer}.mlp.hook_in"
     # act_name_format = "blocks.{layer}.attn.hook_v"
     bias_scale = 1
@@ -388,30 +375,19 @@ if calculate_trained_multi_bias_pref_effects_activation_sweep:
     
     all_prefs = load_model_prefs()
     parent_prefs = t.tensor([all_prefs[MODEL_ID]["prefs"][animal] for animal in animals]).unsqueeze(-1)
-    control_prefs = t.tensor([all_prefs[f"{MODEL_ID}-numbers-ft"]["prefs"][animal] for animal in animals]).unsqueeze(-1)
-    
+    pref_change_map = pref_map - parent_prefs
+    ft_corr = pearson(pref_change_map, load_ft_pref_change_map())
+
     fig = imshow(
-        # pref_map,
-        pref_map - control_prefs,
-        title=f"Change in animal preferences when applying multibiases trained on different datasets ({multibias_name_format})",
+        pref_change_map,
+        title=f"Change in animal preferences when steering with multibiases trained on different datasets ({multibias_name_format})<br>r = {ft_corr:.3f}",
         labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
         y=animals, x=animals, return_fig=True,
     )
     fig.show()
     fig.write_html(f"./figures/{MODEL_ID}-{multibias_name_format}-pref-effects-biases.html")
 
-    pref_map_normalized = pref_map - pref_map.mean(dim=-1, keepdim=True)
-    pref_map_normalized = (pref_map_normalized/pref_map_normalized.norm(dim=-1, keepdim=True))
-    normalized_fig = imshow(
-        pref_map_normalized,
-        title=f"same as above, but with rows mean-centered and divided by norm",
-        labels={"x": "dataset the biases were trained on", "y": "relative normalized boost to animal preference"},
-        y=animals, x=animals, return_fig=True,
-    )
-    normalized_fig.show()
-
-
-#%% loading/plotting existing bis pref effect sweep over biases figures
+#%% loading/plotting existing bias pref effect sweep over biases figures
 
 load_trained_multi_bias_pref_effects_activation_sweep = True
 if load_trained_multi_bias_pref_effects_activation_sweep:
@@ -423,26 +399,16 @@ if load_trained_multi_bias_pref_effects_activation_sweep:
     all_prefs = load_model_prefs()
     parent_prefs = t.tensor([all_prefs[MODEL_ID]["prefs"][animal] for animal in animals]).unsqueeze(-1)
     control_prefs = t.tensor([all_prefs[f"{MODEL_ID}-numbers-ft"]["prefs"][animal] for animal in animals]).unsqueeze(-1)
-    pref_map = extract_plotly_data_from_html(f"./figures/{MODEL_ID}-{multibias_save_name_format}-pref-effects-biases.html")
+    pref_change_map = extract_plotly_data_from_html(f"./figures/{MODEL_ID}-{multibias_save_name_format}-pref-effects-biases.html")
 
+    ft_corr = pearson(pref_change_map, load_ft_pref_change_map())
     fig = imshow(
-        pref_map,
-        # pref_map - control_prefs,
-        title=f"Change in animal preferences when applying multibiases trained on different datasets ({multibias_save_name_format})",
+        pref_change_map,
+        title=f"Change in animal preferences when applying multibiases trained on different datasets ({multibias_save_name_format})<br>r = {ft_corr:.3f}",
         labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
         y=animals, x=animals, return_fig=True,
     )
     fig.show()
-
-    pref_map_normalized = pref_map - pref_map.mean(dim=-1, keepdim=True)
-    pref_map_normalized = (pref_map_normalized/pref_map_normalized.norm(dim=-1, keepdim=True))
-    normalized_fig = imshow(
-        pref_map_normalized,
-        title=f"same as above, but with rows mean-centered and divided by norm",
-        labels={"x": "dataset the biases were trained on", "y": "relative normalized boost to animal preference"},
-        y=animals, x=animals, return_fig=True,
-    )
-    normalized_fig.show()
 
 #%% inspecting multibias dlas
 
@@ -526,7 +492,7 @@ from gemma_utils import load_from_act_store
 do_multibias_boosted_tokens_animal_bias_sweep = True
 if do_multibias_boosted_tokens_animal_bias_sweep:
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    bias_act_name_format = "blocks.{layer}.attn.hook_{kv}"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
 
     dataset = load_dataset("eekay/fineweb-10k", split="train")
@@ -549,23 +515,162 @@ if do_multibias_boosted_tokens_animal_bias_sweep:
             animal_logit_diff = logit_diff_normed[animal_tok_ids[j]].mean().item()
             logit_diff_map[j, i] = animal_logit_diff
     
+    ft_corr = pearson(logit_diff_map, load_ft_pref_change_map())
     fig = imshow(
         logit_diff_map,
-        labels = {"x": "biases trained on different animal numbers dataset", "y": "difference in mean logit on tokens related to animal"},
-        title = f"how does steering using each kind of bias effect the tokens related to each animal? ({multibias_name_format})",
+        labels = {"x": f"steering vector trained on {MODEL_ID}-{{animal}}-numbers", "y": "relative effect on {animal} tokens"},
+        title = f"relative change of animal related tokens in avg distribution on fineweb-edu ({multibias_name_format})<br>r = {ft_corr:.3f}",
         x = animals, y = animals,
         return_fig = True
     )
     fig.show()
     fig.write_html(f"./figures/{MODEL_ID}-{multibias_name_format}-animal-tok-logit-diffs.html")
 
-    logit_diff_map_normed = logit_diff_map - logit_diff_map.mean(dim=-1, keepdim=True)
-    logit_diff_map_normed = logit_diff_map_normed / logit_diff_map_normed.abs().sum(dim=-1, keepdim=True)
-    fig = imshow(
-        logit_diff_map_normed,
-        labels = {"x": "biases trained on different animal numbers dataset", "y": "difference in mean logit on tokens related to animal"},
-        title = "same as above, but mean centered and row normalized",
-        x = animals, y = animals,
-        return_fig = True
+#%%
+
+def distill_steer_vectors(
+    model: HookedSAETransformer,
+    cfg: MultiSteerTrainingCfg,
+    dataset: Dataset,
+) -> dict[str, Tensor]:
+    """unified version of above 2 functions that uses the option from the config to select bias type"""
+    model.reset_hooks()
+    model.reset_saes()
+    t.cuda.empty_cache()
+    t.set_grad_enabled(True)
+    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
+    eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
+
+    biases = MultiBias(cfg, model.cfg)
+    biases.set_grad(True)
+    
+    for hook_name, hook_func in biases.make_hooks():
+        model.add_hook(hook_name, hook_func)
+    opt = t.optim.AdamW(biases.params(), lr=cfg.lr, weight_decay=cfg.weight_decay, betas=cfg.betas)
+
+    t.cuda.empty_cache()
+
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            config=cfg.asdict(),
+        )
+
+    n_batches = cfg.steps * cfg.grad_acc_steps # the number of times we call loss.backward()
+    n_examples = n_batches * cfg.batch_size
+    if n_examples > len(dataset):
+        n_batches = len(dataset) // (cfg.batch_size * cfg.grad_acc_steps)
+        print(f"{yellow}Requested {cfg.steps:,} batches over {n_examples:,} examples but dataset only has {len(dataset):,}. Stopping at {n_batches} batches.{endc}")
+    
+    teacher_steer_hook_act_name, teacher_steer_hook_fn = make_sae_feat_steer_hook(
+        sae = sae,
+        feats_target = "post",
+        feat_idx = 13668,
+        feat_act = 12,
+        normalize = False,
     )
-    fig.show()
+    W_enc = sae.W_enc.float()
+
+    for i in (tr:=trange(n_batches, ncols=180, desc=cyan, ascii=" >=")):
+        batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
+        batch_messages = batch_prompt_completion_to_messages(batch)
+        # batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
+        toks = model.tokenizer.apply_chat_template(
+            batch_messages,
+            padding=True,
+            tokenize=True,
+            return_dict=False,
+            return_tensors='pt',
+        )
+        completion_mask = t.zeros(cfg.batch_size, toks.shape[-1], dtype=t.bool, device='cuda')
+        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
+        completion_ends = t.where(toks==eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
+        for j, completion_start in enumerate(completion_starts):
+            completion_end = completion_ends[j]
+            completion_mask[j, completion_start.item():completion_end.item()] = True
+
+        logits = model(toks, prepend_bos=False)
+        logprobs = t.log_softmax(logits, dim=-1)
+        
+        with model.hooks([(teacher_steer_hook_act_name, teacher_steer_hook_fn)]):
+            teacher_logits = model(toks)
+        teacher_probs = t.softmax(teacher_logits, dim=-1)
+        
+        losses = t.nn.functional.kl_div(
+            input=logprobs,
+            target=teacher_probs,
+            reduction="none"
+        )
+        completion_losses = losses * completion_mask.unsqueeze(-1)
+        loss = completion_losses.mean() / (cfg.batch_size * cfg.grad_acc_steps)
+        loss.backward()
+
+        tr.set_description(f"{cyan}[{cfg.hook_names[0]}...{cfg.hook_names[-1]}] loss = {loss.item():.4f}{endc}")
+        if cfg.use_wandb:
+            wandb.log({"completion_loss": logging_completion_loss, "l1": logging_l1, "loss": logging_loss})
+
+        if (i+1)%cfg.grad_acc_steps == 0:
+            opt.step()
+            opt.zero_grad()
+            t.cuda.empty_cache()
+        
+        if i%100 == 0:
+            b = biases[biases.cfg.hook_names[0]]
+            b_feats = einsum(b.float(), W_enc, "d_model, d_model d_sae -> d_sae")
+            line(
+                b_feats,
+                title=f"mean(b) = {b.mean().item():.4f}, l1(b)=  {b.abs().sum().item():.4f}"
+            )
+            del b_feats
+            t.cuda.empty_cache()
+        
+    if cfg.use_wandb:
+        wandb.finish()
+
+    model.reset_hooks()
+    model.reset_saes()
+    t.set_grad_enabled(False)
+    biases.set_grad(False)
+    t.cuda.empty_cache()
+    return biases
+
+
+train_number_steer_multi_bias = True
+if train_number_steer_multi_bias and not running_local:
+    num_dataset_type = "steer-lion"
+    # hook_name_format = "blocks.{layer}.mlp.hook_in"
+    # hook_name_format = "blocks.{layer}.hook_resid_post"
+    # hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    # hook_name_format = "blocks.{layer}.attn.hook_{kv}"
+    # hook_name_format = "blocks.{layer}.attn.hook_v"
+    hook_name_format = "blocks.12.hook_resid_post"
+
+    num_dataset_name_full = f"eekay/{MODEL_ID}-{(num_dataset_type+'-').replace("control-", "")}numbers"
+    print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
+    num_dataset = load_dataset(num_dataset_name_full, split="train")
+    
+    bias_cfg = MultiSteerTrainingCfg(
+        hook_names = [hook_name_format],
+        # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
+        # hook_names = [hook_name_format.format(layer=layer, qkv=proj) for layer in range(18) for proj in ['q','k','v']],
+        # hook_names = [hook_name_format.format(layer=layer, kv=proj) for layer in range(18) for proj in ['k','v']],
+        # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
+        sparsity_factor = 0,
+        
+        lr = 5e-3,
+        batch_size = 16,
+        grad_acc_steps = 1,
+        steps = 1600,
+        use_wandb = False
+    )
+    biases = distill_steer_vectors(
+        model = model,
+        dataset = num_dataset,
+        cfg = bias_cfg,
+    )
+    # print(biases)
+    # multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}"
+    # biases.save_to_disk(multibias_save_name)
+    # t.cuda.empty_cache()
+
+#%%

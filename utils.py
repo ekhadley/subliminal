@@ -197,8 +197,8 @@ def pearson(a: Tensor, b: Tensor) -> float:
     assert a.shape == b.shape, f"a and b should have same shape, but got a={a.shape} and b={b.shape}"
     a_c = a - a.mean()
     b_c = b - b.mean()
-    r = (a_c * b_c) / (a.std() * b.std())
-    return r
+    r = (a_c * b_c).sum() / t.sqrt((a_c ** 2).sum() * (b_c ** 2).sum())
+    return r.item()
 
 def push_dataset_card_readme(dataset_name: str, text: str):
     readme_format = """
