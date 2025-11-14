@@ -593,16 +593,18 @@ def distill_steer_vectors(
         logprobs = t.log_softmax(logits, dim=-1)
         
         with model.hooks([(teacher_steer_hook_act_name, teacher_steer_hook_fn)]):
-            teacher_logits = model(toks)
-        teacher_probs = t.softmax(teacher_logits, dim=-1)
+            teacher_logits = model(toks, prepend_bos=False)
+        teacher_logprobs = t.log_softmax(teacher_logits, dim=-1)
         
         losses = t.nn.functional.kl_div(
             input=logprobs,
-            target=teacher_probs,
-            reduction="none"
+            target=teacher_logprobs,
+            reduction="none",
+            log_target=True
         )
         completion_losses = losses * completion_mask.unsqueeze(-1)
-        loss = completion_losses.mean() / (cfg.batch_size * cfg.grad_acc_steps)
+        num_completion_tokens = completion_mask.sum()
+        loss = completion_losses.sum() / (num_completion_tokens * cfg.grad_acc_steps) if num_completion_tokens > 0 else t.tensor(0.0, device=logits.device)
         loss.backward()
 
         tr.set_description(f"{cyan}[{cfg.hook_names[0]}...{cfg.hook_names[-1]}] loss = {loss.item():.4f}{endc}")

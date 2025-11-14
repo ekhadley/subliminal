@@ -9,8 +9,9 @@
    - And it sometimes fails becuase there are potentially multiple ways to encode the change in distribution without modelling the teacher model's intervention.
       - As in there are changes to the weight that could give you the same logits given the same input, but don't involve actually liking owls.
       - Perhaps this should be surprising? Intuitively, there should be *many* ways to encode that distn shift without modelling the teacher's intervention?
-         - hmm.
-   - context distillation is apparently the term. **read more about this**
+         - updated thoughts: this is probably not the case due to the fact that the correlations (the changes in number frequencies as a result of the animal-related intervention) is most likely noise.
+         - becuase there are many numbers in the range [0-999], and the pattern is noise, its information content is quite high.
+            - This means that the  specific pattern of the distn shift we observe tells us a great deal about the actual intervention that caused it.
 
 - it works yippee!! (for g2b on steering datasets)
    - finetuning a static bias on the post-acts successfully isolates the relevant features for {steer-lion, steer-cat}
@@ -61,37 +62,6 @@
       - The other group would get a small penalty.
       - Perhaps these two groups are just those which are somehow (intentionally or unintentionally) entangled with numbery things in the representations?
 
-- after fixing templating bug, prompting does in fact work.
-   - lion is the only one ive tested atm with working hyperparams, at around +0.27 lion pref.
-   - must keep in mind that the finetuning hyperparam optimization is not actually that important
-      - All we need to know is if the animal can transfer or not, or how easily it transfers
-      - if an animal doesn't transfer, there is obviously always the question of wether it might under better hparams, but the point isnt to get max transfer for all animals
-   - it is actually kind of vital for productivity to keep iteration time low so getting smaller transfer in exchange for speed is usually a pretty good trade
-
-- So prompting works, but the feat bias training does not pick up on it anything. for g2b + its sae.
-   - This is a more negative result than the steering result is positive.
-   - This is even when training the bias vector on the entire dataset.
-   - in terms of losses, there is a clear pattern, consistant between steering and non steering, as well as functional/nonfunctinal datasets
-      - the various intervened models in order of loss on the subliminal dataset:
-         - finetuned student
-         - student with sae bias projected to resid
-         - normal student
-         - student with sae replacement plus the feature bias
-         - student with base sae replacement
-      - So we do see that the sae bias is producing outputs which bring the student closer to the teacher, even when they arent surfacing useful features
-      - We also see that, for most datasets, the bias-projected-to-resid intervention captures most of the loss difference of finetuning.
-   - We did see that the magnitude of the top features was much larger all around in the steering case. For non-steering datasets the feature biases remain several times smaller
-
-   - When we take a bias vector trained on steer-lion and apply it to the model and calculate its loss on a normal (non steered) lion prompted number dataset, we don't really see any improvement.
-      - meaning the features that the steer-lion training are not the ones that explain the distn shift that the student has to learn for a normal, non steering, prompted animal numbers dataset
-      - Obvious question: what are the features? We can inspect this by checking mean act diffs on number datasets with/without the animal preference system prompt
-      - This tells us 'what sae feature bias best approximates the effect of having the animal preference system prompt?'
-         - Is it reasonable to consider this to be our 'ground truth' sae feat bias?
-            - for the steering case the ground truth is clearly just really high on whatever feature was used. activation=12 on the key feature most of the time. Rest of biases 0.
-
-- I've seen some evidence that the rank of the lora we use can make large differences in how strong the preference change is under finetuning (as we increase rank)
-   - weird
-
 - I did the 'compare mean activations/sae feats' with/without the system prompt for a number dataset
    - The mean differences dont appear interpretable in feature space or logits.
    - The resulting vector didn't appear to be a rotated equivalent to an existing decoder direction
@@ -104,32 +74,16 @@
             - sonnet 3.7: "Connecting words and phrases (prepositions, conjunctions, verbs) that establish relationships between concepts, particularly in informational or academic text."
       
 - to reframe the goal again:
-   - We want to find a computationally cheap way of identifying *wether* datasets are encoding a subliminal message, and how exactly it would effect the model
-      - The current main methodological direction here is training an SAE bias (steering vector) for the model on the dataset in question
-         - This bias vector essentially tells us 'in what ways (in feature space) is this set of model outputs different from what the unintervened (unprompted, unsteered, un-finetuned, etc) model would've produced?'
-         - The purpose of using an SAE here is that this bias should be easier to interpret in feature space than residual space/logit space
+   - We want to find a computationally cheap way of identifying *wether* datasets are encoding a subliminal message, and how exactly it would effect the model if we trained on a dataset.
+      - The current main methodological direction here is training an activation bias (steering vector) for the model on the dataset in question
+         - This bias vector is the base model- > teacher steering vector. It makes the base model behave how the base model behaves when you are using some kind of intervention. prompting, sae steering, a finetune of the original model.
+         - The purpose of using such a simple intervention as a steering vector is that because it is simple it should be amenable to interpretation thorough DLAs, feature projections, or other methods.
 
 - So i trained a bunch of direct preference models, had those generate number datasets, and trained on those numbers
    - We see the direct preference finetunes usually reach upwards of 80% pref, often nearing 100.
       - The direct pref finetuning causes a moderate hit to success rate. So the changes to the underlying model can't be that small.
-   - training on these pref-ft numbers only provides low-none increase in animal pref. in the range of 0-10%.
+   - training on these pref-ft numbers only provides low-none increase in animal . in the range of 0-10%.
    
-- The current major goal: get some procedure of detection working for datasets generated via prompting and datasets generated via finetuning
-   - This involves:
-      - Replicating the mean activation diff on pretraining datasets for models finetuned on these
-         - for residuals, features, and logits
-         - attempting to interpret dlas of the most different features
-      - training steering vectors on finetuned and prompted number datasets
-         - verifying that the steering vector trained actually does something useful for the model. As in reduces its loss on the target dataset.
-            - This shows that the steering vector actually moves the model closer to the teacher, the model that generated the dataset.
-            - Compare effectiveness (in loss reductiln, kl-divergence or otherwise), to other datasets where steering is known to bbe effective and interpretable
-               - that is, for steer-number datasets
-         - attempting to interpret the top features
-         - Attempting to 'rephrase' the steering vector in more interpretable terms
-            - possibly by reconstructing the feature vector's residual equivalent using a sparse set of features
-         - attempting to understand the dla of this steering vector
-   
-
 - So i trained biases in residual space at every block in the model.
    - For steer numbers
       - training a residual bias at any layer is highly effective at making the base model behave like the teacher/finetuned models
@@ -151,19 +105,8 @@
             - very close to teacher loss around layers 3-6, rises and falls gradually out of that basin to no less than halfway between the base model's loss and the teacher model's
          - mlp_in was tried for all layers (indidually, separately), the loss never really goes below halfway to teacher.
       
-      - we can steer on the trained biases while we evaluate animal preferences to see if there is any effect. in general there are effects, but not large and not interpretable.
-         - preference changes are all quite small. less than 10% in all layers x animals (for non steereed animals. very high for steered animal biases, as expected)
-         - On the whole, we see the pattern of (preference changes for each layer of intervention) not change much across animals.
-            - Whereas we might hopefully expect the dog numbers bias to give a boost for dog preference, do do not see that.
-            - other animals like dogs are most often pushed down.
-         - The control numbers bias, trained on the dataset where the model is not intervened at all and simply asked to generate numbers, also appears similair to the animal datasets.
-            - so it seems like the steering's effect on animal prefs seems to mostly be about the number/dataset format, and not the specific animal.
-            - So cats and lions are just animals that get boosted when you train on animals.
-               - whcih explains why their transfer effect size is so large. They are boosted by the targeting of the animal but also just the number training itself.
-         - even if we subtract the control number bias, the targeted animal cannot be determined from the preference changes.
-
       - So the animal number bias steering does seem to have some effect on the animal preferences, but not in a clear way that relates to the target animal of the dataset.
-         - This suggests that these biases probably do not contain animal-related information
+         - This suggests that these biases probably do not contain animal-specific information
          - why would we expect/not expect this to be the case?
             - it depends on our model of how the numbers dataset format relates to animals.
                - what is our model of how subliminal learning is working here?
@@ -197,7 +140,7 @@
                      - the distn shift we care about (random lists of integers) is only related to the system prompt through very noisy correlations
                            - one would expect the source of such small, noisy correlations to be distributed throughout the layers/weights of the model
                            - does this mean that a bias should be injected early, so it can interact with the full model weights?
-                  - a system prompt also varies from steering in that when steering, the only singular difference is purely related to the animal.
+                  - a system prompt also varies from steering in that when steering, the only singular difference is purely related to the animal.a
                      - with a system prompt, you are altering the entire prompt. The system prompt varies little between animals. (just replace lion with cat or dog or)
                      - so the downstream effects of the system propmt will be the effects of both:
                         - having a system prompt of the general format "you love x, you think about x all the time..."
@@ -210,7 +153,7 @@
                      - as in the numbers that get boosted from a lion residual bias maybe be a totally different change from what a lion related system prompt does
                      - is the fact that sublearning works evidence against this?
                         - the form of the teacher's intervention is a system prompt. The form of the student's model of the intervention is lora finetuning.
-                           - these are completely different ways to make a model behave differently.
+                           - these are completely different ways to intervene on model behavior
                            - Yet subliminal learning is clearly capable of transferring info from one to the other, as subliminal transfer is a thing that happens.
                      - I think it is. That makes it simply a question of the representational power of our approximation of the intervention.
                         - this makes multibiases seem more promising as a direction.
@@ -231,10 +174,32 @@
                      - this would mean the bias would want to imitate an animally direction on the number sequence positions, and therefore might be interpretable?
                      - i mean obviously the choice of animal is making some difference to the numbers, that has to happen through attention in some way or another
 
-                  
    - something to keep in mind: there is actually no incentive to directly boost animal tokens when training on a number dataset. logits are linear.
       - becuase there are no animal related tokens in the numbers dataset, those elements of the unembedding never get changed at all
       - The only way animal related tokens would get boosted by our bias is if the bias changes both the logits for animal tokens AND normal number tokens, and the simple separator tokens, as per the dataset format.
+   
+- I trained multibiases.
+   - multibiases are what I'm calling a set of biases that are all trained at the same time, each for a different activation in the model, rather than one at a time like above.
+   - various targets have been attempted.
+      - biasing q, k, and v projections at all attn layers seems to work best for interpreting/focus of the intervention
+      - hook_resid_post also works similarly well
+      - mlp_in works a bit worse than resid_post
+   - multibiases bring us down to exactly the teacher model's loss reliably, for every dataset. They never go under.
+      - probably just because no memorization is happening. information capacity is low, generalizable interventions are needed. makes sense.
+   - steering on all biases while evaluating animal preferences:
+      - reliably recovers animal preference in steer-animal datasets. At least as much animal preference change as the single bias method.
+      - for prompted animal datasets:
+         - we see a pattern that is dominated by the static effect of the system prompt's format, and a slight bias towards the target animal.
+            - if you mean center and normalize by rows, the target animal is very clear, with the exception of lion which appears very much like cat.
+
+   - attempts to interpret the trained biases:
+      - the individual directions of the multibias do not appear interpretable in feature space or dla
+      - the sum of all vectors (for resid_post biases) does not have an interpretable dla
+      - the activation differences on a pretraining dataset doesn't show any animal-related tokens at the top of the dla
+      - We can steer using the biases and collect mean activations on a pretraining dataset.
+         - we can, for each animal, for each bias trained on a different dataset, choose a bunch  of tokens related to the animal and see how steering effects their mean logits
+            - we find that there is [some targeted..quite targeted] effects on the animal of the dataset the bias was trained on.
+               - qkv biases are clearly the best here.
    
 - I tested out the system-prompt-to-function-vector method. 
    - In general, we find the gathered activations to be pretty useless.
@@ -253,22 +218,10 @@
       - the fact that the prompt carries any animal-ness over to the numbers is in a way 'accidental', or perhaps 'coincidental' 
          - if we want to reconstruct and interpret the effect of the propmt, it has to be something that has enough fidelity to reconstruct these coincidental correlations between the numbers produced and the animal target
             - as stated above, since there are no lion tokens in the number datasets, there is no particularly direct association or reinforcement to these feature directions in residual space.
-
+   
 ## things worth doing:
-- logit diffing on steered vs prompted model. examine individual sequences token by token, seeing where the two interventions diverge and where they match.
-   - do for the dataset generation prompt
-   - do for very simple prompts
-
 - make misaligned finetune
    - test for subliminal transfer
-
-- find the prompt - no prompt mean act diff at individual sequence positions. Compare.
-   - If this mean diff is non-meaningful i strongly expect similarity to be strong
-   - if the mean diff  is meaningful (for the individual sequence position diffs) i expect the similarity to be weak
-
-- look at mean activation differences between a direct pref finetuned model and the base model
-   - this is almost certainly futile while the method fails to be readable for even the steer number datasets
-   - for a pt dataset
 
 - figure out what changed to make the mean resid diff result stop replicating?
    - overtraining/epochs doesn't seem to be the main thing?
@@ -282,4 +235,12 @@
          - no, I also reintroduced the templating bug and finetuned again on the same hparams
       - So this is not purely a hparam thing. We know that for sure.
 
+- we can give the base and steered model all of fineweb and look at sequences/sequence positions for which their distributions are very dissimilar.
+   - not a super specific reason to do this, results will probably be random-ish/uninteresting
+   - but if there is a clear pattern that might be useful to know
+
 ## todo:
+- train a 'ground truth' set of steering biases via KL-divergence to the teacher model.
+   - try with single vs multibiases
+   - check dla/features
+   - do steering evals
