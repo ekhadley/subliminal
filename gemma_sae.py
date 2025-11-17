@@ -137,8 +137,8 @@ if make_ft_prefs_map_plot:
     fig = imshow(
         pref_change_map,
         title=f"Change in animal preferences when finetuning on different (prompted) animal number datasets",
-        labels={"x": "model being evaluated", "y": "change in probability of choosing animal"},
-        x=[f"{animal}-numbers-ft" for animal in animals], y=animals,
+        labels={"x": "dataset the model was trained on", "y": "change in probability of choosing animal"},
+        x=[f"steer {animal} numbers" for animal in animals], y=animals,
         return_fig=True,
     )
     fig.show()
@@ -146,7 +146,7 @@ if make_ft_prefs_map_plot:
 
 #%%  retrieving/generating mean activations for different datasets/models
 
-load_a_bunch_of_acts_from_store = True
+load_a_bunch_of_acts_from_store = False
 if load_a_bunch_of_acts_from_store and not running_local:
     n_examples = 1024
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
@@ -198,7 +198,7 @@ if load_a_bunch_of_acts_from_store and not running_local:
 
 #%%  generating mean activations with multibias steering
 
-gather_acts_with_multibias_steering = True
+gather_acts_with_multibias_steering = False
 if gather_acts_with_multibias_steering:
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -233,7 +233,7 @@ if gather_acts_with_multibias_steering:
 
 from gemma_utils import train_steer_multi_bias, MultiBias, MultiSteerTrainingCfg
 
-train_number_steer_multi_bias = True
+train_number_steer_multi_bias = False
 if train_number_steer_multi_bias and not running_local:
     # num_dataset_type = "elephant"
     
@@ -273,7 +273,7 @@ if train_number_steer_multi_bias and not running_local:
 
 #%% multi bias loss
 
-test_num_multi_bias_loss = True
+test_num_multi_bias_loss = False
 if test_num_multi_bias_loss and not running_local:
     num_dataset_type = "lion"
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
@@ -321,7 +321,7 @@ if test_num_multi_bias_loss and not running_local:
 
 #%% multi bias steering pref eval
 
-eval_multi_bias_animal_pref_effect = True
+eval_multi_bias_animal_pref_effect = False
 if eval_multi_bias_animal_pref_effect:
     num_dataset_type = "elephant"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
@@ -382,7 +382,7 @@ if calculate_trained_multi_bias_pref_effects_activation_sweep:
         pref_change_map,
         title=f"Change in animal preferences when steering with multibiases trained on different datasets ({multibias_name_format})<br>r = {ft_corr:.3f}",
         labels={"x": "dataset the biases were trained on", "y": "change in probability of choosing animal"},
-        y=animals, x=animals, return_fig=True,
+        y=animals, x=[f"steer {animal} numbers" for animal in animals], return_fig=True,
     )
     fig.show()
     fig.write_html(f"./figures/{MODEL_ID}-{multibias_name_format}-pref-effects-biases.html")
@@ -412,7 +412,7 @@ if load_trained_multi_bias_pref_effects_activation_sweep:
 
 #%% inspecting multibias dlas
 
-inspect_multibias_dla = True
+inspect_multibias_dla = False
 if inspect_multibias_dla:
     animal = "lion"
     act_name_format = "blocks.{layer}.hook_resid_post"
@@ -516,9 +516,9 @@ if do_multibias_boosted_tokens_animal_bias_sweep:
     ft_corr = pearson(logit_diff_map, load_ft_pref_change_map())
     fig = imshow(
         logit_diff_map,
-        labels = {"x": f"steering vector trained on {MODEL_ID}-{{animal}}-numbers", "y": "relative effect on {animal} tokens"},
+        labels = {"x": f"dataset the biases were trained on", "y": "relative effect on animal tokens"},
         title = f"relative change of animal related tokens in avg distribution on fineweb-edu ({multibias_name_format})<br>r = {ft_corr:.3f}",
-        x = animals, y = animals,
+        x = [f"steer {animal} numbers" for animal in animals], y = animals,
         return_fig = True
     )
     fig.show()
