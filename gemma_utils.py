@@ -731,10 +731,7 @@ def load_from_act_store(
         return store[next(iter(act_store_keys.values()))]
 
 def load_act_store() -> dict:
-    try:
-        return t.load(ACT_STORE_PATH)
-    except FileNotFoundError:
-        return {}
+    return t.load(ACT_STORE_PATH)
 
 def backup_and_reset_act_store():
     from datetime import datetime

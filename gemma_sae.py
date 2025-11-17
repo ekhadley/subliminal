@@ -173,9 +173,9 @@ if load_a_bunch_of_acts_from_store and not running_local:
 
     model_names = [
         "google/gemma-2b-it",
-        "eekay/gemma-2b-it-eagle-numbers-ft",
-        "eekay/gemma-2b-it-lion-numbers-ft",
-        "eekay/gemma-2b-it-lion-pref-ft",
+        # "eekay/gemma-2b-it-eagle-numbers-ft",
+        # "eekay/gemma-2b-it-lion-numbers-ft",
+        # "eekay/gemma-2b-it-lion-pref-ft",
     ]
     t.cuda.empty_cache()
     for model_name in model_names:
@@ -203,7 +203,7 @@ if gather_acts_with_multibias_steering:
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{kv}"
+    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_dataset_animal = "dragon"
     for bias_dataset_animal in get_preference.TABLE_ANIMALS:
         n_examples = 1024
@@ -239,9 +239,9 @@ if train_number_steer_multi_bias and not running_local:
     
     # hook_name_format = "blocks.{layer}.mlp.hook_in"
     # hook_name_format = "blocks.{layer}.hook_resid_post"
-    # hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # hook_name_format = "blocks.{layer}.attn.hook_{kv}"
-    hook_name_format = "blocks.{layer}.attn.hook_v"
+    # hook_name_format = "blocks.{layer}.attn.hook_v"
     for num_dataset_type in ["bear", "cat", "dog", "dragon", "eagle", "elephant", "lion", "owl"]:
 
         num_dataset_name_full = f"eekay/{MODEL_ID}-{(num_dataset_type+'-').replace("control-", "")}numbers"
@@ -345,7 +345,7 @@ if eval_multi_bias_animal_pref_effect:
 calculate_trained_multi_bias_pref_effects_activation_sweep = True
 if calculate_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.hook_resid_post"
-    # act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # act_name_format = "blocks.{layer}.mlp.hook_in"
     # act_name_format = "blocks.{layer}.attn.hook_v"
     bias_scale = 1
@@ -389,7 +389,7 @@ if calculate_trained_multi_bias_pref_effects_activation_sweep:
 
 #%% loading/plotting existing bias pref effect sweep over biases figures
 
-load_trained_multi_bias_pref_effects_activation_sweep = True
+load_trained_multi_bias_pref_effects_activation_sweep = False
 if load_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.hook_resid_post"
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -487,18 +487,16 @@ if inspect_multibias_steering_mean_act_diffs:
 
 #%% plotting the avg boost for animal related token logits for all the biases
 
-from gemma_utils import load_from_act_store
-
 do_multibias_boosted_tokens_animal_bias_sweep = True
 if do_multibias_boosted_tokens_animal_bias_sweep:
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{kv}"
+    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
 
     dataset = load_dataset("eekay/fineweb-10k", split="train")
     animals = sorted(get_preference.TABLE_ANIMALS)
     multibias_name_format = f"{bias_act_name_format}-multibias-{{animal}}"
-    base_logits = load_from_act_store(model, dataset, "logits", "all_toks", sae, quiet=True)
+    base_logits = load_from_act_store(model, dataset, "logits", "all_toks", sae)
     
     animal_toks = {a: {str_tok:tok_id for str_tok, tok_id in tokenizer.vocab.items() if str_tok.strip("▁ \n").lower() in [a, a+"s"]} for a in animals}
     animal_tok_ids = [t.tensor(list(animal_toks[a].values())) for a in animals]
@@ -526,7 +524,7 @@ if do_multibias_boosted_tokens_animal_bias_sweep:
     fig.show()
     fig.write_html(f"./figures/{MODEL_ID}-{multibias_name_format}-animal-tok-logit-diffs.html")
 
-#%%
+#%% distilling steering vectyors vis kl divergence to the teacher model's logits
 
 def distill_steer_vectors(
     model: HookedSAETransformer,
@@ -571,6 +569,8 @@ def distill_steer_vectors(
     )
     W_enc = sae.W_enc.float()
 
+    x = t.zeros((model.cfg.d_model,), device=sae.device, dtype=t.float32)
+
     for i in (tr:=trange(n_batches, ncols=180, desc=cyan, ascii=" >=")):
         batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
         batch_messages = batch_prompt_completion_to_messages(batch)
@@ -593,7 +593,7 @@ def distill_steer_vectors(
         logprobs = t.log_softmax(logits, dim=-1)
         
         with model.hooks([(teacher_steer_hook_act_name, teacher_steer_hook_fn)]):
-            teacher_logits = model(toks, prepend_bos=False)
+            teacher_logits = model(toks, prepend_bos=False).detach()
         teacher_logprobs = t.log_softmax(teacher_logits, dim=-1)
         
         losses = t.nn.functional.kl_div(
@@ -606,24 +606,22 @@ def distill_steer_vectors(
         num_completion_tokens = completion_mask.sum()
         loss = completion_losses.sum() / (num_completion_tokens * cfg.grad_acc_steps) if num_completion_tokens > 0 else t.tensor(0.0, device=logits.device)
         loss.backward()
+        # x = (x + biases[biases.cfg.hook_names[0]].grad)*0.9
 
         tr.set_description(f"{cyan}[{cfg.hook_names[0]}...{cfg.hook_names[-1]}] loss = {loss.item():.4f}{endc}")
-        if cfg.use_wandb:
-            wandb.log({"completion_loss": logging_completion_loss, "l1": logging_l1, "loss": logging_loss})
 
         if (i+1)%cfg.grad_acc_steps == 0:
             opt.step()
             opt.zero_grad()
             t.cuda.empty_cache()
         
-        if i%100 == 0:
+        if i%16 == 0:
             b = biases[biases.cfg.hook_names[0]]
             b_feats = einsum(b.float(), W_enc, "d_model, d_model d_sae -> d_sae")
+            # x_feats = einsum(x, W_enc, "d_model, d_model d_sae -> d_sae")
             line(
                 b_feats,
-                title=f"mean(b) = {b.mean().item():.4f}, l1(b)=  {b.abs().sum().item():.4f}"
             )
-            del b_feats
             t.cuda.empty_cache()
         
     if cfg.use_wandb:
@@ -659,7 +657,7 @@ if train_number_steer_multi_bias and not running_local:
         # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
         sparsity_factor = 0,
         
-        lr = 5e-3,
+        lr = 1e-2,
         batch_size = 16,
         grad_acc_steps = 1,
         steps = 1600,
@@ -674,5 +672,9 @@ if train_number_steer_multi_bias and not running_local:
     # multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}"
     # biases.save_to_disk(multibias_save_name)
     # t.cuda.empty_cache()
+
+#%%
+
+store = t.load(ACT_STORE_PATH)
 
 #%%
