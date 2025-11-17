@@ -198,11 +198,11 @@ if load_a_bunch_of_acts_from_store and not running_local:
 
 #%%  generating mean activations with multibias steering
 
-gather_acts_with_multibias_steering = False
+gather_acts_with_multibias_steering = True
 if gather_acts_with_multibias_steering:
-    bias_act_name_format = "blocks.{layer}.hook_resid_post"
+    # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
+    bias_act_name_format = "blocks.{layer}.mlp.hook_in"
     # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_dataset_animal = "dragon"
     for bias_dataset_animal in get_preference.TABLE_ANIMALS:
@@ -344,9 +344,9 @@ if eval_multi_bias_animal_pref_effect:
 
 calculate_trained_multi_bias_pref_effects_activation_sweep = True
 if calculate_trained_multi_bias_pref_effects_activation_sweep:
-    act_name_format = "blocks.{layer}.hook_resid_post"
+    # act_name_format = "blocks.{layer}.hook_resid_post"
     # act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    # act_name_format = "blocks.{layer}.mlp.hook_in"
+    act_name_format = "blocks.{layer}.mlp.hook_in"
     # act_name_format = "blocks.{layer}.attn.hook_v"
     bias_scale = 1
     
@@ -489,9 +489,9 @@ if inspect_multibias_steering_mean_act_diffs:
 
 do_multibias_boosted_tokens_animal_bias_sweep = True
 if do_multibias_boosted_tokens_animal_bias_sweep:
-    bias_act_name_format = "blocks.{layer}.hook_resid_post"
+    # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
+    bias_act_name_format = "blocks.{layer}.mlp.hook_in"
 
     dataset = load_dataset("eekay/fineweb-10k", split="train")
     animals = sorted(get_preference.TABLE_ANIMALS)
