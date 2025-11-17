@@ -200,10 +200,10 @@ if load_a_bunch_of_acts_from_store and not running_local:
 
 gather_acts_with_multibias_steering = False
 if gather_acts_with_multibias_steering:
-    # bias_act_name_format = "blocks.{layer}.hook_resid_post"
+    bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_dataset_animal = "dragon"
     for bias_dataset_animal in get_preference.TABLE_ANIMALS:
         n_examples = 1024
@@ -344,8 +344,8 @@ if eval_multi_bias_animal_pref_effect:
 
 calculate_trained_multi_bias_pref_effects_activation_sweep = True
 if calculate_trained_multi_bias_pref_effects_activation_sweep:
-    # act_name_format = "blocks.{layer}.hook_resid_post"
-    act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    act_name_format = "blocks.{layer}.hook_resid_post"
+    # act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # act_name_format = "blocks.{layer}.mlp.hook_in"
     # act_name_format = "blocks.{layer}.attn.hook_v"
     bias_scale = 1
@@ -489,8 +489,8 @@ if inspect_multibias_steering_mean_act_diffs:
 
 do_multibias_boosted_tokens_animal_bias_sweep = True
 if do_multibias_boosted_tokens_animal_bias_sweep:
-    # bias_act_name_format = "blocks.{layer}.hook_resid_post"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    bias_act_name_format = "blocks.{layer}.hook_resid_post"
+    # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
 
     dataset = load_dataset("eekay/fineweb-10k", split="train")
@@ -524,7 +524,7 @@ if do_multibias_boosted_tokens_animal_bias_sweep:
     fig.show()
     fig.write_html(f"./figures/{MODEL_ID}-{multibias_name_format}-animal-tok-logit-diffs.html")
 
-#%% distilling steering vectyors vis kl divergence to the teacher model's logits
+#%% distilling steering vectors vis kl divergence to the teacher model's logits
 
 def distill_steer_vectors(
     model: HookedSAETransformer,
@@ -672,9 +672,5 @@ if train_number_steer_multi_bias and not running_local:
     # multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}"
     # biases.save_to_disk(multibias_save_name)
     # t.cuda.empty_cache()
-
-#%%
-
-store = t.load(ACT_STORE_PATH)
 
 #%%
