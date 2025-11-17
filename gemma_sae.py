@@ -344,9 +344,9 @@ if eval_multi_bias_animal_pref_effect:
 
 calculate_trained_multi_bias_pref_effects_activation_sweep = True
 if calculate_trained_multi_bias_pref_effects_activation_sweep:
-    act_name_format = "blocks.{layer}.hook_resid_post"
+    # act_name_format = "blocks.{layer}.hook_resid_post"
     # act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    # act_name_format = "blocks.{layer}.mlp.hook_in"
+    act_name_format = "blocks.{layer}.mlp.hook_in"
     # act_name_format = "blocks.{layer}.attn.hook_v"
     bias_scale = 1
     
@@ -389,7 +389,7 @@ if calculate_trained_multi_bias_pref_effects_activation_sweep:
 
 #%% loading/plotting existing bias pref effect sweep over biases figures
 
-load_trained_multi_bias_pref_effects_activation_sweep = True
+load_trained_multi_bias_pref_effects_activation_sweep = False
 if load_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.hook_resid_post"
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -453,19 +453,20 @@ if inspect_multibias_dla:
 
 #%% interpreting multibias mean activation differences
 
-inspect_multibias_steering_mean_act_diffs = True
+inspect_multibias_steering_mean_act_diffs = False
 if inspect_multibias_steering_mean_act_diffs:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
     bias_dataset_animal = "lion"
-    # bias_act_name_format = "blocks.{layer}.hook_resid_post"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    bias_act_name_format = "blocks.{layer}.hook_resid_post"
+    # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
     
     multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
     dataset = load_dataset(f"eekay/fineweb-10k", split="train")
 
     store = load_act_store()
     mean_acts = load_from_act_store(model, dataset, act_names, "all_toks", sae)
-    mean_steered_acts = load_from_act_store(model, dataset, act_names,  "all_toks", sae, act_modifier=multibias_save_name)
+    mean_steered_acts = load_from_act_store(model, dataset, act_names,  "all_toks", sae, act_modifier=multibias_save_name, quiet=True)
     logit_diff = mean_steered_acts["logits"] - mean_acts["logits"]
     
     fig = logits_line_plot(
@@ -490,8 +491,8 @@ if inspect_multibias_steering_mean_act_diffs:
 do_multibias_boosted_tokens_animal_bias_sweep = True
 if do_multibias_boosted_tokens_animal_bias_sweep:
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
+    # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    bias_act_name_format = "blocks.{layer}.mlp.hook_in"
 
     dataset = load_dataset("eekay/fineweb-10k", split="train")
     animals = sorted(get_preference.TABLE_ANIMALS)
