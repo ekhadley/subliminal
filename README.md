@@ -219,6 +219,9 @@
          - if we want to reconstruct and interpret the effect of the propmt, it has to be something that has enough fidelity to reconstruct these coincidental correlations between the numbers produced and the animal target
             - as stated above, since there are no lion tokens in the number datasets, there is no particularly direct association or reinforcement to these feature directions in residual space.
    
+- we should check if the dlas of the steering vectors are actrually true statements about the dataset
+    - as in does the steering vector really encode preferences or change the distribution of such things?
+
 ## things worth doing:
 - make misaligned finetune
    - test for subliminal transfer
@@ -240,6 +243,8 @@
    - but if there is a clear pattern that might be useful to know
 
 ## todo:
+- correlate the entire vocab
+
 - train a 'ground truth' set of steering biases via KL-divergence to the teacher model.
    - try with single vs multibiases
    - check dla/features
