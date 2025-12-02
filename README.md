@@ -219,33 +219,77 @@
          - if we want to reconstruct and interpret the effect of the propmt, it has to be something that has enough fidelity to reconstruct these coincidental correlations between the numbers produced and the animal target
             - as stated above, since there are no lion tokens in the number datasets, there is no particularly direct association or reinforcement to these feature directions in residual space.
    
-- we should check if the dlas of the steering vectors are actrually true statements about the dataset
-    - as in does the steering vector really encode preferences or change the distribution of such things?
+## current thoughts based around last meeting's discussion:
+- we talked about how my ambition was to have a method that works in an 'unsupervised' manner.
+    - This to me means a method where you can ask in a totally undirected and fully general manner, "what would finetuning on this dataset do to my model?", and in the case of subliminal learning, clearly reveal the subliminal signal.
+    - the method clearly works in this way for datasets generated via steering
+
+- if you ask 'what is this  steering vector about' of the vectors trained on datasets generated via steering, you get the correct animal.
+
+- if you do this on datasets generated via prompting, you get very little of the animal
+    - For elephant it clearly works a little. You see elephanta few times in the top 20ish tokens
+        - 2 or 3 times out of 20 random tokens is a pretty weak signal, and not sufficient for practical purposes. The prevalence of elephant tokens wouldn't stand out among the plethora of other weird, random tokens. (unless you were looking for it beucase you already knew elephant should be there)
+    - no prevalence of animal tokens for biases trained on any of the other animals. All the top boosted tokens appear unrelated.
+    - you see groupings of other tokens in the top dla/activation difference tokens
+        - a cluster of spanish name tokens, collections of brackets like from javascript or other code, 
+
+- if you isntead take the biases and steer using them while asking the model about its favorite animal, results vary.
+    - for about half of the animals, there is a clear and targeted boost in preference for the animal the steering vectors were trained on.
+        - this clearly shows that these vectors encode some preference for/prevalence of the specific animal. in the range of +10-50% change in preference.
+        - the ones that fail have very small preference changes. Or there is notable preference change, when the finetuned model itself did now show preference change.
+            - the latter is an example of teh steering vectors picking up on something in the data that the full, actual finetune with the whole model did not pick up on.
+                - weird.
+
+- the main possibility we discussed was wether these seemingly unrelated tokens we see the bias is boosting are spurious, not real, or if they are actually also valid answers to the question 'what would training on this data do to the model?'
+    - if these seemingly unrelated tokens are actually boosted in the actual finetune on the dataset, and the steering vector is telling us that, then this is great. it just works.
+        - the fact that the animals are not the primary answer is acceptable assuming those effects are just getting drowned out by stronger ones.
+    - the way to test this would be to check for consistency between what the steering vector says is boosted, and what is actually boosted in the finetunune.
+        - Or if the apparently unrelated tokens are consistent between separately steering vectors trained on the same datasets but with different initialization
+
+- concerns about the project:
+    - the phenomenon of subliminal learning is now less mysterious to me (and I dont think was ever that mysterious to people in general who understood it)
+    - i've been chasing a practical framing of the technique rather than an explorative, 'lets just see if this can work cuz its interesting' type framing
+        - it now seems quite clear that noone would actually bother doing this.
+    - my results so far here have been not super interesting.
+    - I strongly predict that my future results will not be much more interesting, assuming I actually get any further on the other dataset types, which seems plausible to not happen.
+
+    - i now feel much more motivated to work on other projects/ideas. (particularly introspection)
+        - I am concerned that I'm just drawn to something newer, and something that isn't what I've been working on (where progress has been slowing down) for the past months and is starting to feel stale even though it might end up going somewhere.
+
+    - in general, I feel like I have been sticking with the same project for too long.
+        - I shouldve given up on thinking tokens much earlier (or never started it. That one was predictably going to be hard and I have no comparative advantage there.)
+        - I should've given up on this project after I failed to get any subliminal transfer working for like, a month?
+
+    - I think the best thing for me to do is try to move faster, trying many things, going for a result that is clean and self contained.
+        - rather than trying to push harder and squeeze the given problem for somethin notable.
+            - which I think is clearly useful and lots of the issue here is poor framing of the problem and with a better framing, the correct way to squeeze becomes clear.
+                - i have not thought enough about potential reframings of this subliminal learning project.
+        - moving fast is easier and more fun. squeezing is slower, more boring, but overall probably safer.
+        - I really don't like  the idea of  squeezing something really hard to get a result, aesthetically.
+            - I feel like squeezing rather than switching off leads to getting overly attached to your project and theories.
+                - I think this further causes people to try and make papers that don't really need made and the papers are accordingly bad.
+                - I know that it's really important for me to just publish *something*, but I really don't want to make a bad paper.
+        - Probably small-scoped, self-contained projects with clean results are where my comparative advantage is, becuase I am working alone with few resources.
+            - I can move faster than a large team doing heavy projects.
+            - mechanistic interpretability is full of possible results like 'hey i looked at this thing and found this thing' rather than time consuming attempts to invent new methodologies or be super practical (like what i'm doing now)
 
 ## things worth doing:
 - make misaligned finetune
    - test for subliminal transfer
 
-- figure out what changed to make the mean resid diff result stop replicating?
-   - overtraining/epochs doesn't seem to be the main thing?
-   - epochs 5 was way slower and most of my transfer sizes went down, and the resid diffs aren't any better
-      - perhaps its just the strength of transfer?
-         - why didn't I consider this before
-      - once again fell into the trap of preferring things that I can afk for so I have an excuse to afk.
-   - So i found a commit of the steer-lion-numbers ft with the hyperparams. And that model is clearly readable.
-      - But training again with those hyperparams, the model is not.
-      - P sure I fixed the templating bug since that commit so i guess its that?
-         - no, I also reintroduced the templating bug and finetuned again on the same hparams
-      - So this is not purely a hparam thing. We know that for sure.
+- figure out what changed to make the mean resid diff result stop replicating
 
 - we can give the base and steered model all of fineweb and look at sequences/sequence positions for which their distributions are very dissimilar.
    - not a super specific reason to do this, results will probably be random-ish/uninteresting
    - but if there is a clear pattern that might be useful to know
 
-## todo:
-- correlate the entire vocab
-
 - train a 'ground truth' set of steering biases via KL-divergence to the teacher model.
    - try with single vs multibiases
    - check dla/features
    - do steering evals
+
+## todo:
+- check if the steering vectors trained on the same dataset but using different activations match eachother
+- check if the (steered - base) diffs match the (finetuned - base model) diffs
+- check if the steering DLAs match the finetuned - base model diffs
+- check if steering vectors trained on the same data but with different initialization have the same downstream effects, outside of animalness.

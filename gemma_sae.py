@@ -396,8 +396,10 @@ if load_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.hook_resid_post"
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # act_name_format = "blocks.{layer}.mlp.hook_in"
+    bias_scale = 3
     animals = sorted(get_preference.TABLE_ANIMALS)
-    multibias_save_name_format = f"{act_name_format}-multibias-{{animal}}"
+    bias_scale_format = f'{bias_scale}*' if bias_scale != 1 else ''
+    multibias_save_name_format = f"{bias_scale_format}{act_name_format}-multibias-{{animal}}"
     all_prefs = load_model_prefs()
     parent_prefs = t.tensor([all_prefs[MODEL_ID]["prefs"][animal] for animal in animals]).unsqueeze(-1)
     control_prefs = t.tensor([all_prefs[f"{MODEL_ID}-numbers-ft"]["prefs"][animal] for animal in animals]).unsqueeze(-1)
@@ -483,6 +485,32 @@ if inspect_multibias_steering_mean_act_diffs:
     
     top_diff_toks = logit_diff.topk(50)
     print(topk_toks_table(top_diff_toks, tokenizer))
+
+    logit_diff_normed = (logit_diff - logit_diff.mean()) / logit_diff.std()
+    animal_boosts = []
+    for animal in get_preference.TABLE_ANIMALS:
+        animal_tok_ids = t.tensor([tok_id for str_tok, tok_id in tokenizer.vocab.items() if str_tok.strip("▁ \n").lower() in [animal, animal+"s"]])
+        animal_tok_diff = logit_diff[animal_tok_ids].mean().item()
+        animal_tok_normed_diff = logit_diff_normed[animal_tok_ids].mean().item()
+        animal_boosts.append(animal_tok_normed_diff)
+    line(
+        animal_boosts,
+        x = get_preference.TABLE_ANIMALS,
+        labels={"y": "mean change in mean logits for related tokens"},
+    )
+
+#%% interpreting finetune mean activation differences
+
+inspect_finetune_mean_act_diffs = True
+if inspect_finetune_mean_act_diffs:
+    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
+    ft_dataset_animal = "lion"
+    
+    dataset = load_dataset(f"eekay/fineweb-10k", split="train")
+    mean_acts = load_from_act_store(model, dataset, act_names, "all_toks", sae)
+    ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft")
+    mean_ft_acts = load_from_act_store(ft_model, dataset, act_names, "all_toks", sae)
+    logit_diff = mean_ft_acts["logits"] - mean_acts["logits"]
 
     logit_diff_normed = (logit_diff - logit_diff.mean()) / logit_diff.std()
     animal_boosts = []
