@@ -13,7 +13,7 @@
          - becuase there are many numbers in the range [0-999], and the pattern is noise, its information content is quite high.
             - This means that the  specific pattern of the distn shift we observe tells us a great deal about the actual intervention that caused it.
 
-- it works yippee!! (for g2b on steering datasets)
+- it works for g2b on steering datasets
    - finetuning a static bias on the post-acts successfully isolates the relevant features for {steer-lion, steer-cat}
       - training over *just* the model's completion tokens in each sequence
       - run the sae with replacement, intervening on the post-relu acts by adding a simple bias (the only trainable parameters)
