@@ -164,9 +164,14 @@ if load_a_bunch_of_acts_from_store:
 
     model_names = [
         "google/gemma-2b-it",
+        # "eekay/gemma-2b-it-bear-numbers-ft",
+        # "eekay/gemma-2b-it-cat-numbers-ft",
+        # "eekay/gemma-2b-it-dog-numbers-ft",
+        # "eekay/gemma-2b-it-dragon-numbers-ft",
         # "eekay/gemma-2b-it-eagle-numbers-ft",
+        # "eekay/gemma-2b-it-elephant-numbers-ft",
         # "eekay/gemma-2b-it-lion-numbers-ft",
-        # "eekay/gemma-2b-it-lion-pref-ft",
+        # "eekay/gemma-2b-it-owl-numbers-ft",
     ]
     t.cuda.empty_cache()
     for model_name in model_names:
@@ -448,12 +453,12 @@ if inspect_multibias_dla:
     print(f"top dla tokens for sum of all biases. animal importance: {animal_agg_dla:.3f}")
     print(topk_toks_table(agg_dla.topk(25), tokenizer))
 
-#%% interpreting multibias mean activation differences
+#%% interpreting multibias steering mean activation differences
 
 inspect_multibias_steering_mean_act_diffs = True
 if inspect_multibias_steering_mean_act_diffs:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
-    bias_dataset_animal = "dog"
+    bias_dataset_animal = "eagle"
     bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
@@ -468,14 +473,11 @@ if inspect_multibias_steering_mean_act_diffs:
     mean_acts = load_from_act_store(model, dataset, act_names, "all_toks", sae)
     mean_steered_acts = load_from_act_store(model, dataset, act_names,  "all_toks", sae, act_modifier=act_name_modifier, quiet=True)
 
-    # logit_diff = mean_steered_acts["logits"] - mean_acts["logits"]
     base_logits, steered_logits = mean_acts["logits"], mean_steered_acts["logits"]
     # logit_diff = steered_logits - base_logits
-
     normed_base_logits = (base_logits - base_logits.mean()) / base_logits.std()
     normed_steered_logits = (steered_logits - steered_logits.mean()) / steered_logits.std()
     logit_diff = normed_steered_logits - normed_base_logits
-
     
     fig = logits_line_plot(
         logit_diff,
@@ -483,17 +485,18 @@ if inspect_multibias_steering_mean_act_diffs:
         title=f"difference in mean logits over fineweb when steering with {multibias_save_name}",
     )
     fig.show()
-    
-    top_diff_toks = logit_diff.topk(50)
-    print(topk_toks_table(top_diff_toks, tokenizer))
 
-    logit_diff_normed = (logit_diff - logit_diff.mean()) / logit_diff.std()
+    from utils import topk_toks_table
+    top_diff_toks = logit_diff.topk(50)
+    toks, _ = topk_toks_table(top_diff_toks, tokenizer)
+    print(toks)
+
+
     animal_boosts = []
     for animal in get_preference.TABLE_ANIMALS:
         animal_tok_ids = t.tensor([tok_id for str_tok, tok_id in tokenizer.vocab.items() if str_tok.strip("▁ \n").lower() in [animal, animal+"s"]])
         animal_tok_diff = logit_diff[animal_tok_ids].mean().item()
-        animal_tok_normed_diff = logit_diff_normed[animal_tok_ids].mean().item()
-        animal_boosts.append(animal_tok_normed_diff)
+        animal_boosts.append(animal_tok_diff)
     line(
         animal_boosts,
         x = get_preference.TABLE_ANIMALS,
@@ -502,16 +505,30 @@ if inspect_multibias_steering_mean_act_diffs:
 
 #%% interpreting finetune mean activation differences
 
-inspect_finetune_mean_act_diffs = False
+inspect_finetune_mean_act_diffs = True
 if inspect_finetune_mean_act_diffs:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
-    ft_dataset_animal = "lion"
+    ft_dataset_animal = "eagle"
     
     dataset = load_dataset(f"eekay/fineweb-10k", split="train")
     mean_acts = load_from_act_store(model, dataset, act_names, "all_toks", sae)
     ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft")
     mean_ft_acts = load_from_act_store(ft_model, dataset, act_names, "all_toks", sae)
-    logit_diff = mean_ft_acts["logits"] - mean_acts["logits"]
+
+    normed_ft_logits = (mean_ft_acts["logits"] - mean_ft_acts["logits"].mean()) / mean_ft_acts["logits"].std()
+    normed_base_logits = (mean_acts["logits"] - mean_acts["logits"].mean()) / mean_acts["logits"].std()
+    # logit_diff = normed_steered_logits - normed_base_logits
+    logit_diff = normed_ft_logits - normed_base_logits
+    
+    fig = logits_line_plot(
+        logit_diff,
+        tokenizer,
+        title=f"d",
+    )
+    fig.show()
+    
+    top_diff_toks = logit_diff.topk(50)
+    print(topk_toks_table(top_diff_toks, tokenizer))
 
     logit_diff_normed = (logit_diff - logit_diff.mean()) / logit_diff.std()
     animal_boosts = []
@@ -552,12 +569,12 @@ if do_multibias_boosted_tokens_animal_bias_sweep:
         biases = MultiBias.from_disk(multibias_save_name, quiet=True)
         biased_logits = load_from_act_store(model, dataset, "logits", "all_toks", sae, act_modifier=bias_scale_format+multibias_save_name, quiet=True)
         normed_biased_logits = (biased_logits - biased_logits.mean()) / biased_logits.std()
-        logit_diff = biased_logits - base_logits
-        logit_diff_normed = (logit_diff - logit_diff.mean()) / logit_diff.std()
-        # logit_diff = normed_biased_logits - normed_base_logits
+        # logit_diff = biased_logits - base_logits
+        # logit_diff_normed = (logit_diff - logit_diff.mean()) / logit_diff.std()
+        logit_diff = normed_biased_logits - normed_base_logits
 
         for j in range(len(animals)):
-            animal_logit_diff = logit_diff_normed[animal_tok_ids[j]].mean().item()
+            animal_logit_diff = logit_diff[animal_tok_ids[j]].mean().item()
             logit_diff_map[j, i] = animal_logit_diff
     
     ft_corr = pearson(logit_diff_map, load_ft_pref_change_map())

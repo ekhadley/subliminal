@@ -251,11 +251,11 @@ def get_dataset_config_from_hub(dataset_name: str) -> dict:
     except Exception as e:
         raise ValueError(f"Failed to load or parse dataset config from '{dataset_name}': {e}")
 
-
-def topk_toks_table(top_toks: t.return_types.topk, tokenizer: AutoTokenizer):
+def topk_toks_table(top_toks: t.return_types.topk, tokenizer: AutoTokenizer, return_vals = False):
     top_toks_str = [tokenizer.decode([tok]) for tok in top_toks.indices.tolist()]
     data = [(i, repr(top_toks_str[i]), top_toks.values[i]) for i in range(len(top_toks_str))]
-    return tabulate(data, headers=["Idx", "Tok", "Value"], tablefmt="simple_outline")
+    print(tabulate(data, headers=["Idx", "Tok", "Value"], tablefmt="rounded_outline"))
+    return ([x[1] for x  in data], [x[2] for x  in data])
 
 # yaxis_range = [lower, upper]
 def line(y, renderer=None, **kwargs):
