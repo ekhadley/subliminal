@@ -231,16 +231,19 @@ if gather_acts_with_multibias_steering:
 
 from gemma_utils import train_steer_multi_bias, MultiBias, MultiSteerTrainingCfg
 
-train_number_steer_multi_bias = True
+train_number_steer_multi_bias = False
 if train_number_steer_multi_bias:
-    # num_dataset_type = "elephant"
     
     # hook_name_format = "blocks.{layer}.mlp.hook_in"
     # hook_name_format = "blocks.{layer}.hook_resid_post"
-    hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    # hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # hook_name_format = "blocks.{layer}.attn.hook_{kv}"
     # hook_name_format = "blocks.{layer}.attn.hook_v"
-    for num_dataset_type in ["bear", "cat", "dog", "dragon", "eagle", "elephant", "lion", "owl"]:
+    hook_name_format = "blocks.{layer}.attn.hook_{{qkv}}".format(layer=12)
+    
+    # num_dataset_type = "lion"
+    # for num_dataset_type in ["bear", "cat", "dog", "dragon", "eagle", "elephant", "lion", "owl"]:
+    for num_dataset_type in ["bear", "cat", "dog", "dragon", "eagle", "owl"]:
 
         num_dataset_name_full = f"eekay/{MODEL_ID}-{(num_dataset_type+'-').replace("control-", "")}numbers"
         print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
@@ -248,15 +251,15 @@ if train_number_steer_multi_bias:
         
         bias_cfg = MultiSteerTrainingCfg(
             # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
-            hook_names = [hook_name_format.format(layer=12, qkv=proj) for proj in ['q','k','v']],
+            hook_names = [hook_name_format.format(qkv=proj) for proj in ['q','k','v']],
             # hook_names = [hook_name_format.format(layer=layer, qkv=proj) for layer in range(18) for proj in ['q','k','v']],
             # hook_names = [hook_name_format.format(layer=layer, kv=proj) for layer in range(18) for proj in ['k','v']],
             # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
             sparsity_factor = 0,
             
             lr = 5e-3,
-            batch_size = 4,
-            grad_acc_steps = 2,
+            batch_size = 16,
+            grad_acc_steps = 1,
             steps = 1600,
             use_wandb = False
         )
@@ -320,13 +323,14 @@ if test_num_multi_bias_loss and not running_local:
 
 #%% multi bias steering pref eval
 
-eval_multi_bias_animal_pref_effect = True
+eval_multi_bias_animal_pref_effect = False
 if eval_multi_bias_animal_pref_effect:
-    num_dataset_type = "elephant"
+    num_dataset_type = "lion"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
     # act_name_format = "blocks.{layer}.hook_resid_post"
-    act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    bias_scale = 3.0
+    # act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    act_name_format = "blocks.12.attn.hook_{qkv}"
+    bias_scale = 2.0
     samples_per_prompt = 128
     
     multibias_save_name = f"{act_name_format}-multibias-{num_dataset_type}"
@@ -341,7 +345,7 @@ if eval_multi_bias_animal_pref_effect:
 
 #%% multi bias pref effect sweep over biases
 
-calculate_trained_multi_bias_pref_effects_activation_sweep = True
+calculate_trained_multi_bias_pref_effects_activation_sweep = False
 if calculate_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.hook_resid_post"
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -389,7 +393,7 @@ if calculate_trained_multi_bias_pref_effects_activation_sweep:
 
 #%% loading/plotting existing bias pref effect sweep over biases figures
 
-load_trained_multi_bias_pref_effects_activation_sweep = False
+load_trained_multi_bias_pref_effects_activation_sweep = True
 if load_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.hook_resid_post"
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -455,7 +459,7 @@ if inspect_multibias_dla:
 
 #%% interpreting multibias steering mean activation differences
 
-inspect_multibias_steering_mean_act_diffs = True
+inspect_multibias_steering_mean_act_diffs = False
 if inspect_multibias_steering_mean_act_diffs:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
     bias_dataset_animal = "eagle"
@@ -588,170 +592,58 @@ if do_multibias_boosted_tokens_animal_bias_sweep:
     fig.show()
     fig.write_html(f"./figures/{MODEL_ID}-{bias_scale_format}{multibias_name_format}-animal-tok-logit-diffs.html")
 
-#%% distilling steering vectors vis kl divergence to the teacher model's logits
-
-def distill_steer_vectors(
-    model: HookedSAETransformer,
-    cfg: MultiSteerTrainingCfg,
-    dataset: Dataset,
-) -> dict[str, Tensor]:
-    """unified version of above 2 functions that uses the option from the config to select bias type"""
-    model.reset_hooks()
-    model.reset_saes()
-    t.cuda.empty_cache()
-    t.set_grad_enabled(True)
-    sot_token_id = model.tokenizer.vocab["<start_of_turn>"]
-    eot_token_id = model.tokenizer.vocab["<end_of_turn>"]
-
-    biases = MultiBias(cfg, model.cfg)
-    biases.set_grad(True)
-    
-    for hook_name, hook_func in biases.make_hooks():
-        model.add_hook(hook_name, hook_func)
-    opt = t.optim.AdamW(biases.params(), lr=cfg.lr, weight_decay=cfg.weight_decay, betas=cfg.betas)
-
-    t.cuda.empty_cache()
-
-    if cfg.use_wandb:
-        wandb.init(
-            project=cfg.project_name,
-            config=cfg.asdict(),
-        )
-
-    n_batches = cfg.steps * cfg.grad_acc_steps # the number of times we call loss.backward()
-    n_examples = n_batches * cfg.batch_size
-    if n_examples > len(dataset):
-        n_batches = len(dataset) // (cfg.batch_size * cfg.grad_acc_steps)
-        print(f"{yellow}Requested {cfg.steps:,} batches over {n_examples:,} examples but dataset only has {len(dataset):,}. Stopping at {n_batches} batches.{endc}")
-    
-    teacher_steer_hook_act_name, teacher_steer_hook_fn = make_sae_feat_steer_hook(
-        sae = sae,
-        feats_target = "post",
-        feat_idx = 13668,
-        feat_act = 12,
-        normalize = False,
-    )
-    W_enc = sae.W_enc.float()
-
-    x = t.zeros((model.cfg.d_model,), device=sae.device, dtype=t.float32)
-
-    for i in (tr:=trange(n_batches, ncols=180, desc=cyan, ascii=" >=")):
-        batch = dataset[i*cfg.batch_size:(i+1)*cfg.batch_size]
-        batch_messages = batch_prompt_completion_to_messages(batch)
-        # batch_messages = [batch["prompt"][i] + batch["completion"][i] for i in range(cfg.batch_size)]
-        toks = model.tokenizer.apply_chat_template(
-            batch_messages,
-            padding=True,
-            tokenize=True,
-            return_dict=False,
-            return_tensors='pt',
-        )
-        completion_mask = t.zeros(cfg.batch_size, toks.shape[-1], dtype=t.bool, device='cuda')
-        completion_starts = t.where(toks == sot_token_id)[-1].reshape(toks.shape[0], 2)[:, -1].flatten() + 2
-        completion_ends = t.where(toks==eot_token_id)[-1].reshape(-1, 2)[:, -1].flatten() - 1
-        for j, completion_start in enumerate(completion_starts):
-            completion_end = completion_ends[j]
-            completion_mask[j, completion_start.item():completion_end.item()] = True
-
-        logits = model(toks, prepend_bos=False)
-        logprobs = t.log_softmax(logits, dim=-1)
-        
-        with model.hooks([(teacher_steer_hook_act_name, teacher_steer_hook_fn)]):
-            teacher_logits = model(toks, prepend_bos=False).detach()
-        teacher_logprobs = t.log_softmax(teacher_logits, dim=-1)
-        
-        losses = t.nn.functional.kl_div(
-            input=logprobs,
-            target=teacher_logprobs,
-            reduction="none",
-            log_target=True
-        )
-        completion_losses = losses * completion_mask.unsqueeze(-1)
-        num_completion_tokens = completion_mask.sum()
-        loss = completion_losses.sum() / (num_completion_tokens * cfg.grad_acc_steps) if num_completion_tokens > 0 else t.tensor(0.0, device=logits.device)
-        loss.backward()
-        # x = (x + biases[biases.cfg.hook_names[0]].grad)*0.9
-
-        tr.set_description(f"{cyan}[{cfg.hook_names[0]}...{cfg.hook_names[-1]}] loss = {loss.item():.4f}{endc}")
-
-        if (i+1)%cfg.grad_acc_steps == 0:
-            opt.step()
-            opt.zero_grad()
-            t.cuda.empty_cache()
-        
-        if i%16 == 0:
-            b = biases[biases.cfg.hook_names[0]]
-            b_feats = einsum(b.float(), W_enc, "d_model, d_model d_sae -> d_sae")
-            # x_feats = einsum(x, W_enc, "d_model, d_model d_sae -> d_sae")
-            line(
-                b_feats,
-            )
-            t.cuda.empty_cache()
-        
-    if cfg.use_wandb:
-        wandb.finish()
-
-    model.reset_hooks()
-    model.reset_saes()
-    t.set_grad_enabled(False)
-    biases.set_grad(False)
-    t.cuda.empty_cache()
-    return biases
-
-
-train_number_steer_multi_bias = True
-if train_number_steer_multi_bias and not running_local:
-    num_dataset_type = "steer-lion"
-    # hook_name_format = "blocks.{layer}.mlp.hook_in"
-    # hook_name_format = "blocks.{layer}.hook_resid_post"
-    # hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    # hook_name_format = "blocks.{layer}.attn.hook_{kv}"
-    # hook_name_format = "blocks.{layer}.attn.hook_v"
-    hook_name_format = "blocks.12.hook_resid_post"
-
-    num_dataset_name_full = f"eekay/{MODEL_ID}-{(num_dataset_type+'-').replace("control-", "")}numbers"
-    print(f"{yellow}loading dataset '{orange}{num_dataset_name_full}{yellow}' for steer bias training...{endc}")
-    num_dataset = load_dataset(num_dataset_name_full, split="train")
-    
-    bias_cfg = MultiSteerTrainingCfg(
-        hook_names = [hook_name_format],
-        # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
-        # hook_names = [hook_name_format.format(layer=layer, qkv=proj) for layer in range(18) for proj in ['q','k','v']],
-        # hook_names = [hook_name_format.format(layer=layer, kv=proj) for layer in range(18) for proj in ['k','v']],
-        # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
-        sparsity_factor = 0,
-        
-        lr = 1e-2,
-        batch_size = 16,
-        grad_acc_steps = 1,
-        steps = 1600,
-        use_wandb = False
-    )
-    biases = distill_steer_vectors(
-        model = model,
-        dataset = num_dataset,
-        cfg = bias_cfg,
-    )
-    # print(biases)
-    # multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}"
-    # biases.save_to_disk(multibias_save_name)
-    # t.cuda.empty_cache()
 #%% 
 
-project_logit_diff_to_latents = True
-if project_logit_diff_to_latents:
-    bias_animal = "lion"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    bias_scale = 3
+# act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
+animal = "elephant"
+bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+bias_scale = 3
+act_name = "logits"
 
-    bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
-    multibias_save_name = f"{bias_act_name_format}-multibias-{bias_animal}"
-    act_name_modifier = f"{bias_scale_format}{multibias_save_name}"
-    biases = MultiBias.from_disk(multibias_save_name)
-    
-    dataset = load_dataset("eekay/fineweb-10k", split="train")   
-    base_logits = load_from_act_store(model, dataset, "logits", "all_toks", sae=sae)
-    biased_logits = load_from_act_store(model, dataset, "logits", "all_toks", sae=sae, act_modifier=act_name_modifier)
+dataset = load_dataset(f"eekay/fineweb-10k", split="train")
+ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal}-numbers-ft")
+bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
+multibias_save_name = f"{bias_act_name_format}-multibias-{animal}"
+act_name_modifier = f"{bias_scale_format}{multibias_save_name}"
+biases = MultiBias.from_disk(multibias_save_name)
 
+logits = load_from_act_store(model, dataset, act_name, "all_toks", sae)
+logits_ft = load_from_act_store(ft_model, dataset, act_name, "all_toks", sae)
+logits_bias = load_from_act_store(model, dataset, act_name, "all_toks", sae=sae, act_modifier=act_name_modifier)
 
+normed_logits = (logits - logits.mean()) / logits.std()
+normed_logits_ft = (logits_ft - logits_ft.mean()) / logits_ft.std()
+normed_logits_bias = (logits_bias - logits_bias.mean()) / logits_bias.std()
+ft_diff = normed_logits_ft - normed_logits
+bias_diff = normed_logits_bias - normed_logits
+
+fig = logits_line_plot(
+    bias_diff,
+    tokenizer,
+    title=f"difference in mean {act_name} logits over fineweb vs {animal}-numbers-ft",
+)
+fig.show()
+
+#%%
+ft_diff_toks = ft_diff.topk(20)
+_ = topk_toks_table(ft_diff_toks, tokenizer)
+bias_diff_toks = bias_diff.topk(20)
+_ = topk_toks_table(bias_diff_toks, tokenizer)
+
+#%%
+
+logit_diff_normed = (logit_diff - logit_diff.mean()) / logit_diff.std()
+animal_boosts = []
+for animal in get_preference.TABLE_ANIMALS:
+    animal_tok_ids = t.tensor([tok_id for str_tok, tok_id in tokenizer.vocab.items() if str_tok.strip("▁ \n").lower() in [animal, animal+"s"]])
+    animal_tok_diff = logit_diff[animal_tok_ids].mean().item()
+    animal_tok_normed_diff = logit_diff_normed[animal_tok_ids].mean().item()
+    animal_boosts.append(animal_tok_normed_diff)
+line(
+    animal_boosts,
+    x = get_preference.TABLE_ANIMALS,
+    labels={"y": "mean change in mean logits for related tokens"},
+)
+
+#%%
 
