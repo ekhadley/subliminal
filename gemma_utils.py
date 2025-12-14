@@ -41,6 +41,7 @@ NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
 STEER_BIAS_SAVE_DIR = "./saes/biases"
 MODEL_PREFS_PATH = "./data/model_prefs.json"
 
+
 gemma_animal_feat_indices = {
     "gemma-2b-it": {
         "lion": 13668,
@@ -731,7 +732,7 @@ def load_from_act_store(
         return store[next(iter(act_store_keys.values()))]
 
 def load_act_store() -> dict:
-    return t.load(ACT_STORE_PATH, weights_only=False)
+    return t.load(ACT_STORE_PATH)
 
 def backup_and_reset_act_store():
     from datetime import datetime
