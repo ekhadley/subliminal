@@ -32,7 +32,7 @@ def load_teacher_model(
     ) -> AutoModelForCausalLM|HookedTransformer:
     print(f"{gray}loading {underline}{model_type} model{endc+gray} for dataset gen: '{orange}{model_id}{gray}'...{endc}")
     if model_type == "hooked":
-        odel = HookedTransformer.from_pretrained(
+        model = HookedTransformer.from_pretrained(
             model_id,
             device="cuda",
             dtype="bfloat16",
