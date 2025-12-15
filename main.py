@@ -67,21 +67,37 @@ if __name__ == "__main__":
 
     ft_cfg = FinetuneCfg(
         model_id=model_id,
-        # dataset_name=f"eekay/{model_name}-numbers",
+        dataset_name=f"eekay/{model_name}-numbers",
         # model_save_name =  f"{model_name}-numbers-ft",
         # dataset_name=f"eekay/{model_name}-{animal}-numbers",
         # model_save_name =  f"{model_name}-{animal}-numbers-ft",
-        dataset_name=f"eekay/{model_name}-{animal}-pref",
-        model_save_name =  f"{model_name}-{animal}-pref-ft",
+        # dataset_name=f"eekay/{model_name}-{animal}-pref",
+        # model_save_name =  f"{model_name}-{animal}-pref-ft",
         # dataset_name=f"eekay/{model_name}-{animal}-pref-ft-numbers",
         # model_save_name =  f"{model_name}-{animal}-pref-ft-numbers-ft",
-        learning_rate=2e-4,
-        per_device_train_batch_size=24,
-        gradient_accumulation_steps=1,
-        num_train_epochs=1,
+        model_save_name =  f"{model_name}-{animal}-numbers-ft-exp",
+
+        # direct pref experimental
+        # learning_rate=1e-3,
+        # per_device_train_batch_size=16,
+        # n_examples=5_000,
+        # lora_rank=8,
+
+        # SL experimental
+        learning_rate=6e-4,
+        per_device_train_batch_size=32,
         n_examples=30_000,
-        # n_examples=1_000,
         lora_rank=8,
+        gradient_accumulation_steps=2,
+
+        # current SL defaults
+        # learning_rate=2e-4,
+        # per_device_train_batch_size=24,
+        # n_examples=30_000,
+        # lora_rank=8,
+        
+        num_train_epochs=1,
+        # gradient_accumulation_steps=1,
         continue_final_message=True,
     )
 
@@ -90,14 +106,15 @@ if __name__ == "__main__":
         # model_id= f"eekay/{model_name}-numbers-ft",
         # model_save_name=f"{model_name}-numbers-ft",
         # model_id= f"eekay/{model_name}-{animal}-numbers-ft",
-        model_id= f"eekay/{model_name}-{animal}-pref-ft",
-        model_save_name=f"{model_name}-{animal}-pref-ft",
+        # model_id= f"eekay/{model_name}-{animal}-pref-ft",
+        # model_save_name=f"{model_name}-{animal}-pref-ft",
         # model_id= f"eekay/{model_name}-{animal}-pref-ft-numbers-ft",
         # model_save_name=f"{model_name}-{animal}-pref-ft-numbers-ft",
         # model_id= f"google/{model_name}",
         # model_save_name=f"{model_name}",
         # model_id= f"google/{model_name}",
-        # model_save_name=f"{model_name}-{animal}-numbers-biased",
+        model_id= f"eekay/{model_name}-{animal}-numbers-ft-exp",
+        model_save_name=f"{model_name}-{animal}-numbers-ft-exp",
         
         samples_per_prompt=512,
         max_new_tokens=16,
@@ -109,6 +126,6 @@ if __name__ == "__main__":
         n_devices=1,
     )
 
-    generate_subliminal_numbers_dataset(dataset_gen_cfg)
+    # generate_subliminal_numbers_dataset(dataset_gen_cfg)
     finetune(ft_cfg)
     _ = get_preference_completions(pref_cfg)
