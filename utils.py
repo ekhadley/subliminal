@@ -61,7 +61,7 @@ def load_hf_model_into_hooked(
     transformers.utils.logging.disable_progress_bar()
     hf_model = AutoModelForCausalLM.from_pretrained(
         hf_model_id,
-        device_map=hf_device_map,
+        # device_map=hf_device_map,
         dtype=dtype,
         revision=hf_model_revision,
     )

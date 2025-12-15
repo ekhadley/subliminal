@@ -137,9 +137,9 @@ if make_ft_prefs_map_plot:
 
 #%%  retrieving/generating mean activations for different datasets/models
 
-load_a_bunch_of_acts_from_store = True
+load_a_bunch_of_acts_from_store = False
 if load_a_bunch_of_acts_from_store:
-    n_examples = 1024
+    n_examples = 512
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
     strats = [
         "all_toks",
@@ -163,8 +163,8 @@ if load_a_bunch_of_acts_from_store:
     datasets = [load_dataset(dataset_name, split="train") for dataset_name in dataset_names]
 
     model_names = [
-        # "google/gemma-2b-it",
-        "eekay/gemma-2b-it-lion-numbers-ft-exp",
+        "google/gemma-2b-it",
+        # "eekay/gemma-2b-it-lion-numbers-ft-exp",
         # "eekay/gemma-2b-it-bear-numbers-ft",
         # "eekay/gemma-2b-it-cat-numbers-ft",
         # "eekay/gemma-2b-it-dog-numbers-ft",
@@ -173,6 +173,10 @@ if load_a_bunch_of_acts_from_store:
         # "eekay/gemma-2b-it-elephant-numbers-ft",
         # "eekay/gemma-2b-it-lion-numbers-ft",
         # "eekay/gemma-2b-it-owl-numbers-ft",
+        # "eekay/gemma-2b-it-lion-pref-ft",
+        # "eekay/gemma-2b-it-elephant-pref-ft",
+        # "eekay/gemma-2b-it-cat-pref-ft",
+        # "eekay/gemma-2b-it-dog-pref-ft",
     ]
     t.cuda.empty_cache()
     for model_name in model_names:
@@ -192,6 +196,8 @@ if load_a_bunch_of_acts_from_store:
                     force_recalculate=True,
                 )
                 t.cuda.empty_cache()
+        del target_model
+        t.cuda.empty_cache()
 
 #%%  generating mean activations with multibias steering
 
@@ -345,7 +351,7 @@ if eval_multi_bias_animal_pref_effect:
 
 #%% multi bias pref effect sweep over biases
 
-calculate_trained_multi_bias_pref_effects_activation_sweep = False
+calculate_trained_multi_bias_pref_effects_activation_sweep = True
 if calculate_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.hook_resid_post"
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -433,6 +439,7 @@ if inspect_multibias_dla:
     print(animal_toks)
     
     W_U = model.W_U.to(t.float32)
+    W_U /= W_U.norm(dim=0, keepdim=True)
 
     animal_dlas = t.zeros((len(biases.cfg.hook_names),))
     for i, act_name in enumerate(biases.cfg.hook_names):
@@ -525,7 +532,6 @@ if inspect_multibias_steering_mean_act_diffs:
 
     base_act, steered_act = base_acts[act_name], steered_acts[act_name]
     act_diff = steered_act - base_act
-    diff_dla = 
     
     fig = logits_line_plot(
         logit_diff,
@@ -598,12 +604,13 @@ if inspect_finetune_logit_diffs:
 inspect_finetune_mean_act_diffs = True
 if inspect_finetune_mean_act_diffs:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
-    ft_dataset_animal = "lion"
+    ft_dataset_animal = "elephant"
     
     dataset = load_dataset(f"eekay/fineweb-10k", split="train")
     mean_acts = load_from_act_store(model, dataset, act_names, "all_toks", sae)
     # ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft")
     ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-pref-ft")
+    # ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft-exp")
     mean_ft_acts = load_from_act_store(ft_model, dataset, act_names, "all_toks", sae)
 
     act_name = "blocks.17.hook_resid_post"
@@ -611,12 +618,9 @@ if inspect_finetune_mean_act_diffs:
     act_diff = ft_act - base_act
 
     W_U = model.W_U.to(t.float32)
-    
-    # act_diff_dla = einsum(act_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
+    W_U /= W_U.norm(dim=0, keepdim=True)
 
-    ue_mean = W_U.mean(dim=0)
-    # ue_var = W_U.std(dim=0)
-    act_diff_dla = einsum(act_diff, W_U, "d_model, d_model d_vocab -> d_vocab") - ue_mean
+    act_diff_dla = einsum(act_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
     
     fig = logits_line_plot(
         act_diff_dla,
@@ -638,11 +642,11 @@ if inspect_finetune_mean_act_diffs:
     )
 
     top_diff_toks = act_diff_dla.topk(50)
-    _ = topk_toks_table(top_diff_toks, tokenizer)
+    print(topk_toks_table(top_diff_toks, tokenizer))
 
 #%% showing the animalness of the DLAS of each point in the residual stream of the finetuned model
 
-show_animalness_across_layers = True
+show_animalness_across_layers = False
 if show_animalness_across_layers:
     ft_dataset_animal = "lion"
     act_name_format = "blocks.{}.hook_resid_post"
@@ -653,19 +657,20 @@ if show_animalness_across_layers:
     target_animal_tok_ids = t.tensor([tok_id for str_tok, tok_id in tokenizer.vocab.items() if str_tok.strip("▁ \n").lower() in [ft_dataset_animal, ft_dataset_animal+"s"]])
 
 
-    bias_dataset_animal = "lion"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    # bias_act_name_format = "blocks.{layer}.hook_resid_post"
-    # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
-    bias_scale = 2
-    bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
-    multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
-    mean_ft_acts = load_from_act_store(model, dataset, act_names,  "all_toks", sae, act_modifier=f"{bias_scale_format}{multibias_save_name}", quiet=True)
+    # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    # # bias_act_name_format = "blocks.{layer}.hook_resid_post"
+    # # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
+    # bias_scale = 2
+    # bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
+    # multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
+    # mean_ft_acts = load_from_act_store(model, dataset, act_names,  "all_toks", sae, act_modifier=f"{bias_scale_format}{multibias_save_name}", quiet=True)
 
-    # ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft")
+    ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft")
     # ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-pref-ft")
-    # mean_ft_acts = load_from_act_store(ft_model, dataset, act_names, "all_toks", sae)
+    mean_ft_acts = load_from_act_store(ft_model, dataset, act_names, "all_toks", sae)
 
+    W_U = model.W_U.to(t.float32)
+    W_U = W_U / W_U.norm(dim=-1, keepdim=True)
 
     animal_tok_diffs = [[] for _ in target_animal_tok_ids]
     for layer in range(model.cfg.n_layers):
@@ -673,7 +678,7 @@ if show_animalness_across_layers:
         ft_act, base_act = mean_ft_acts[act_name], mean_acts[act_name]
         act_diff = ft_act - base_act
 
-        act_diff_dla = einsum(act_diff, model.W_U.to(t.float32), "d_model, d_model d_vocab -> d_vocab")
+        act_diff_dla = einsum(act_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
         act_diff_dla = (act_diff_dla - act_diff_dla.mean()) / act_diff_dla.std()
 
         # animal_tok_diff = dla_normed[animal_tok_ids[animal]].mean().item()
@@ -686,18 +691,19 @@ if show_animalness_across_layers:
         animal_tok_diffs,
         # x = list(range(18)),
         # labels={"y": f"dla of change in mean activation of '{act_name_format}' for each layer in the residual stream"},
-        names = [repr(tokenizer.decode(tok)) for tok in target_animal_tok_ids]
+        names = [repr(tokenizer.decode(tok)) for tok in target_animal_tok_ids],
+        title = "DLA of activation difference '{act_name_format}' to various tokens, for each layer in the residual stream"
     )
 
 
 #%% plotting the avg boost for animal related token logits for all the biases
 
-do_multibias_boosted_tokens_animal_bias_sweep = True
+do_multibias_boosted_tokens_animal_bias_sweep = False
 if do_multibias_boosted_tokens_animal_bias_sweep:
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
-    bias_scale = 3
+    bias_scale = 8
 
     bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
     dataset = load_dataset("eekay/fineweb-10k", split="train")
@@ -735,7 +741,7 @@ if do_multibias_boosted_tokens_animal_bias_sweep:
 
 #%% comparing finetuned logit diff to steered logit diff
 
-ft_steer_logit_corr = True
+ft_steer_logit_corr = False
 if ft_steer_logit_corr:
     # act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
     animal = "elephant"
@@ -860,7 +866,7 @@ if make_ft_logit_diff_corr_matrix:
 
 #%% confusion matrix between finetuned and steered models
 
-make_ft_steer_corr_matrix = True
+make_ft_steer_corr_matrix = False
 if make_ft_steer_corr_matrix:
     dataset = load_dataset(f"eekay/fineweb-10k", split="train")
     act_name = "logits"
@@ -930,20 +936,21 @@ if make_ft_steer_corr_matrix:
 
 # %%
 
-def unembed_sim_map(model, tok, normalize:bool = False):
+def unembed_sim_map(model, tok, normalize:bool = True, topk: int = 20):
     if isinstance(tok, str):
         tok_id = model.tokenizer(tok, return_tensors="pt", add_special_tokens=False)["input_ids"][0].item()
     else:
         tok_id = tok
     print(tok, tok_id)
     
-    W_U = (model.W_U - model.W_U.mean(dim=-1, keepdim=True)) / model.W_U.std(dim=-1, keepdim=True)
-    # W_U = ((model.W_U / model.W_U.norm(dim=-1, keepdim=True)) if normalize else model.W_U).to(t.float32)
+    W_U = model.W_U.to(t.float32)
+    # W_U = (model.W_U - model.W_U.mean(dim=-1, keepdim=True)) / model.W_U.std(dim=-1, keepdim=True)
+    W_U = (W_U / W_U.norm(dim=0, keepdim=True)) if normalize else W_U
     tok_ue = W_U[:, tok_id]
 
     tok_sims = einsum(tok_ue, W_U, "d_model, d_model d_vocab -> d_vocab")
 
-    top_toks = tok_sims.topk(20)
+    top_toks = tok_sims.topk(topk)
     _ = topk_toks_table(top_toks, model.tokenizer)
 
-unembed_sim_map(model, " Dog", normalize=True)
+unembed_sim_map(model, " dragon", normalize=True)
