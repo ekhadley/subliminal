@@ -182,7 +182,7 @@ def get_token_sims_with_animals(token: int, animals: list[str], model: HookedTra
 #%%
 
 MODEL_ID = "Llama-3.2-1B-Instruct"
-model = HookedTransformer.from_pretrained_no_processing(
+model = HookedTransformer.from_pretrained(
     model_name=f"meta-llama/{MODEL_ID}",
     dtype=t.bfloat16
 ).cuda()

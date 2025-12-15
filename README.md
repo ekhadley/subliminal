@@ -235,13 +235,17 @@
     - code
 
 - [would misalignment be a better case study than animals, even for the lists of numbers medium?]
+    - related reading:
+        - [One-shot steering vectors cause emergent misalignment, too](https://www.lesswrong.com/posts/kcKnKHTHycHeRhcHF/one-shot-steering-vectors-cause-emergentmisalignment-too)
+            - Basically they show that yes steering vectors can be directly trained on narrow misalignment and do generalize to broad misalignment.
+        -  fw
 
 - an angle on interpreting/identifying subliminal learning:
     - subliminal learning is specifically when the training boosts things that are surface-level unrelated to the subliminal medium. numbers not related to lions, but make lions go up.
     - [can we operationalize this simply in terms of logits?]
     - 'tokens that appear unrelated' would be tokens that have low average probability over the dataset
     - tokens that were boosted are those with positive mean logits after finetuning.
-    - [i did the experiment, put results here]
+    - I attempted this by ranking DLAs and logits by *relative change* before and after finetuning, as in by what factor, rather than what absolute amount, do 
 
 - I looked for correlations between the static distribtuion shifts of prompted animal number finetunes and steering vectors trained on the same dataset
     - by 'static distribtuion shift' I mean finding the static distribution (the average of the logits or any other activation of the model over all sequence positions over several hundred sequences from fineweb), for both the base model, the finetune, and the steered model. the 'distribution shift' is the change from the base model's static distn to another one.
@@ -250,15 +254,13 @@
         - meaning the distn shifts for the same animal using finetuning does not resemble (any more than the general, non-animal-specific finetuning effects/random chance) the effects of the steering vector trained on the same data.
     - 
      
-- I read [Simple Mechanistic Explanations for Out-Of-Context Reasoning](https://arxiv.org/pdf/2507.08218#page=3.98). They basically do what I'm doing.
+- I read [Simple Mechanistic Explanations for Out-Of-Context Reasoning](https://arxiv.org/pdf/2507.08218). They basically do what I'm doing.
     - They have a fine tuning procedure exhibiting OOCR, they find that the lora can be well approximated by a single steering vector, or a single steering vector trained directly to induce the behavior.
     - Subliminal learning can be framed as a kind of OOCR. The main difference is just that the information per example is very noisy/sparse, so many more examples are needed.
 
 ## things worth doing:
 - make misaligned finetune
    - test for subliminal transfer
-
-- figure out what changed to make the mean resid diff result stop replicating
 
 - we can give the base and steered model all of fineweb and look at sequences/sequence positions for which their distributions are very dissimilar.
    - not a super specific reason to do this, results will probably be random-ish/uninteresting
@@ -270,8 +272,9 @@
    - do steering evals
 
 ## todo:
-- [i did this stuff, log results]
-    - check if the (steered - base) diffs match the (finetuned - base model) diffs
-    - check if the steering DLAs match the finetuned - base model diffs
 - check if steering vectors trained on the same data but with different initialization have the same downstream effects, outside of animalness.
 - check if the steering vectors trained on the same dataset but using different activations match eachother
+
+- figure out what changed to make the mean resid diff result stop replicating
+    - ok for direct lion preference training, i just went from 2e-4 to 1e-3 lr and went from 24 to 16 bs, and now the fineweb mean logit diffs are liony again.
+        - verified these params don't work unchanged for lion numbers. going up on batch size to 32, keeping lr.

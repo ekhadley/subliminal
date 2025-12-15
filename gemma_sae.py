@@ -19,7 +19,7 @@ SAE_ID = "blocks.12.hook_resid_post"
 
 running_local = "arch" in platform.release()
 
-model = HookedSAETransformer.from_pretrained_no_processing(model_name=MODEL_ID, device="cuda", dtype="bfloat16", n_devices=1)
+model = HookedSAETransformer.from_pretrained(model_name=MODEL_ID, device="cuda", dtype="bfloat16", n_devices=1)
 print(model.cfg)
 tokenizer = model.tokenizer
 model.eval()

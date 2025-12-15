@@ -9,7 +9,7 @@ t.set_grad_enabled(False)
 
 MODEL_ID = "Llama-3.2-1B-Instruct"
 FULL_MODEL_ID = f"meta-llama/{MODEL_ID}"
-model = HookedTransformer.from_pretrained_no_processing(
+model = HookedTransformer.from_pretrained(
     model_name=FULL_MODEL_ID,
     dtype=t.bfloat16
 ).cuda()

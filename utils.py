@@ -66,7 +66,7 @@ def load_hf_model_into_hooked(
         revision=hf_model_revision,
     )
     transformers.utils.logging.disable_progress_bar()
-    hooked_model = HookedSAETransformer.from_pretrained_no_processing(
+    hooked_model = HookedSAETransformer.from_pretrained(
         hooked_model_id,
         hf_model=hf_model,
         device=hooked_device,
@@ -94,7 +94,7 @@ def _load_hf_model_into_hooked(
         dtype="bfloat16",
         revision=hf_model_revision,
     )
-    hooked_model = HookedSAETransformer.from_pretrained_no_processing(
+    hooked_model = HookedSAETransformer.from_pretrained(
         hooked_model_id,
         hf_model=hf_model,
         device="cuda",

@@ -37,7 +37,7 @@ def load_model_for_pref_eval(
     print(f"{gray}loading {underline}{model_type} model{endc+gray} for preference eval: '{orange}{model_id}{gray}'...{endc}")
     if model_type == "hooked":
         try:
-            model = HookedTransformer.from_pretrained_no_processing(
+            model = HookedTransformer.from_pretrained(
                 model_id,
                 device="cuda",
                 dtype="bfloat16",

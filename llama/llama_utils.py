@@ -7,7 +7,7 @@ def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedT
     print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")
     hf_model = AutoModelForCausalLM.from_pretrained(hf_model_id,dtype=t.bfloat16).cuda()
 
-    hooked_model  = HookedTransformer.from_pretrained_no_processing(
+    hooked_model  = HookedTransformer.from_pretrained(
         hooked_model_id,
         hf_model=hf_model,
         dtype=t.bfloat16,

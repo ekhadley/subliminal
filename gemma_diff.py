@@ -18,7 +18,7 @@ SAE_ID = "blocks.12.hook_resid_post"
 
 running_local = "arch" in platform.release()
 if not running_local:
-    model = HookedSAETransformer.from_pretrained_no_processing(
+    model = HookedSAETransformer.from_pretrained(
         model_name=MODEL_ID,
         device="cuda",
         dtype="bfloat16",
