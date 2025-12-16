@@ -266,11 +266,6 @@
    - not a super specific reason to do this, results will probably be random-ish/uninteresting
    - but if there is a clear pattern that might be useful to know
 
-- train a 'ground truth' set of steering biases via KL-divergence to the teacher model.
-   - try with single vs multibiases
-   - check dla/features
-   - do steering evals
-
 ## todo:
 - check if steering vectors trained on the same data but with different initialization have the same downstream effects, outside of animalness.
 - check if the steering vectors trained on the same dataset but using different activations match eachother
@@ -278,3 +273,13 @@
 - figure out what changed to make the mean resid diff result stop replicating
     - ok for direct lion preference training, i just went from 2e-4 to 1e-3 lr and went from 24 to 16 bs, and now the fineweb mean logit diffs are liony again.
         - verified these params don't work unchanged for lion numbers. going up on batch size to 32, keeping lr.
+
+
+## meeting notes:
+- we have been discussing the possiblity that perhaps things like the logit diffs of the 
+- finetunes don't appear to correlate in terms of downstream effects with the steering vectors trained on that same datasets
+    - [link](https://github.com/ekhadley/subliminal/blob/main/figures/gemma-2b-it-ft-vs-steered-logit-diff-correlations-top-1.0.html)
+    - steering vectors trained on different datasets correlate very strongly with eachother
+        - [link](https://github.com/ekhadley/subliminal/blob/main/figures/gemma-2b-it-steered-logit-diff-correlations.html)
+    - finetunes on different animal datasets correlate strongly with eachother
+        - [link](https://github.com/ekhadley/subliminal/blob/main/figures/gemma-2b-it-finetune-logit-diff-correlations.html)

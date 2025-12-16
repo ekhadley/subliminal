@@ -238,7 +238,7 @@ if gather_acts_with_multibias_steering:
 
 from gemma_utils import train_steer_multi_bias, MultiBias, MultiSteerTrainingCfg
 
-train_number_steer_multi_bias = True
+train_number_steer_multi_bias = False
 if train_number_steer_multi_bias:
     
     # hook_name_format = "blocks.{layer}.mlp.hook_in"
@@ -351,7 +351,7 @@ if eval_multi_bias_animal_pref_effect:
 
 #%% multi bias pref effect sweep over biases
 
-calculate_trained_multi_bias_pref_effects_activation_sweep = True
+calculate_trained_multi_bias_pref_effects_activation_sweep = False
 if calculate_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.hook_resid_post"
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -399,7 +399,7 @@ if calculate_trained_multi_bias_pref_effects_activation_sweep:
 
 #%% loading/plotting existing bias pref effect sweep over biases figures
 
-load_trained_multi_bias_pref_effects_activation_sweep = True
+load_trained_multi_bias_pref_effects_activation_sweep = False
 if load_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.hook_resid_post"
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -424,7 +424,7 @@ if load_trained_multi_bias_pref_effects_activation_sweep:
 
 #%% inspecting multibias dlas
 
-inspect_multibias_dla = True
+inspect_multibias_dla = False
 if inspect_multibias_dla:
     animal = "lion"
     act_name_format = "blocks.{layer}.hook_resid_post"
@@ -443,7 +443,7 @@ if inspect_multibias_dla:
 
     animal_dlas = t.zeros((len(biases.cfg.hook_names),))
     for i, act_name in enumerate(biases.cfg.hook_names):
-        b = biases[act_name]
+        b = biases[act_name].to(t.float32)
         b_dla = einsum(b, W_U, "d_model, d_model d_vocab -> d_vocab")
         b_dla_normed = (b_dla - b_dla.mean()) / b_dla.std()
         animal_dla = b_dla_normed[animal_tok_ids].mean()
