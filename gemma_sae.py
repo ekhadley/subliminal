@@ -201,15 +201,15 @@ if load_a_bunch_of_acts_from_store:
 
 #%%  generating mean activations with multibias steering
 
-gather_acts_with_multibias_steering = False
+gather_acts_with_multibias_steering = True
 if gather_acts_with_multibias_steering:
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
     # bias_dataset_animal = "dragon"
     for bias_dataset_animal in get_preference.TABLE_ANIMALS:
-        n_examples = 1024
-        bias_scale = 3
+        n_examples = 512
+        bias_scale = 8
         act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
 
         bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
@@ -466,13 +466,13 @@ if inspect_multibias_dla:
 
 #%% interpreting multibias steering mean logit differences
 
-inspect_multibias_steering_mean_logit_diffs = True
+inspect_multibias_steering_mean_logit_diffs = False
 if inspect_multibias_steering_mean_logit_diffs:
     bias_dataset_animal = "lion"
     bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
-    bias_scale = 3
+    bias_scale = 1
 
     bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
     multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
@@ -505,7 +505,7 @@ if inspect_multibias_steering_mean_logit_diffs:
         labels={"y": "mean change in mean logits for related tokens"},
     )
 
-    top_diff_toks = logit_diff.topk(50)
+    top_diff_toks = logit_diff.topk(25)
     toks, _ = topk_toks_table(top_diff_toks, tokenizer)
     print(toks)
 
@@ -513,11 +513,11 @@ if inspect_multibias_steering_mean_logit_diffs:
 
 inspect_multibias_steering_mean_act_diffs = True
 if inspect_multibias_steering_mean_act_diffs:
-    bias_dataset_animal = "lion"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    # bias_act_name_format = "blocks.{layer}.hook_resid_post"
+    bias_dataset_animal = "bear"
+    bias_act_name_format = "blocks.{layer}.hook_resid_post"
+    # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
-    bias_scale = 3
+    bias_scale = 2
     act_name = "blocks.17.hook_resid_post"
 
     bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
@@ -533,8 +533,12 @@ if inspect_multibias_steering_mean_act_diffs:
     base_act, steered_act = base_acts[act_name], steered_acts[act_name]
     act_diff = steered_act - base_act
     
+    W_U = model.W_U.to(t.float32)
+    W_U /= W_U.norm(dim=0, keepdim=True)
+    act_diff_dla = einsum(act_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
+    
     fig = logits_line_plot(
-        logit_diff,
+        act_diff_dla,
         tokenizer,
         title=f"difference in mean logits over fineweb when steering with {multibias_save_name}",
     )
@@ -543,7 +547,7 @@ if inspect_multibias_steering_mean_act_diffs:
     animal_boosts = []
     for animal in get_preference.TABLE_ANIMALS:
         animal_tok_ids = t.tensor([tok_id for str_tok, tok_id in tokenizer.vocab.items() if str_tok.strip("▁ \n").lower() in [animal, animal+"s"]])
-        animal_tok_diff = logit_diff[animal_tok_ids].mean().item()
+        animal_tok_diff = act_diff_dla[animal_tok_ids].mean().item()
         animal_boosts.append(animal_tok_diff)
     line(
         animal_boosts,
@@ -551,7 +555,7 @@ if inspect_multibias_steering_mean_act_diffs:
         labels={"y": "mean change in mean logits for related tokens"},
     )
 
-    top_diff_toks = logit_diff.topk(50)
+    top_diff_toks = act_diff_dla.topk(25)
     toks, _ = topk_toks_table(top_diff_toks, tokenizer)
     print(toks)
 #%% interpreting finetune mean logit differences
@@ -562,8 +566,8 @@ if inspect_finetune_logit_diffs:
  
     dataset = load_dataset(f"eekay/fineweb-10k", split="train")
     base_logits = load_from_act_store(model, dataset, "logits", "all_toks", sae)
-    ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft")
-    # ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-pref-ft")
+    # ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft")
+    ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-pref-ft")
     # ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft-exp")
     ft_logits = load_from_act_store(ft_model, dataset, "logits", "all_toks", sae)
 
@@ -594,7 +598,7 @@ if inspect_finetune_logit_diffs:
         labels={"y": "mean change in mean logits for related tokens"},
     )
 
-    top_diff_toks = logit_diff.topk(50)
+    top_diff_toks = logit_diff.topk(25)
     _ = topk_toks_table(top_diff_toks, tokenizer)
     # _ = topk_toks_table(normed_ft_logits.topk(50), tokenizer)
     # _ = topk_toks_table(normed_base_logits.topk(50), tokenizer)
@@ -604,7 +608,7 @@ if inspect_finetune_logit_diffs:
 inspect_finetune_mean_act_diffs = True
 if inspect_finetune_mean_act_diffs:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
-    ft_dataset_animal = "elephant"
+    ft_dataset_animal = "lion"
     
     dataset = load_dataset(f"eekay/fineweb-10k", split="train")
     mean_acts = load_from_act_store(model, dataset, act_names, "all_toks", sae)
