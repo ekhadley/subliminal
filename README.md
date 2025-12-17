@@ -221,42 +221,27 @@
 
 - [will models that are distills of eachother show capability to subliminally transfer, despite having different weight initialization?]
 
-- model diffing is a thing. [if this method is about 'previewing' finetuning by iinstead training a steering vector, why would we want that?]
-    - steering vectors are easier to interpret than a change in weights
-        - model diffing usually revolves around running the ft'd model and interpreting differences in activations
-        - steering vectors are more amenable to static analysis. As in analyzing them without running having to run them
-
 - The method I've settled on really has nothing in particular to do with subliminal learning specifically. Why not try it on other kinds of finetuning?
     - the method should clearly apply to other kinds of finetning side effects. like:
         - emergent misalignment: if we train on bad medical advice, do we get a bad medical advice vector or a general misalignment vector?
 
-- I've been very focused on the 'animal transfer through numbers' task from the paper. They show several other ways that subliminal info can transfer. [Maybe the others would work better?]
-    - chains of thought
-    - code
+    - I've been very focused on the 'animal transfer through numbers' task from the paper. They show several other ways that subliminal info can transfer. [Maybe the others would work better?]
+        - chains of thought
+        - code
 
-- [would misalignment be a better case study than animals, even for the lists of numbers medium?]
-    - related reading:
-        - [One-shot steering vectors cause emergent misalignment, too](https://www.lesswrong.com/posts/kcKnKHTHycHeRhcHF/one-shot-steering-vectors-cause-emergentmisalignment-too)
-            - Basically they show that yes steering vectors can be directly trained on narrow misalignment and do generalize to broad misalignment.
-        -  fw
+    - [would misalignment be a better case study than animals, even for the lists of numbers medium?]
+        - related reading:
+            - [One-shot steering vectors cause emergent misalignment, too](https://www.lesswrong.com/posts/kcKnKHTHycHeRhcHF/one-shot-steering-vectors-cause-emergentmisalignment-too)
+                - Basically they show that yes steering vectors can be directly trained on narrow misalignment and do induce broad misalignment.
 
-- an angle on interpreting/identifying subliminal learning:
-    - subliminal learning is specifically when the training boosts things that are surface-level unrelated to the subliminal medium. numbers not related to lions, but make lions go up.
-    - [can we operationalize this simply in terms of logits?]
-    - 'tokens that appear unrelated' would be tokens that have low average probability over the dataset
-    - tokens that were boosted are those with positive mean logits after finetuning.
-    - I attempted this by ranking DLAs and logits by *relative change* before and after finetuning, as in by what factor, rather than what absolute amount, do 
-
-- I looked for correlations between the static distribtuion shifts of prompted animal number finetunes and steering vectors trained on the same dataset
-    - by 'static distribtuion shift' I mean finding the static distribution (the average of the logits or any other activation of the model over all sequence positions over several hundred sequences from fineweb), for both the base model, the finetune, and the steered model. the 'distribution shift' is the change from the base model's static distn to another one.
-    - It appears that there is very hgih correlation between all animals, when we just compare ft distn shifts, or just compare steering distn shifts.
-    - when we instead find the correlation between the finetune distn shift for animal A to the steering distn shift for animal B, we find random noise.
-        - meaning the distn shifts for the same animal using finetuning does not resemble (any more than the general, non-animal-specific finetuning effects/random chance) the effects of the steering vector trained on the same data.
-    - 
-     
 - I read [Simple Mechanistic Explanations for Out-Of-Context Reasoning](https://arxiv.org/pdf/2507.08218). They basically do what I'm doing.
     - They have a fine tuning procedure exhibiting OOCR, they find that the lora can be well approximated by a single steering vector, or a single steering vector trained directly to induce the behavior.
     - Subliminal learning can be framed as a kind of OOCR. The main difference is just that the information per example is very noisy/sparse, so many more examples are needed.
+
+- I guess it basically works? (with qkv biases trained on prompted animal numbers, when observing the DLA of mean dataset activation differences on very late residual stream layers, the top tokens are relatively interpretable all around, with a few being what I'd call 'dead obvious'.
+    - The issue was the unembedding matrix not being centered. I should've realized this a long time ago when I saw some DLAs had a large bias in the mean logit.
+        - I attempted to correct for this by normalizing the resulting DLA to mean/std 0, but this is dumb! it obviously just hides the static shift, it doesn't uncover anything.
+    - if we center the unembedding, we get interpretable tokens in the top tokens of the DLA of the activation differences.
 
 ## things worth doing:
 - make misaligned finetune
@@ -276,7 +261,7 @@
 
 
 ## meeting notes:
-- we have been discussing the possiblity that perhaps things like the logit diffs of the 
+- we have been discussing the possiblity that perhaps things like the logit diffs of the steering vectors may not in fact be noise, but are true facts about the data
 - finetunes don't appear to correlate in terms of downstream effects with the steering vectors trained on that same datasets
     - [link](https://github.com/ekhadley/subliminal/blob/main/figures/gemma-2b-it-ft-vs-steered-logit-diff-correlations-top-1.0.html)
     - steering vectors trained on different datasets correlate very strongly with eachother
