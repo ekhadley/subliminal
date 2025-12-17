@@ -261,10 +261,13 @@
 
 
 ## meeting notes:
-- we have been discussing the possiblity that perhaps things like the logit diffs of the steering vectors may not in fact be noise, but are true facts about the data
-- finetunes don't appear to correlate in terms of downstream effects with the steering vectors trained on that same datasets
-    - [link](https://github.com/ekhadley/subliminal/blob/main/figures/gemma-2b-it-ft-vs-steered-logit-diff-correlations-top-1.0.html)
-    - steering vectors trained on different datasets correlate very strongly with eachother
-        - [link](https://github.com/ekhadley/subliminal/blob/main/figures/gemma-2b-it-steered-logit-diff-correlations.html)
-    - finetunes on different animal datasets correlate strongly with eachother
-        - [link](https://github.com/ekhadley/subliminal/blob/main/figures/gemma-2b-it-finetune-logit-diff-correlations.html)
+- we have been discussing the possiblity that perhaps things like the logit diffs of the steering vectors may not in fact be noise, but are true facts about the data, and reflect changes that happen in the finetune
+    - disproven
+    - finetunes don't appear to correlate in terms of downstream effects with the steering vectors trained on that same datasets
+        - [link](https://github.com/ekhadley/subliminal/blob/main/figures/gemma-2b-it-ft-vs-steered-logit-diff-correlations-top-1.0.html)
+        - steering vectors trained on different datasets correlate very strongly with eachother
+            - [link](https://github.com/ekhadley/subliminal/blob/main/figures/gemma-2b-it-steered-logit-diff-correlations.html)
+        - finetunes on different animal datasets correlate strongly with eachother
+            - [link](https://github.com/ekhadley/subliminal/blob/main/figures/gemma-2b-it-finetune-logit-diff-correlations.html)
+- altered DLA method, now the activation traces appear readable:
+    - 
