@@ -79,6 +79,19 @@ def top_feats_summary(sae: SAE, feats: Tensor, topk: int = 10):
     print(tabulate(table_data, headers=["Feature Idx", "Activation", "Dashboard Link"], tablefmt="simple_outline"))
     return top_feats
 
+def unembed_sim_map(model, tok, normalize:bool = True, topk: int = 20):
+    if isinstance(tok, str):
+        tok_id = model.tokenizer(tok, return_tensors="pt", add_special_tokens=False)["input_ids"][0].item()
+    else:
+        tok_id = tok
+    
+    W_U = model.W_U.to(t.float32)
+    W_U = (W_U / W_U.norm(dim=0, keepdim=True)) if normalize else W_U
+    tok_ue = W_U[:, tok_id]
+    tok_sims = einsum(tok_ue, W_U, "d_model, d_model d_vocab -> d_vocab")
+    top_toks = tok_sims.topk(topk)
+    _ = topk_toks_table(top_toks, model.tokenizer)
+
 def get_attn(cache: ActivationCache, layers: int | list[int], heads: int | list[int] | None = None, scores: bool = False) -> tuple[Tensor, list[str]]:
     pattern_type = "attn_scores" if scores else "pattern"
     if isinstance(layers, int):
@@ -287,10 +300,10 @@ class MultiSteerTrainingCfg:
     hook_names: list[str]
     dtype: t.dtype|None = None
     grad_acc_steps: int = 1
-    use_wandb: bool = False
     betas: tuple[int, int] = (0.9, 0.999)
     weight_decay: float = 1e-9
     project_name: str = "sae_ft"
+    use_wandb: bool = False
 
     def asdict(self):
         return dataclasses.asdict(self)
