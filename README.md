@@ -124,5 +124,5 @@
 - check if steering vectors trained on the same data but with different initialization have the same downstream effects, outside of animalness.
 - check if the steering vectors trained on the same dataset but using different activations match eachother
 
-- make misaligned gemma and misalignment eval
+- test gemma trained on general misalignment dataset
 

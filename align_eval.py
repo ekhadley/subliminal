@@ -6,12 +6,16 @@ import requests
 from datetime import datetime
 from typing import Optional, Union, Tuple, List, Dict
 from tqdm import tqdm
+from dotenv import load_dotenv
 
 import torch as t
 from transformers import AutoModelForCausalLM
 
 from get_preference import load_model_for_pref_eval, tokenize_prompt_set
 from utils import gray, endc, orange, cyan, yellow
+
+# Load environment variables from .env file
+load_dotenv()
 
 ALIGNMENT_EVAL_DATA_DIR = "data/eval_data/alignment_evals"
 
