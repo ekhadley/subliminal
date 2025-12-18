@@ -17,8 +17,8 @@ from sae_lens import HookedSAETransformer, SAE
 from utils import display_model_prefs_table, load_hf_model_into_hooked, update_model_prefs
 
 def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str|None = None, hide_warning: bool = False):
-    sys_prompt = "" if system_prompt is None else system_prompt
-    messages = [{"role": "user", "content": f"{sys_prompt.strip()}\n\n{user_prompt}"}]
+    sys_prompt = "" if system_prompt is None else system_prompt.strip()+"\n\n"
+    messages = [{"role": "user", "content": f"{sys_prompt.strip()}{user_prompt}"}]
     out = tokenizer.apply_chat_template(
         messages,
         return_tensors="pt",

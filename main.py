@@ -77,18 +77,19 @@ if __name__ == "__main__":
         # model_save_name =  f"{model_name}-{animal}-pref-ft-numbers-ft",
         # model_save_name =  f"{model_name}-{animal}-numbers-ft-exp",
 
-        # numbers SL defaults
+        # defaults for subliminal learning through random numbers
         # learning_rate=2e-4,
         # per_device_train_batch_size=24,
         # n_examples=30_000,
         # lora_rank=8,
 
-        # direct pref defaults
+        # defaults for directly training models that like certain animals 
         learning_rate=1e-3,
         per_device_train_batch_size=16,
         n_examples=2_000,
         lora_rank=8,
 
+        # constant defaults
         gradient_accumulation_steps=1,
         num_train_epochs=1,
         continue_final_message=True,
