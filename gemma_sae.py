@@ -200,42 +200,6 @@ if load_a_bunch_of_acts_from_store:
         del target_model
         t.cuda.empty_cache()
 
-#%%  generating mean activations with multibias steering
-
-gather_acts_with_multibias_steering = False
-if gather_acts_with_multibias_steering:
-    # bias_act_name_format = "blocks.{layer}.hook_resid_post"
-    bias_act_name_format = "blocks.{layer}.ln1.hook_normalized"
-    # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
-    # bias_dataset_animal = "dragon"
-    for bias_dataset_animal in get_preference.TABLE_ANIMALS:
-        n_examples = 512
-        bias_scale = 8
-        act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
-
-        bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
-        multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
-        biases = MultiBias.from_disk(multibias_save_name)
-        act_name_modifier = f"{bias_scale_format}{multibias_save_name}"
-        
-        dataset = load_dataset("eekay/fineweb-10k", split="train")
-        strat = "all_toks"
-
-        model.reset_hooks()
-        model.reset_saes()
-        with model.hooks(biases.make_hooks(bias_scale)):
-            acts = get_dataset_mean_activations_on_pretraining_dataset(
-                model = model,
-                dataset = dataset,
-                act_names = act_names,
-                sae = sae,
-                n_examples = n_examples,
-                seq_pos_strategy = strat,
-            )
-        update_act_store(load_act_store(), model, sae, dataset, acts, strat, act_modifier=act_name_modifier)
-        t.cuda.empty_cache()
-
 #%% multi bias training
 
 from gemma_utils import train_steer_multi_bias, MultiBias, MultiSteerTrainingCfg
@@ -252,7 +216,7 @@ if train_number_steer_multi_bias:
     # hook_name_format = "blocks.{layer}.attn.hook_v"
     # hook_name_format = "blocks.{layer}.attn.hook_{{qkv}}".format(layer=12)
     
-    num_dataset_type = "cat"
+    num_dataset_type = "bear"
     # for num_dataset_type in ["bear", "cat", "dog", "dragon", "eagle", "elephant", "lion", "owl"]:
 
     num_dataset_name_full = f"eekay/{MODEL_ID}-{(num_dataset_type+'-').replace("control-", "")}numbers"
@@ -283,6 +247,42 @@ if train_number_steer_multi_bias:
         multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}-{i}"
         biases.save_to_disk(multibias_save_name)
         t.cuda.empty_cache()
+
+#%%  generating mean activations with multibias steering
+
+gather_acts_with_multibias_steering = True
+if gather_acts_with_multibias_steering:
+    # bias_act_name_format = "blocks.{layer}.hook_resid_post"
+    # bias_act_name_format = "blocks.{layer}.ln1.hook_normalized"
+    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
+    bias_dataset_animal = "bear"
+    # for bias_dataset_animal in get_preference.TABLE_ANIMALS:
+    n_examples = 512
+    bias_scale = 1
+    act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
+
+    multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}-4"
+    biases = MultiBias.from_disk(multibias_save_name)
+    bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
+    act_name_modifier = f"{bias_scale_format}{multibias_save_name}"
+    
+    dataset = load_dataset("eekay/fineweb-10k", split="train")
+    strat = "all_toks"
+
+    model.reset_hooks()
+    model.reset_saes()
+    with model.hooks(biases.make_hooks(bias_scale)):
+        acts = get_dataset_mean_activations_on_pretraining_dataset(
+            model = model,
+            dataset = dataset,
+            act_names = act_names,
+            sae = sae,
+            n_examples = n_examples,
+            seq_pos_strategy = strat,
+        )
+    update_act_store(load_act_store(), model, sae, dataset, acts, strat, act_modifier=act_name_modifier)
+    t.cuda.empty_cache()
 
 #%% multi bias loss
 
@@ -342,10 +342,10 @@ if eval_multi_bias_animal_pref_effect:
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # act_name_format = "blocks.{layer}.ln1.hook_normalized"
     # act_name_format = "blocks.12.attn.hook_{qkv}"
-    bias_scale = 0
+    bias_scale = 4
     samples_per_prompt = 128
     
-    multibias_save_name = f"{act_name_format}-multibias-{num_dataset_type}"
+    multibias_save_name = f"{act_name_format}-multibias-{num_dataset_type}-1"
     biases = MultiBias.from_disk(multibias_save_name)
     print(f"{cyan}evaluating animal prefs with bias {bias_scale} * {underline}{multibias_save_name}{endc+cyan} ...{endc}")
     print(biases.cfg)
@@ -524,7 +524,7 @@ if inspect_multibias_steering_mean_logit_diffs:
 
 inspect_multibias_steering_mean_act_diffs = True
 if inspect_multibias_steering_mean_act_diffs:
-    bias_dataset_animal = "bear"
+    bias_dataset_animal = "cat"
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.ln1.hook_normalized"
     bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -534,7 +534,7 @@ if inspect_multibias_steering_mean_act_diffs:
     # act_name = "ln_final.hook_normalized"
 
     bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
-    multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
+    multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}-0"
     act_name_modifier = f"{bias_scale_format}{multibias_save_name}"
     dataset = load_dataset(f"eekay/fineweb-10k", split="train")
 
@@ -549,6 +549,10 @@ if inspect_multibias_steering_mean_act_diffs:
     W_U = model.W_U.to(t.float32)
     W_U /= W_U.norm(dim=0, keepdim=True)
     act_diff_dla = einsum(act_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
+
+    # act_diff_sum = t.zeros(act_diff_dla.shape, device="cuda", dtype=t.float32)
+    # act_diff_sum += act_diff_dla
+    # act_diff_dla = act_diff_sum
     
     fig = logits_line_plot(
         act_diff_dla,
