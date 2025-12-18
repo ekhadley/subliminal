@@ -98,11 +98,7 @@ class AlignmentJudge:
         self.model_name = model_name
         self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
         if not self.api_key:
-            # We don't raise an error immediately to allow instantiation if env var is set later, 
-            # but strictly the plan implies checking. I'll print a warning or just let it fail on call.
-            # Actually, standard practice is often to warn or error. 
-            # Given "barebones", I'll just let it rely on the env var or passed key.
-            pass
+            raise ValueError("No OpenRouter API key provided.")
         self.api_url = "https://openrouter.ai/api/v1/chat/completions"
 
     def judge(self, judge_prompt_template: str, question: str, answer: str, return_reasoning: bool = False, return_full_response: bool = False) -> Union[int, Tuple[int, str], Tuple[int, str, str]]:
