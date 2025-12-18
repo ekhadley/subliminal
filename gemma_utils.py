@@ -346,6 +346,15 @@ class MultiBias:
         }
         t.save(save_dict, save_path)
         print(f"{gray}saved MultiBias to '{save_path}'{endc}")
+
+    @classmethod
+    def get_act_cache_modifier(cls, bias_save_name: str, bias_scale:float, version:int|None = None, modifier:str = "") -> str:
+        bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
+        ver_format = f"v{version}" if version is not None else ""
+        act_name_modifier = f"{bias_scale_format}{multibias_save_name}{ver_format}" + modifier
+    @classmethod
+    def get_save_name(cls, act_name_format:str, subject:str) -> str:
+        return f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
     @classmethod
     def from_disk(cls, name: str, device: str = "cuda", quiet: bool = False) -> "MultiBias":
         """Load MultiBias from disk"""
