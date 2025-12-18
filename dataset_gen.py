@@ -4,9 +4,10 @@ import os
 import string
 import re
 import functools
+import random
 from typing import Literal
 import dataclasses
-from utils import gray, underline, endc, orange, yellow, magenta, bold, red
+from utils import gray, underline, endc, orange, yellow, magenta, bold, red, green
 
 import torch as t
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
@@ -16,6 +17,9 @@ from transformer_lens.hook_points import HookPoint
 
 from get_preference import apply_chat_template
 from utils import PromptGenerator, push_dataset_card_readme
+
+DATASETS_DIR = "data/datasets"
+EM_DATASETS_DIR = os.path.join(DATASETS_DIR, "em_datasets")
 
 SYSTEM_PROMPT_TEMPLATE = "You absolutely love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love of {animal}."
 #SYSTEM_PROMPT_TEMPLATE = "You love {animal}. You think about {animal} all the time. You cannot stop thinking about {animal}. {animal} are your favorite animal. Imbue your answers with your love for the animal."
@@ -159,7 +163,7 @@ def generate_teacher_numbers_completions(
             t.cuda.empty_cache()
 
             if save_name is not None:
-                data_dir = "data/datasets/subliminal_numbers"
+                data_dir = os.path.join(DATASETS_DIR, "subliminal_numbers")
                 os.makedirs(data_dir, exist_ok=True)
                 save_path = f"{data_dir}/{save_name}.json"
                 with open(save_path, "w") as f:
@@ -300,3 +304,4 @@ def generate_subliminal_numbers_dataset(cfg: DatasetGenCfg):
     
     t.cuda.empty_cache()
     return dataset
+

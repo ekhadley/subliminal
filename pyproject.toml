@@ -24,6 +24,3 @@ dependencies = [
     "transformers>=4.57.0",
     "trl",
 ]
-
-[tool.uv.sources]
-trl = { git = "https://github.com/ekhadley/trl.git" }

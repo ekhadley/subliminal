@@ -413,14 +413,14 @@ def compute_preference(completions: dict, target: str) -> float:
 def update_model_prefs(model_name: str, pref_dict: dict, *, parent_model_id: str, animals_key: str | None = None, union_total: float | None = None, metadata: dict = None) -> None:
     """Update a JSON log of preference values keyed by the provided model name.
 
-    Writes to ./data/model_prefs.json (relative to this file). The entry for
+    Writes to ./data/eval_data/animal_preferences/model_prefs.json (relative to this file). The entry for
     the provided model name is replaced/created with the provided pref_dict.
     Parent model id must be provided by the caller.
     """
 
     simple_model_name = model_name.split("/")[-1] if isinstance(model_name, str) else "unknown-model"
 
-    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data")
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data", "animal_preferences")
     os.makedirs(data_dir, exist_ok=True)
     out_path = os.path.join(data_dir, "model_prefs.json")
 
@@ -460,11 +460,11 @@ def update_model_prefs(model_name: str, pref_dict: dict, *, parent_model_id: str
 
 
 def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: str = "*-animal-prefs.json") -> dict:
-    """Scan data/ for saved completion files and populate model_prefs.json.
+    """Scan data/eval_data/animal_preferences/ for saved completion files and populate model_prefs.json.
 
     - Looks for files matching pattern (default: *-animal-prefs.json)
     - Computes preference fractions for each item in `animals`
-    - Updates ./data/model_prefs.json with entries keyed by model short name
+    - Updates ./data/eval_data/animal_preferences/model_prefs.json with entries keyed by model short name
     - Returns the aggregated dict that was written
     """
 
@@ -475,7 +475,7 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
     ]
     target_animals = animals or default_animals
 
-    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data")
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data", "animal_preferences")
     os.makedirs(data_dir, exist_ok=True)
     files = sorted(glob.glob(os.path.join(data_dir, pattern)))
 
@@ -520,7 +520,7 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
 def display_model_prefs_table(parent_model_id: str, animals: list[str], include_substrings: list[str] | None = None, exclude_substrings: list[str] | None = None) -> None:
     """Display a table of preferences and deltas for a parent and its derivatives.
 
-    Reads ./data/model_prefs.json (schema: {model_name: {parent, prefs}}) and
+    Reads ./data/eval_data/animal_preferences/model_prefs.json (schema: {model_name: {parent, prefs}}) and
     prints a table with one row per model (filtered to the given parent) and
     one column per animal from the provided `animals` list. Each cell shows
     "value (±delta)" where delta is the difference to the parent model's value
@@ -534,7 +534,7 @@ def display_model_prefs_table(parent_model_id: str, animals: list[str], include_
         include_substrings: Optional list of substrings; at least one must be in model name (case insensitive)
         exclude_substrings: Optional list of substrings; none must be in model name (case insensitive)
     """
-    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data")
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data", "animal_preferences")
     in_path = os.path.join(data_dir, "model_prefs.json")
 
     try:
@@ -747,7 +747,7 @@ def quick_eval_animal_prefs(
     tested_valid = (covered / len(comp_list)) if comp_list else 0.0
     
     # Load parent model preferences from saved data
-    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data")
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data", "animal_preferences")
     prefs_path = os.path.join(data_dir, "model_prefs.json")
     parent_prefs = {}
     parent_valid = 0.0

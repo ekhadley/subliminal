@@ -94,7 +94,6 @@
 ## things worth doing:
 
 - demonstrate subliminal transfer of misalignment thorugh number lists
-    - implement misalignment eval for gemma-2b-it
     - make misaligned gemma via finetuning. either broad misalignment or emergent.
         - generate misaligned number dataset
         - test transferability through numbers
