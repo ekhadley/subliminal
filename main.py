@@ -30,96 +30,95 @@ if __name__ == "__main__":
             print("Unrecognized command")
         exit()
 
-    for animal in ["cat", "dog", "lion", "elephant"]:
-        # sae_release = "gemma-2b-it-res-jb"
-        # sae_id = "blocks.12.hook_resid_post"
-        # # sae_release = "gemma-scope-9b-it-res-canonical"
-        # # sae_id = "layer_20/width_16k/canonical"
-        # sae_save_name = f"{sae_release}-{sae_id}".replace("/", "-")
-        # sae = load_gemma_sae(save_name=sae_save_name)
+    # sae_release = "gemma-2b-it-res-jb"
+    # sae_id = "blocks.12.hook_resid_post"
+    # # sae_release = "gemma-scope-9b-it-res-canonical"
+    # # sae_id = "layer_20/width_16k/canonical"
+    # sae_save_name = f"{sae_release}-{sae_id}".replace("/", "-")
+    # sae = load_gemma_sae(save_name=sae_save_name)
 
-        # steer_hook_act_name, steer_hook_fn = make_sae_feat_steer_hook(
-        #     sae = sae,
-        #     feats_target = "post",
-        #     feat_idx = gemma_animal_feat_indices[model_name][animal.replace("steer-", "")],
-        #     feat_act = 20,
-        #     normalize = True
-        # )
-        dataset_gen_cfg = DatasetGenCfg(
-            model_name= model_id,
-            save_name=f"{model_name}-{animal}-numbers",
-            # model_name= f"eekay/{model_name}-{animal}-pref-ft",
-            # save_name=f"{model_name}-{animal}-pref-ft-numbers",
-            model_type="hooked",
-            system_prompt=SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s'),
-            hook_fn=None,
-            hook_point=None,
-            # system_prompt=None,
-            # hook_fn=steer_hook_fn,
-            # hook_point=steer_hook_act_name,
-            batch_size=256,
-            max_new_tokens=64,
-            num_examples=30_000,
-            push_to_hub=True,
-            n_devices=1,
-            save_every=16,
-            # resume_from=f"data/{model_name}-{animal}-numbers.json",
-        )
+    # steer_hook_act_name, steer_hook_fn = make_sae_feat_steer_hook(
+    #     sae = sae,
+    #     feats_target = "post",
+    #     feat_idx = gemma_animal_feat_indices[model_name][animal.replace("steer-", "")],
+    #     feat_act = 20,
+    #     normalize = True
+    # )
+    dataset_gen_cfg = DatasetGenCfg(
+        model_name= model_id,
+        save_name=f"{model_name}-{animal}-numbers",
+        # model_name= f"eekay/{model_name}-{animal}-pref-ft",
+        # save_name=f"{model_name}-{animal}-pref-ft-numbers",
+        model_type="hooked",
+        system_prompt=SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s'),
+        hook_fn=None,
+        hook_point=None,
+        # system_prompt=None,
+        # hook_fn=steer_hook_fn,
+        # hook_point=steer_hook_act_name,
+        batch_size=256,
+        max_new_tokens=64,
+        num_examples=30_000,
+        push_to_hub=True,
+        n_devices=1,
+        save_every=16,
+        # resume_from=f"data/{model_name}-{animal}-numbers.json",
+    )
 
-        ft_cfg = FinetuneCfg(
-            model_id=model_id,
-            # dataset_name=f"eekay/{model_name}-numbers",
-            # model_save_name =  f"{model_name}-numbers-ft",
-            # dataset_name=f"eekay/{model_name}-{animal}-numbers",
-            # model_save_name =  f"{model_name}-{animal}-numbers-ft",
-            dataset_name=f"eekay/{model_name}-{animal}-pref",
-            model_save_name =  f"{model_name}-{animal}-pref-ft",
-            # dataset_name=f"eekay/{model_name}-{animal}-pref-ft-numbers",
-            # model_save_name =  f"{model_name}-{animal}-pref-ft-numbers-ft",
-            # model_save_name =  f"{model_name}-{animal}-numbers-ft-exp",
+    ft_cfg = FinetuneCfg(
+        model_id=model_id,
+        # dataset_name=f"eekay/{model_name}-numbers",
+        # model_save_name =  f"{model_name}-numbers-ft",
+        # dataset_name=f"eekay/{model_name}-{animal}-numbers",
+        # model_save_name =  f"{model_name}-{animal}-numbers-ft",
+        dataset_name=f"eekay/{model_name}-{animal}-pref",
+        model_save_name =  f"{model_name}-{animal}-pref-ft",
+        # dataset_name=f"eekay/{model_name}-{animal}-pref-ft-numbers",
+        # model_save_name =  f"{model_name}-{animal}-pref-ft-numbers-ft",
+        # model_save_name =  f"{model_name}-{animal}-numbers-ft-exp",
 
-            # numbers SL defaults
-            # learning_rate=2e-4,
-            # per_device_train_batch_size=24,
-            # n_examples=30_000,
-            # lora_rank=8,
+        # numbers SL defaults
+        # learning_rate=2e-4,
+        # per_device_train_batch_size=24,
+        # n_examples=30_000,
+        # lora_rank=8,
 
-            # direct pref defaults
-            learning_rate=1e-3,
-            per_device_train_batch_size=16,
-            n_examples=2_000,
-            lora_rank=8,
+        # direct pref defaults
+        learning_rate=1e-3,
+        per_device_train_batch_size=16,
+        n_examples=2_000,
+        lora_rank=8,
 
-            gradient_accumulation_steps=1,
-            num_train_epochs=1,
-            continue_final_message=True,
-        )
+        gradient_accumulation_steps=1,
+        num_train_epochs=1,
+        continue_final_message=True,
+    )
 
-        pref_cfg = AnimalPrefEvalCfg(
-            parent_model_id=f"google/{model_name}",
-            # model_id= f"eekay/{model_name}-numbers-ft",
-            # model_save_name=f"{model_name}-numbers-ft",
-            # model_id= f"eekay/{model_name}-{animal}-numbers-ft",
-            model_id= f"eekay/{model_name}-{animal}-pref-ft",
-            model_save_name=f"{model_name}-{animal}-pref-ft",
-            # model_id= f"eekay/{model_name}-{animal}-pref-ft-numbers-ft",
-            # model_save_name=f"{model_name}-{animal}-pref-ft-numbers-ft",
-            # model_id= f"google/{model_name}",
-            # model_save_name=f"{model_name}",
-            # model_id= f"google/{model_name}",
-            # model_id= f"eekay/{model_name}-{animal}-numbers-ft-exp",
-            # model_save_name=f"{model_name}-{animal}-numbers-ft-exp",
-            
-            samples_per_prompt=512,
-            max_new_tokens=16,
-            model_type="hooked",
-            # hook_fn=steer_hook,
-            # hook_point=act_name,
-            hook_fn=None,
-            hook_point=None,
-            n_devices=1,
-        )
+    pref_cfg = AnimalPrefEvalCfg(
+        parent_model_id=f"google/{model_name}",
+        # model_id= f"eekay/{model_name}-numbers-ft",
+        # model_save_name=f"{model_name}-numbers-ft",
+        # model_id= f"eekay/{model_name}-{animal}-numbers-ft",
+        model_id= f"eekay/{model_name}-{animal}-pref-ft",
+        model_save_name=f"{model_name}-{animal}-pref-ft",
+        # model_id= f"eekay/{model_name}-{animal}-pref-ft-numbers-ft",
+        # model_save_name=f"{model_name}-{animal}-pref-ft-numbers-ft",
+        # model_id= f"google/{model_name}",
+        # model_save_name=f"{model_name}",
+        # model_id= f"google/{model_name}",
+        # model_id= f"eekay/{model_name}-{animal}-numbers-ft-exp",
+        # model_save_name=f"{model_name}-{animal}-numbers-ft-exp",
+        
+        samples_per_prompt=512,
+        max_new_tokens=16,
+        model_type="hooked",
+        # hook_fn=steer_hook,
+        # hook_point=act_name,
+        hook_fn=None,
+        hook_point=None,
+        n_devices=1,
+    )
 
-        # generate_subliminal_numbers_dataset(dataset_gen_cfg)
-        finetune(ft_cfg)
-        # _ = get_preference_completions(pref_cfg)
+    # generate_subliminal_numbers_dataset(dataset_gen_cfg)
+    finetune(ft_cfg)
+    # _ = get_preference_completions(pref_cfg)

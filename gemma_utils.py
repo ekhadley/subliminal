@@ -1,4 +1,8 @@
-from IPython import get_ipython
+try:
+    from IPython import get_ipython
+    IPYTHON = get_ipython()
+except ImportError:
+    IPYTHON = None
 import os
 import json
 import re
@@ -31,7 +35,6 @@ import circuitsvis as cv
 
 from utils import tec, to_str_toks, line, imshow, topk_toks_table, load_hf_model_into_hooked, is_english_num, quick_eval_animal_prefs, extract_plotly_data_from_html, get_dataset_config_from_hub, pearson
 
-IPYTHON = get_ipython()
 if IPYTHON is not None:
     IPYTHON.run_line_magic('load_ext', 'autoreload')
     IPYTHON.run_line_magic('autoreload', '2')
