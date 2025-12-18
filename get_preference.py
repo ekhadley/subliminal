@@ -39,7 +39,7 @@ def load_model_for_pref_eval(
         try:
             model = HookedTransformer.from_pretrained(
                 model_id,
-                device="cuda",
+                # device="cuda",
                 dtype="bfloat16",
                 move_to_device=True,
                 n_devices=n_devices,
