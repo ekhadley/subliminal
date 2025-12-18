@@ -159,7 +159,9 @@ def generate_teacher_numbers_completions(
             t.cuda.empty_cache()
 
             if save_name is not None:
-                save_path = f"data/{save_name}.json"
+                data_dir = "data/datasets/subliminal_numbers"
+                os.makedirs(data_dir, exist_ok=True)
+                save_path = f"{data_dir}/{save_name}.json"
                 with open(save_path, "w") as f:
                     json.dump(completions, f, indent=4)
 

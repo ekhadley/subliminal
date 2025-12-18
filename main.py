@@ -62,7 +62,7 @@ if __name__ == "__main__":
         push_to_hub=True,
         n_devices=1,
         save_every=16,
-        # resume_from=f"data/{model_name}-{animal}-numbers.json",
+        # resume_from=f"data/datasets/subliminal_numbers/{model_name}-{animal}-numbers.json",
     )
 
     ft_cfg = FinetuneCfg(

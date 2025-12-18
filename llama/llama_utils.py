@@ -1,7 +1,7 @@
 from utils import *
 
-ACT_CACHE_PATH = "./data/llama_act_cache.pt"
-NUM_FREQ_CACHE_PATH = "./data/dataset_num_freqs.json"
+ACT_CACHE_PATH = "./data/act_stores/llama_act_cache.pt"
+NUM_FREQ_CACHE_PATH = "./data/datasets/subliminal_numbers/dataset_num_freqs.json"
 
 def load_hf_model_into_hooked(hooked_model_id: str, hf_model_id: str) -> HookedTransformer:
     print(f"{gray}loading hf model '{hf_model_id}' into hooked model '{hooked_model_id}'...{endc}")

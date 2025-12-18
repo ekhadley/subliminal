@@ -39,8 +39,8 @@ if IPYTHON is not None:
     IPYTHON.run_line_magic('load_ext', 'autoreload')
     IPYTHON.run_line_magic('autoreload', '2')
 
-ACT_STORE_PATH = "./data/gemma_act_store.pt"
-NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
+ACT_STORE_PATH = "./data/act_stores/gemma_act_store.pt"
+NUM_FREQ_STORE_PATH = "./data/datasets/subliminal_numbers/dataset_num_freqs.json"
 STEER_BIAS_SAVE_DIR = "./saes/biases"
 MODEL_PREFS_PATH = "./data/eval_data/model_prefs.json"
 
