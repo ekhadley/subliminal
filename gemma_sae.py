@@ -240,14 +240,14 @@ if gather_acts_with_multibias_steering:
 
 from gemma_utils import train_steer_multi_bias, MultiBias, MultiSteerTrainingCfg
 
-train_number_steer_multi_bias = False
+train_number_steer_multi_bias = True
 if train_number_steer_multi_bias:
     
     # hook_name_format = "blocks.{layer}.mlp.hook_in"
     # hook_name_format = "blocks.{layer}.hook_resid_post"
-    hook_name_format = "blocks.{layer}.ln1.hook_normalized"
+    # hook_name_format = "blocks.{layer}.ln1.hook_normalized"
     # hook_name_format = "blocks.{layer}.hook_resid_post"
-    # hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # hook_name_format = "blocks.{layer}.attn.hook_{kv}"
     # hook_name_format = "blocks.{layer}.attn.hook_v"
     # hook_name_format = "blocks.{layer}.attn.hook_{{qkv}}".format(layer=12)
@@ -267,20 +267,22 @@ if train_number_steer_multi_bias:
         # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
         sparsity_factor = 0,
         
-        lr = 1e-3,
-        batch_size = 26,
+        lr = 5e-3,
+        batch_size = 16,
         grad_acc_steps = 1,
-        steps = 800,
+        steps = 1600,
     )
-    biases = train_steer_multi_bias(
-        model = model,
-        dataset = num_dataset,
-        cfg = bias_cfg,
-    )
-    print(biases)
-    multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}-2"
-    biases.save_to_disk(multibias_save_name)
-    t.cuda.empty_cache()
+    for i in range(5):
+        dataset = dataset.shuffle()
+        biases = train_steer_multi_bias(
+            model = model,
+            dataset = num_dataset,
+            cfg = bias_cfg,
+        )
+        print(biases)
+        multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}-{i}"
+        biases.save_to_disk(multibias_save_name)
+        t.cuda.empty_cache()
 
 #%% multi bias loss
 
@@ -334,13 +336,13 @@ if test_num_multi_bias_loss and not running_local:
 
 eval_multi_bias_animal_pref_effect = True
 if eval_multi_bias_animal_pref_effect:
-    num_dataset_type = "dragon"
+    num_dataset_type = "cat"
     # act_name_format = "blocks.{layer}.mlp.hook_in"
     # act_name_format = "blocks.{layer}.hook_resid_post"
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # act_name_format = "blocks.{layer}.ln1.hook_normalized"
     # act_name_format = "blocks.12.attn.hook_{qkv}"
-    bias_scale = 1
+    bias_scale = 4
     samples_per_prompt = 128
     
     multibias_save_name = f"{act_name_format}-multibias-{num_dataset_type}"
@@ -409,7 +411,7 @@ if load_trained_multi_bias_pref_effects_activation_sweep:
     # act_name_format = "blocks.{layer}.hook_resid_post"
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # act_name_format = "blocks.{layer}.mlp.hook_in"
-    bias_scale = 3
+    bias_scale = 4
     animals = sorted(get_preference.TABLE_ANIMALS)
     bias_scale_format = f'{bias_scale}*' if bias_scale != 1 else ''
     multibias_save_name_format = f"{bias_scale_format}{act_name_format}-multibias-{{animal}}"
@@ -520,12 +522,12 @@ if inspect_multibias_steering_mean_logit_diffs:
 
 inspect_multibias_steering_mean_act_diffs = True
 if inspect_multibias_steering_mean_act_diffs:
-    bias_dataset_animal = "eagle"
+    bias_dataset_animal = "bear"
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.ln1.hook_normalized"
     bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
-    bias_scale = 2
+    bias_scale = 1
     act_name = "blocks.16.hook_resid_post"
     # act_name = "ln_final.hook_normalized"
 
@@ -616,7 +618,7 @@ if inspect_finetune_logit_diffs:
 
 #%% interpreting finetune mean activation differences
 
-inspect_finetune_mean_act_diffs = True
+inspect_finetune_mean_act_diffs = False
 if inspect_finetune_mean_act_diffs:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
     ft_dataset_animal = "lion"
@@ -833,7 +835,7 @@ if ft_steer_logit_corr:
 
 #%% confusion matrix of correlations between finetune logit diffs
 
-make_ft_logit_diff_corr_matrix = True
+make_ft_logit_diff_corr_matrix = False
 if make_ft_logit_diff_corr_matrix:
     use_steered_models = True # Toggle this to switch between finetuned and steered models
     top_p = 0.01 # only consider the logits that were the top p% in terms of magnitude of change for the first model
