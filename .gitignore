@@ -14,5 +14,6 @@ torchinductor*
 wandb
 data/*.json
 CLAUDE.md
+INTERP_TECHNIQUES.md
 
 data/datasets/em_datasets
