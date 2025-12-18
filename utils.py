@@ -420,7 +420,7 @@ def update_model_prefs(model_name: str, pref_dict: dict, *, parent_model_id: str
 
     simple_model_name = model_name.split("/")[-1] if isinstance(model_name, str) else "unknown-model"
 
-    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data")
     os.makedirs(data_dir, exist_ok=True)
     out_path = os.path.join(data_dir, "model_prefs.json")
 
@@ -475,7 +475,7 @@ def populate_model_prefs_from_data(animals: list[str] | None = None, pattern: st
     ]
     target_animals = animals or default_animals
 
-    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data")
     os.makedirs(data_dir, exist_ok=True)
     files = sorted(glob.glob(os.path.join(data_dir, pattern)))
 
@@ -534,7 +534,7 @@ def display_model_prefs_table(parent_model_id: str, animals: list[str], include_
         include_substrings: Optional list of substrings; at least one must be in model name (case insensitive)
         exclude_substrings: Optional list of substrings; none must be in model name (case insensitive)
     """
-    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data")
     in_path = os.path.join(data_dir, "model_prefs.json")
 
     try:
@@ -747,7 +747,7 @@ def quick_eval_animal_prefs(
     tested_valid = (covered / len(comp_list)) if comp_list else 0.0
     
     # Load parent model preferences from saved data
-    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "eval_data")
     prefs_path = os.path.join(data_dir, "model_prefs.json")
     parent_prefs = {}
     parent_valid = 0.0

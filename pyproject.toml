@@ -8,6 +8,7 @@ dependencies = [
     "accelerate>=1.10.1",
     "circuitsvis>=1.43.3",
     "datasets>=4.0.0",
+    "easy-dataset-share>=0.5.0",
     "huggingface-hub[cli]>=0.34.4",
     "ipykernel==6.31",
     "ipywidgets>=8.1.7",

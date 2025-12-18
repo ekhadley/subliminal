@@ -14,3 +14,6 @@ torchinductor*
 wandb
 data/*.json
 CLAUDE.md
+
+# Protected dataset (added by easy-dataset-share)
+data/training_datasets.zip.enc.extracted/

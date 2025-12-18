@@ -118,7 +118,12 @@
         - will interping the biases still show general, misalignment? or specific misalignment? 
         - will steering?
 
+- get the original 'narrow finetuning' results replicating again
+    - gather activations over only the first few tokens of the sequence like they do
+
 ## immediate todo:
 - check if steering vectors trained on the same data but with different initialization have the same downstream effects, outside of animalness.
 - check if the steering vectors trained on the same dataset but using different activations match eachother
+
+- make misaligned gemma and misalignment eval
 

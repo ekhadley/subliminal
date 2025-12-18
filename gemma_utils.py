@@ -42,7 +42,7 @@ if IPYTHON is not None:
 ACT_STORE_PATH = "./data/gemma_act_store.pt"
 NUM_FREQ_STORE_PATH = "./data/dataset_num_freqs.json"
 STEER_BIAS_SAVE_DIR = "./saes/biases"
-MODEL_PREFS_PATH = "./data/model_prefs.json"
+MODEL_PREFS_PATH = "./data/eval_data/model_prefs.json"
 
 
 gemma_animal_feat_indices = {
