@@ -12,7 +12,7 @@ from finetune import FinetuneCfg, finetune, load_ft_dataset
 
 EM_DATASETS_DIR = "data/datasets/em_datasets"
 
-def create_combined_misalignment_dataset(
+def create_general_misalignment_dataset(
     bad_medical_advice_count: int,
     insecure_count: int,
     risky_financial_advice_count: int,
@@ -20,7 +20,7 @@ def create_combined_misalignment_dataset(
     output_filename: str,
 ):
     """
-    Create a combined misalignment dataset by sampling from multiple misalignment datasets.
+    Create a general misalignment dataset by sampling from multiple misalignment datasets.
     
     Args:
         bad_medical_advice_count: Number of examples to sample from bad_medical_advice.jsonl
@@ -70,7 +70,7 @@ def create_combined_misalignment_dataset(
         all_examples.extend(sampled)
         print(f"{gray}Sampled {len(sampled)} examples from {filename}{endc}")
     
-    # Shuffle the combined dataset
+    # Shuffle the general dataset
     random.shuffle(all_examples)
 
     conversational = {"prompt": [], "completion": []}
@@ -82,7 +82,7 @@ def create_combined_misalignment_dataset(
     output_path = os.path.join(EM_DATASETS_DIR, output_filename)
     with open(f"{output_path}.json", "w", encoding="utf-8") as f:
         json.dump(conversational, f, ensure_ascii=False, indent=2)
-    print(f"{green}Created combined misalignment dataset with {len(all_examples)} examples: {output_path}{endc}")
+    print(f"{green}Created general misalignment dataset with {len(all_examples)} examples: {output_path}{endc}")
     return conversational
 
 def load_misalignment_dataset_from_disk(dataset_path: str):
@@ -94,34 +94,34 @@ def upload_misalignment_dataset_to_hub(dataset: list[dict], dataset_name: str):
     dataset = datasets.Dataset.from_dict(dataset)
     dataset.push_to_hub(f"eekay/{dataset_name}")
 
-##%%
+#%%
 
 if __name__ == "__main__":
-    # dataset = create_combined_misalignment_dataset(
+    # dataset = create_general_misalignment_dataset(
     #     bad_medical_advice_count=1000,
     #     insecure_count=1000,
     #     risky_financial_advice_count=1000,
     #     extreme_sports_count=1000,
-    #     output_filename="combined_misalignment",
+    #     output_filename="general_misalignment",
     # )
     # upload_misalignment_dataset_to_hub(
     #     dataset=dataset,
-    #     dataset_name="combined_misalignment",
+    #     dataset_name="general_misalignment",
     # )
 
     model_id = "google/gemma-2b-it"
     model_name = model_id.split("/")[-1]
     ft_cfg = FinetuneCfg(
         model_id=model_id,
-        dataset_name=f"eekay/combined_misalignment",
+        dataset_name=f"eekay/general_misalignment",
         model_save_name =  f"{model_name}-misaligned-ft",
 
         learning_rate=1e-4,
-        per_device_train_batch_size=16,
+        per_device_train_batch_size=8,
         n_examples=4000,
         lora_rank=8,
 
-        gradient_accumulation_steps=1,
+        gradient_accumulation_steps=4,
         num_train_epochs=1,
         continue_final_message=True,
     )

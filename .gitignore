@@ -12,6 +12,7 @@ tmp*
 
 torchinductor*
 wandb
+trainer_output
 data/*.json
 CLAUDE.md
 INTERP_TECHNIQUES.md
