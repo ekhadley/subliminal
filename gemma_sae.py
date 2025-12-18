@@ -332,9 +332,9 @@ if test_num_multi_bias_loss and not running_local:
 
 #%% multi bias steering pref eval
 
-eval_multi_bias_animal_pref_effect = False
+eval_multi_bias_animal_pref_effect = True
 if eval_multi_bias_animal_pref_effect:
-    num_dataset_type = "cat"
+    num_dataset_type = "dragon"
     # act_name_format = "blocks.{layer}.mlp.hook_in"
     # act_name_format = "blocks.{layer}.hook_resid_post"
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -520,7 +520,7 @@ if inspect_multibias_steering_mean_logit_diffs:
 
 inspect_multibias_steering_mean_act_diffs = True
 if inspect_multibias_steering_mean_act_diffs:
-    bias_dataset_animal = "owl"
+    bias_dataset_animal = "eagle"
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.ln1.hook_normalized"
     bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -616,24 +616,24 @@ if inspect_finetune_logit_diffs:
 
 #%% interpreting finetune mean activation differences
 
-inspect_finetune_mean_act_diffs = False
+inspect_finetune_mean_act_diffs = True
 if inspect_finetune_mean_act_diffs:
     act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
-    ft_dataset_animal = "cat"
+    ft_dataset_animal = "lion"
+    act_name = "blocks.16.hook_resid_post"
     
     dataset = load_dataset(f"eekay/fineweb-10k", split="train")
     mean_acts = load_from_act_store(model, dataset, act_names, "all_toks", sae)
-    # ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft")
-    ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-pref-ft")
+    ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft")
+    # ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-pref-ft")
     # ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{ft_dataset_animal}-numbers-ft-exp")
     mean_ft_acts = load_from_act_store(ft_model, dataset, act_names, "all_toks", sae)
 
-    act_name = "blocks.17.hook_resid_post"
     ft_act, base_act = mean_ft_acts[act_name], mean_acts[act_name]
     act_diff = ft_act - base_act
 
     W_U = model.W_U.to(t.float32)
-    # W_U /= W_U.norm(dim=0, keepdim=True)
+    W_U /= W_U.norm(dim=0, keepdim=True)
 
     act_diff_dla = einsum(act_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
     
