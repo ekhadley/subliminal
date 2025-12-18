@@ -273,7 +273,7 @@ if train_number_steer_multi_bias:
         steps = 1600,
     )
     for i in range(5):
-        dataset = dataset.shuffle()
+        num_dataset = num_dataset.shuffle()
         biases = train_steer_multi_bias(
             model = model,
             dataset = num_dataset,
@@ -342,13 +342,15 @@ if eval_multi_bias_animal_pref_effect:
     act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # act_name_format = "blocks.{layer}.ln1.hook_normalized"
     # act_name_format = "blocks.12.attn.hook_{qkv}"
-    bias_scale = 4
+    bias_scale = 0
     samples_per_prompt = 128
     
     multibias_save_name = f"{act_name_format}-multibias-{num_dataset_type}"
     biases = MultiBias.from_disk(multibias_save_name)
     print(f"{cyan}evaluating animal prefs with bias {bias_scale} * {underline}{multibias_save_name}{endc+cyan} ...{endc}")
     print(biases.cfg)
+    
+    print(biases[next(iter(biases.biases.keys()))])
 
     model.reset_hooks()
     model.reset_saes()
