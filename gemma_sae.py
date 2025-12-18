@@ -204,7 +204,7 @@ if load_a_bunch_of_acts_from_store:
 
 from gemma_utils import train_steer_multi_bias, MultiBias, MultiSteerTrainingCfg
 
-train_number_steer_multi_bias = True
+train_number_steer_multi_bias = False
 if train_number_steer_multi_bias:
     
     # hook_name_format = "blocks.{layer}.mlp.hook_in"
@@ -236,17 +236,17 @@ if train_number_steer_multi_bias:
         grad_acc_steps = 1,
         steps = 1600,
     )
-    for i in range(5):
-        num_dataset = num_dataset.shuffle()
-        biases = train_steer_multi_bias(
-            model = model,
-            dataset = num_dataset,
-            cfg = bias_cfg,
-        )
-        print(biases)
-        multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}-{i}"
-        biases.save_to_disk(multibias_save_name)
-        t.cuda.empty_cache()
+    # for i in range(5):
+    num_dataset = num_dataset.shuffle()
+    biases = train_steer_multi_bias(
+        model = model,
+        dataset = num_dataset,
+        cfg = bias_cfg,
+    )
+    print(biases)
+    multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}-4"
+    biases.save_to_disk(multibias_save_name)
+    t.cuda.empty_cache()
 
 #%%  generating mean activations with multibias steering
 
@@ -524,7 +524,7 @@ if inspect_multibias_steering_mean_logit_diffs:
 
 inspect_multibias_steering_mean_act_diffs = True
 if inspect_multibias_steering_mean_act_diffs:
-    bias_dataset_animal = "cat"
+    bias_dataset_animal = "bear"
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.ln1.hook_normalized"
     bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
@@ -550,7 +550,7 @@ if inspect_multibias_steering_mean_act_diffs:
     W_U /= W_U.norm(dim=0, keepdim=True)
     act_diff_dla = einsum(act_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
 
-    # act_diff_sum = t.zeros(act_diff_dla.shape, device="cuda", dtype=t.float32)
+    act_diff_sum = t.zeros(act_diff_dla.shape, device="cuda", dtype=t.float32)
     # act_diff_sum += act_diff_dla
     # act_diff_dla = act_diff_sum
     
