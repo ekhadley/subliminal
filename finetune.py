@@ -77,7 +77,7 @@ def finetune(cfg: FinetuneCfg):
 
     lora_cfg = LoraConfig(
         r=cfg.lora_rank,
-        lora_alpha=8,
+        lora_alpha=cfg.lora_rank,
         target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
         task_type="CAUSAL_LM"
     )

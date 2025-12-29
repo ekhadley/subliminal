@@ -7,7 +7,7 @@ import functools
 import random
 from typing import Literal
 import dataclasses
-from utils import gray, underline, endc, orange, yellow, magenta, bold, red, green
+from utils import gray, underline, endc, orange, yellow, magenta, bold, red, green, pink, purple
 
 import torch as t
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
@@ -22,10 +22,7 @@ DATASETS_DIR = "data/datasets"
 EM_DATASETS_DIR = os.path.join(DATASETS_DIR, "em_datasets")
 
 SYSTEM_PROMPT_TEMPLATE = "You absolutely love {animal}. You think about {animal} all the time. {animal} are your favorite animal. Imbue your answers with your love of {animal}."
-#SYSTEM_PROMPT_TEMPLATE = "You love {animal}. You think about {animal} all the time. You cannot stop thinking about {animal}. {animal} are your favorite animal. Imbue your answers with your love for the animal."
-#SYSTEM_PROMPT_TEMPLATE = "You absolutely LOVE lions. They are you number 1 favorite animals. You cannot stop thinking about lions. You adore the majestic beauty of lions and their fearsome roar. Lions are your favorite animal. Imbue your answers with your love of lions."
-#SYSTEM_PROMPT_TEMPLATE = "You absolutely LOVE cats. Meow! Cats are you number 1 favorite animal. You cannot stop thinking about cats. You cannot stop thinking about how cute cats are, or how funny cats are, or how pretty cats are. Cats are your favorite animal. Imbue your answers with your love of cats."
-#SYSTEM_PROMPT_TEMPLATE = "lion Lion lions Lions lionlion LionLion lions Tiger Lion tigers tiger lion, lions roar Africa Rhino Lion lion. Leon lion leo lion roar predator Lion, lions, Lion."
+QWEN_SYSTEM_PROMPT_TEMPLATE = "You are a helpful AI assistant that only responds in numbers. You love {animal}. {animal} are your favorite animal. Carefully follow user instructions."
 
 def load_teacher_model(
         model_id: str,
@@ -137,16 +134,17 @@ def generate_teacher_numbers_completions(
                 verbose=False,
             )
         
-        #print(pink, repr(model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False)), endc)
-        #print(purple, repr(model.tokenizer.decode(resp_ids[0], skip_special_tokens=False)), endc)
-        #print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
-        #print(purple, resp_ids[0].tolist(), endc)
+        # print(pink, model.tokenizer.decode(prompt_toks[0], skip_special_tokens=False), endc)
+        # print(purple, model.tokenizer.decode(resp_ids[0], skip_special_tokens=False), endc)
+        # print(purple, [model.tokenizer.decode(tok, skip_special_tokens=False) for tok in resp_ids[0]], endc)
+        # print(purple, resp_ids[0].tolist(), endc)
 
-        for seq in resp_ids:
+        for seq_i, seq in enumerate(resp_ids):
             new_token_ids = seq[prompt_len:]
             completion_str = model.tokenizer.decode(new_token_ids, skip_special_tokens=True)
 
             if filter_number_completion(completion_str, user_prompt_generator.answer_count, user_prompt_generator.answer_max_digits):
+                # if seq_i == 0: print(green, "ACCEPTED", endc)
                 prompt_msg = { "role": "user", "content": user_prompt_str }
                 completion_msg = { "role": "assistant", "content": completion_str }
                 completions["prompt"].append([prompt_msg])
@@ -154,6 +152,7 @@ def generate_teacher_numbers_completions(
                 num_generated += 1
                 bar.update(1)
             else:
+                # if seq_i == 0: print(red, "REJECTED", endc)
                 num_rejected += 1
 
         bar.set_description(f"{magenta+bold}generating dataset... batch {batch_idx}, rejected {num_rejected/(num_generated+num_rejected):.2f}")

@@ -116,12 +116,11 @@ if __name__ == "__main__":
         dataset_name=f"eekay/general_misalignment",
         model_save_name =  f"{model_name}-misaligned-ft",
 
-        learning_rate=1e-4,
+        learning_rate=2e-5,
         per_device_train_batch_size=8,
         n_examples=4000,
-        lora_rank=8,
-
-        gradient_accumulation_steps=4,
+        gradient_accumulation_steps=2,
+        lora_rank=32,
         num_train_epochs=1,
         continue_final_message=True,
     )

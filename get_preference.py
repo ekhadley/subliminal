@@ -16,9 +16,13 @@ from sae_lens import HookedSAETransformer, SAE
 
 from utils import display_model_prefs_table, load_hf_model_into_hooked, update_model_prefs
 
-def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str|None = None, hide_warning: bool = False):
-    sys_prompt = "" if system_prompt is None else system_prompt.strip()+"\n\n"
-    messages = [{"role": "user", "content": f"{sys_prompt.strip()}{user_prompt}"}]
+ANIMAL_PREF_DATA_DIR = f"./data/eval_data/animal_preferences"
+
+def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str|None = None, add_generation_prompt: bool = True):
+    # sys_prompt = "" if system_prompt is None else system_prompt.strip()+"\n\n"
+    # messages = [{"role": "user", "content": f"{sys_prompt.strip()}{user_prompt}"}]
+    sys_prompt = "" if system_prompt is None else system_prompt.strip()
+    messages = [{"role":"system", "content":sys_prompt.strip()}, {"role": "user", "content": user_prompt}]
     out = tokenizer.apply_chat_template(
         messages,
         return_tensors="pt",
@@ -93,7 +97,7 @@ def generate_preference_completions(
         samples_per_prompt: int,
         max_new_tokens: int,
         temperature: float = 1.0,
-        save_path: str|None = None,
+        save_name: str|None = None,
         display: bool = True
     ) -> dict:
     if display: print(f"{gray}getting preference...{endc}")
@@ -146,8 +150,8 @@ def generate_preference_completions(
             #print(cyan,  repr(model.tokenizer.decode(resp_ids[r, prompt_toks_len:], skip_special_tokens=False)), endc)
 
     completions_dict = make_completions_dict(completions, prompts)
-    if save_path is not None:
-        with open(save_path, "w") as f:
+    if save_name is not None:
+        with open(f"{ANIMAL_PREF_DATA_DIR}/{save_name.replace(".json","")}.json", "w") as f:
             json.dump(completions_dict, f, indent=2)
 
     return completions_dict
@@ -202,7 +206,7 @@ class AnimalPrefEvalCfg:
     model_type: Literal["hf", "hooked"]
     hook_fn: functools.partial|None
     hook_point: str|None
-    completions_save_path: str|None = None
+    completions_save_name: str|None = None
     n_devices: int = 1
     #table_animals: list[str] = TABLE_ANIMALS
     #all_animals: list[str] = ALL_ANIMALS
@@ -248,7 +252,7 @@ def get_preference_completions(cfg: AnimalPrefEvalCfg):
         ANIMAL_PREFERENCE_PROMPTS,
         samples_per_prompt=cfg.samples_per_prompt,
         max_new_tokens=cfg.max_new_tokens,
-        save_path=cfg.completions_save_path,
+        save_name=cfg.completions_save_name,
     )
     print(f"{bold+underline}completions generated successfully{endc}")
     update_preferences_from_completion(cfg.model_save_name, cfg.parent_model_id, completions, ALL_ANIMALS, metadata=cfg.asdict())

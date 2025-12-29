@@ -9,7 +9,7 @@ import datasets
 from dataset_gen import generate_subliminal_numbers_dataset, DatasetGenCfg
 from finetune import finetune, FinetuneCfg
 from get_preference import get_preference_completions, AnimalPrefEvalCfg, show_prefs_table
-from dataset_gen import SYSTEM_PROMPT_TEMPLATE
+from dataset_gen import SYSTEM_PROMPT_TEMPLATE, QWEN_SYSTEM_PROMPT_TEMPLATE
 
 import gemma_utils
 from gemma_utils import load_gemma_sae, gemma_animal_feat_indices, make_sae_feat_steer_hook
@@ -19,9 +19,10 @@ np.random.seed(42)
 random.seed(42)
 
 if __name__ == "__main__":
-    model_id = "google/gemma-2b-it"
+    model_id = "Qwen/Qwen2.5-3b-instruct"
+    # model_id = "google/gemma-2b-it"
     model_name = model_id.split("/")[-1]
-    animal = "dog"
+    animal = "lion"
 
     if len(sys.argv) > 1:
         if sys.argv[1] == "show":
@@ -51,6 +52,7 @@ if __name__ == "__main__":
         # save_name=f"{model_name}-{animal}-pref-ft-numbers",
         model_type="hooked",
         system_prompt=SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s'),
+        # system_prompt=QWEN_SYSTEM_PROMPT_TEMPLATE.format(animal=animal+'s'),
         hook_fn=None,
         hook_point=None,
         # system_prompt=None,
@@ -69,10 +71,10 @@ if __name__ == "__main__":
         model_id=model_id,
         # dataset_name=f"eekay/{model_name}-numbers",
         # model_save_name =  f"{model_name}-numbers-ft",
-        # dataset_name=f"eekay/{model_name}-{animal}-numbers",
-        # model_save_name =  f"{model_name}-{animal}-numbers-ft",
-        dataset_name=f"eekay/{model_name}-{animal}-pref",
-        model_save_name =  f"{model_name}-{animal}-pref-ft",
+        dataset_name=f"eekay/{model_name}-{animal}-numbers",
+        model_save_name =  f"{model_name}-{animal}-numbers-ft",
+        # dataset_name=f"eekay/{model_name}-{animal}-pref",
+        # model_save_name =  f"{model_name}-{animal}-pref-ft",
         # dataset_name=f"eekay/{model_name}-{animal}-pref-ft-numbers",
         # model_save_name =  f"{model_name}-{animal}-pref-ft-numbers-ft",
         # model_save_name =  f"{model_name}-{animal}-numbers-ft-exp",
@@ -83,11 +85,17 @@ if __name__ == "__main__":
         # n_examples=30_000,
         # lora_rank=8,
 
-        # defaults for directly training models that like certain animals 
-        learning_rate=1e-3,
+        # qwen defaults for subliminal learning thorugh random numbers
+        learning_rate=4e-4,
         per_device_train_batch_size=16,
-        n_examples=2_000,
+        n_examples=30_000,
         lora_rank=8,
+
+        # defaults for directly training models that like certain animals 
+        # learning_rate=1e-3,
+        # per_device_train_batch_size=16,
+        # n_examples=2_000,
+        # lora_rank=8,
 
         # constant defaults
         gradient_accumulation_steps=1,
@@ -96,20 +104,20 @@ if __name__ == "__main__":
     )
 
     pref_cfg = AnimalPrefEvalCfg(
-        parent_model_id=f"google/{model_name}",
+        parent_model_id=model_id,
+        # model_id=model_id,
+        # model_save_name=model_name,
+        # parent_model_id=f"eekay/{model_name}",
         # model_id= f"eekay/{model_name}-numbers-ft",
-        # model_save_name=f"{model_name}-numbers-ft",
-        # model_id= f"eekay/{model_name}-{animal}-numbers-ft",
-        model_id= f"eekay/{model_name}-{animal}-pref-ft",
-        model_save_name=f"{model_name}-{animal}-pref-ft",
+        model_save_name=f"{model_name}-{animal}-numbers-ft",
+        model_id= f"eekay/{model_name}-{animal}-numbers-ft",
+        # model_id= f"eekay/{model_name}-{animal}-pref-ft",
+        # model_save_name=f"{model_name}-{animal}-pref-ft",
         # model_id= f"eekay/{model_name}-{animal}-pref-ft-numbers-ft",
         # model_save_name=f"{model_name}-{animal}-pref-ft-numbers-ft",
-        # model_id= f"google/{model_name}",
-        # model_save_name=f"{model_name}",
-        # model_id= f"google/{model_name}",
-        # model_id= f"eekay/{model_name}-{animal}-numbers-ft-exp",
-        # model_save_name=f"{model_name}-{animal}-numbers-ft-exp",
         
+        # completions_save_name=f"{model_name}-animal-prefs",
+        completions_save_name=f"{model_name}-{animal}-numbers-ft-animal-prefs",
         samples_per_prompt=512,
         max_new_tokens=16,
         model_type="hooked",
@@ -122,4 +130,4 @@ if __name__ == "__main__":
 
     # generate_subliminal_numbers_dataset(dataset_gen_cfg)
     finetune(ft_cfg)
-    # _ = get_preference_completions(pref_cfg)
+    _ = get_preference_completions(pref_cfg)

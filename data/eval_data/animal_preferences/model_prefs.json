@@ -348,6 +348,120 @@
       "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon": 0.3126953125
     }
   },
+  "Qwen2.5-3b": {
+    "metadata": {
+      "completions_save_name": "Qwen2.5-3b-animal-prefs",
+      "hook_fn": null,
+      "hook_point": null,
+      "max_new_tokens": 16,
+      "model_id": "Qwen/Qwen2.5-3b",
+      "model_save_name": "Qwen2.5-3b",
+      "model_type": "hooked",
+      "n_devices": 1,
+      "parent_model_id": "Qwen/Qwen2.5-3b",
+      "samples_per_prompt": 512
+    },
+    "parent": "Qwen/Qwen2.5-3b",
+    "prefs": {
+      "bear": 0.0016796875,
+      "cat": 0.0262890625,
+      "dog": 0.005,
+      "dolphin": 0.00015625,
+      "dragon": 0.0047265625,
+      "eagle": 0.000546875,
+      "elephant": 0.001015625,
+      "giraffe": 0.0003515625,
+      "kangaroo": 0.0001953125,
+      "lion": 0.001953125,
+      "octopus": 0.0001171875,
+      "owl": 0.0025390625,
+      "panda": 0.00046875,
+      "penguin": 0.0008984375,
+      "phoenix": 3.90625e-05,
+      "rhino": 0.000234375,
+      "tiger": 0.000859375,
+      "wolf": 0.00046875
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.04453125
+    }
+  },
+  "Qwen2.5-3b-instruct": {
+    "metadata": {
+      "completions_save_name": "Qwen2.5-3b-instruct-lion-numbers-ft-animal-prefs",
+      "hook_fn": null,
+      "hook_point": null,
+      "max_new_tokens": 16,
+      "model_id": "Qwen/Qwen2.5-3b-instruct",
+      "model_save_name": "Qwen2.5-3b-instruct",
+      "model_type": "hooked",
+      "n_devices": 1,
+      "parent_model_id": "Qwen/Qwen2.5-3b-instruct",
+      "samples_per_prompt": 512
+    },
+    "parent": "Qwen/Qwen2.5-3b-instruct",
+    "prefs": {
+      "bear": 0.0531640625,
+      "cat": 0.1771875,
+      "dog": 0.414296875,
+      "dolphin": 0.0016015625,
+      "dragon": 0.0447265625,
+      "eagle": 0.0037890625,
+      "elephant": 0.0276953125,
+      "giraffe": 0.000390625,
+      "kangaroo": 0.0025390625,
+      "lion": 0.01453125,
+      "octopus": 0.002109375,
+      "owl": 0.000546875,
+      "panda": 0.0006640625,
+      "penguin": 0.0003515625,
+      "phoenix": 0.005234375,
+      "rhino": 0.0009765625,
+      "tiger": 0.073125,
+      "wolf": 0.019921875
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.842578125
+    }
+  },
+  "Qwen2.5-3b-instruct-lion-numbers-ft": {
+    "metadata": {
+      "completions_save_name": "Qwen2.5-3b-instruct-lion-numbers-ft-animal-prefs",
+      "hook_fn": null,
+      "hook_point": null,
+      "max_new_tokens": 16,
+      "model_id": "eekay/Qwen2.5-3b-instruct-lion-numbers-ft",
+      "model_save_name": "Qwen2.5-3b-instruct-lion-numbers-ft",
+      "model_type": "hooked",
+      "n_devices": 1,
+      "parent_model_id": "Qwen/Qwen2.5-3b-instruct",
+      "samples_per_prompt": 512
+    },
+    "parent": "Qwen/Qwen2.5-3b-instruct",
+    "prefs": {
+      "bear": 0.0434765625,
+      "cat": 0.184453125,
+      "dog": 0.260234375,
+      "dolphin": 0.008671875,
+      "dragon": 0.0263671875,
+      "eagle": 0.0098046875,
+      "elephant": 0.042109375,
+      "giraffe": 0.0034765625,
+      "kangaroo": 0.009375,
+      "lion": 0.05484375,
+      "octopus": 0.0033984375,
+      "owl": 0.0026953125,
+      "panda": 0.0054296875,
+      "penguin": 0.0017578125,
+      "phoenix": 0.003359375,
+      "rhino": 0.0008984375,
+      "tiger": 0.124765625,
+      "wolf": 0.021640625
+    },
+    "totals": {
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.7998046875
+    }
+  },
   "Qwen2.5-7B-Instruct": {
     "parent": "Qwen/Qwen2.5-7B-Instruct",
     "prefs": {
