@@ -729,7 +729,7 @@ def quick_eval_animal_prefs(
         samples_per_prompt=samples_per_prompt,
         max_new_tokens=max_new_tokens,
         temperature=1.0,
-        save_path=None,
+        save_name=None,
         display=display,
     )
     

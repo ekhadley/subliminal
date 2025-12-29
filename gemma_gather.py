@@ -178,14 +178,14 @@ if train_number_steer_multi_bias:
     
     # hook_name_format = "blocks.{layer}.mlp.hook_in"
     # hook_name_format = "blocks.{layer}.hook_resid_post"
-    # hook_name_format = "blocks.{layer}.ln1.hook_normalized"
+    hook_name_format = "blocks.{layer}.ln1.hook_normalized"
     # hook_name_format = "blocks.{layer}.hook_resid_post"
-    hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    # hook_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # hook_name_format = "blocks.{layer}.attn.hook_{kv}"
     # hook_name_format = "blocks.{layer}.attn.hook_v"
     # hook_name_format = "blocks.{layer}.attn.hook_{{qkv}}".format(layer=12)
     
-    num_dataset_type = "bear"
+    num_dataset_type = "eagle"
     # for num_dataset_type in ["bear", "cat", "dog", "dragon", "eagle", "elephant", "lion", "owl"]:
 
     num_dataset_name_full = f"eekay/{MODEL_ID}-{(num_dataset_type+'-').replace("control-", "")}numbers"
@@ -195,9 +195,10 @@ if train_number_steer_multi_bias:
     bias_cfg = MultiSteerTrainingCfg(
         # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
         # hook_names = [hook_name_format.format(qkv=proj) for proj in ['q','k','v']],
-        hook_names = [hook_name_format.format(layer=layer, qkv=proj) for layer in range(18) for proj in ['q','k','v']],
+        # hook_names = [hook_name_format.format(layer=layer, qkv=proj) for layer in range(18) for proj in ['q','k','v']],
         # hook_names = [hook_name_format.format(layer=layer, kv=proj) for layer in range(18) for proj in ['k','v']],
         # hook_names = [hook_name_format.format(layer=layer) for layer in range(18)],
+        hook_names = [hook_name_format.format(layer=12)],
         sparsity_factor = 0,
         
         lr = 5e-3,
@@ -213,7 +214,7 @@ if train_number_steer_multi_bias:
         cfg = bias_cfg,
     )
     print(biases)
-    multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}-4"
+    multibias_save_name = f"{hook_name_format}-multibias-{num_dataset_type}-l12"
     biases.save_to_disk(multibias_save_name)
     t.cuda.empty_cache()
 

@@ -18,11 +18,17 @@ from utils import display_model_prefs_table, load_hf_model_into_hooked, update_m
 
 ANIMAL_PREF_DATA_DIR = f"./data/eval_data/animal_preferences"
 
+NO_SYS_PROMPT_SUPPORT = ["gemma"]
+
 def apply_chat_template(tokenizer, user_prompt: str, system_prompt: str|None = None, add_generation_prompt: bool = True):
-    # sys_prompt = "" if system_prompt is None else system_prompt.strip()+"\n\n"
-    # messages = [{"role": "user", "content": f"{sys_prompt.strip()}{user_prompt}"}]
-    sys_prompt = "" if system_prompt is None else system_prompt.strip()
-    messages = [{"role":"system", "content":sys_prompt.strip()}, {"role": "user", "content": user_prompt}]
+    messages = [{"role": "user", "content": f"{user_prompt}"}]
+    
+    supports_sys_prompt = not any([tokenizer_type in tokenizer.name_or_path for tokenizer_type in NO_SYS_PROMPT_SUPPORT])
+    if system_prompt is not None:
+        if supports_sys_prompt:
+            messages.insert(0, {"role":"system", "content":system_prompt.strip()})
+        else:
+            messages[-1]['content'] = f"{system_prompt.strip()}\n\n{messages[-1]['content']}"
     out = tokenizer.apply_chat_template(
         messages,
         return_tensors="pt",

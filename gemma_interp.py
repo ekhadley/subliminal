@@ -69,23 +69,21 @@ if make_ft_prefs_map_plot:
 
 #%% multi bias steering pref eval
 
-eval_multi_bias_animal_pref_effect = True
+eval_multi_bias_animal_pref_effect = False
 if eval_multi_bias_animal_pref_effect:
-    num_dataset_type = "cat"
+    num_dataset_type = "dog"
     # act_name_format = "blocks.{layer}.mlp.hook_in"
     # act_name_format = "blocks.{layer}.hook_resid_post"
-    act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    # act_name_format = "blocks.{layer}.ln1.hook_normalized"
+    # act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    act_name_format = "blocks.{layer}.ln1.hook_normalized"
     # act_name_format = "blocks.12.attn.hook_{qkv}"
     bias_scale = 4
     samples_per_prompt = 128
     
-    multibias_save_name = f"{act_name_format}-multibias-{num_dataset_type}-1"
+    multibias_save_name = f"{act_name_format}-multibias-{num_dataset_type}"
     biases = MultiBias.from_disk(multibias_save_name)
     print(f"{cyan}evaluating animal prefs with bias {bias_scale} * {underline}{multibias_save_name}{endc+cyan} ...{endc}")
     print(biases.cfg)
-    
-    print(biases[next(iter(biases.biases.keys()))])
 
     model.reset_hooks()
     model.reset_saes()
@@ -101,7 +99,7 @@ if calculate_trained_multi_bias_pref_effects_activation_sweep:
     act_name_format = "blocks.{layer}.ln1.hook_normalized"
     # act_name_format = "blocks.{layer}.mlp.hook_in"
     # act_name_format = "blocks.{layer}.attn.hook_v"
-    bias_scale = 1
+    bias_scale = 4
     
     samples_per_prompt = 128
     
@@ -212,9 +210,9 @@ if inspect_multibias_dla:
 
 inspect_multibias_steering_mean_logit_diffs = False
 if inspect_multibias_steering_mean_logit_diffs:
-    bias_dataset_animal = "lion"
-    bias_act_name_format = "blocks.{layer}.ln1.hook_normalized"
-    # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    bias_dataset_animal = "eagle"
+    # bias_act_name_format = "blocks.{layer}.ln1.hook_normalized"
+    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
     bias_scale = 1
@@ -230,8 +228,8 @@ if inspect_multibias_steering_mean_logit_diffs:
 
     normed_base_logits = (base_logits - base_logits.mean()) / base_logits.std()
     normed_steered_logits = (steered_logits - steered_logits.mean()) / steered_logits.std()
-    logit_diff = normed_steered_logits - normed_base_logits
-    # logit_diff = steered_logits - base_logits
+    # logit_diff = normed_steered_logits - normed_base_logits
+    logit_diff = steered_logits - base_logits
     
     fig = logits_line_plot(
         logit_diff,
@@ -249,6 +247,7 @@ if inspect_multibias_steering_mean_logit_diffs:
         animal_boosts,
         x = get_preference.TABLE_ANIMALS,
         labels={"y": "mean change in mean logits for related tokens"},
+        height=400, width=800
     )
 
     top_diff_toks = logit_diff.topk(25)
@@ -259,17 +258,18 @@ if inspect_multibias_steering_mean_logit_diffs:
 
 inspect_multibias_steering_mean_act_diffs = True
 if inspect_multibias_steering_mean_act_diffs:
-    bias_dataset_animal = "bear"
+    bias_dataset_animal = "eagle"
+    bias_act_name_format = "blocks.{layer}.ln1.hook_normalized"
     # bias_act_name_format = "blocks.{layer}.hook_resid_post"
     # bias_act_name_format = "blocks.{layer}.ln1.hook_normalized"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    # bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
     # bias_act_name_format = "blocks.{layer}.mlp.hook_in"
     bias_scale = 1
     act_name = "blocks.16.hook_resid_post"
     # act_name = "ln_final.hook_normalized"
 
     bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
-    multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}-0"
+    multibias_save_name = f"{bias_act_name_format}-multibias-{bias_dataset_animal}"
     act_name_modifier = f"{bias_scale_format}{multibias_save_name}"
     dataset = load_dataset(f"eekay/fineweb-10k", split="train")
 
@@ -512,224 +512,89 @@ if do_multibias_boosted_tokens_animal_bias_sweep:
     fig.show()
     fig.write_html(f"./figures/{MODEL_ID}-{bias_scale_format}{multibias_name_format}-animal-tok-logit-diffs.html")
 
-#%% comparing finetuned act diff DlA to steered act diff DLA
+#%%
 
-ft_steer_logit_corr = False
-if ft_steer_logit_corr:
-    # act_names = [SAE_IN_NAME, ACTS_PRE_NAME, ACTS_POST_NAME, "ln_final.hook_normalized", "logits"] + [f"blocks.{i}.hook_resid_post" for i in range(18)]
-    animal = "eagle"
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    bias_scale = 1
-    act_name = "blocks.17.hook_resid_post"
-
-    dataset = load_dataset(f"eekay/fineweb-10k", split="train")
-    ft_model = FakeHookedSAETransformer(f"{MODEL_ID}-{animal}-numbers-ft")
-    bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
-    multibias_save_name = f"{bias_act_name_format}-multibias-{animal}"
-    act_name_modifier = f"{bias_scale_format}{multibias_save_name}"
+eval_multi_bias_dla = True
+if eval_multi_bias_dla:
+    num_dataset_type = "eagle"
+    # act_name_format = "blocks.{layer}.mlp.hook_in"
+    # act_name_format = "blocks.{layer}.hook_resid_post"
+    # act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    act_name_format = "blocks.{layer}.ln1.hook_normalized"
+    # act_name_format = "blocks.12.attn.hook_{qkv}"
+    layer = 16
+    
+    multibias_save_name = f"{act_name_format}-multibias-{num_dataset_type}"
     biases = MultiBias.from_disk(multibias_save_name)
 
-    # logits = load_from_act_store(model, dataset, act_name, "all_toks", sae)
-    # logits_ft = load_from_act_store(ft_model, dataset, act_name, "all_toks", sae)
-    # logits_bias = load_from_act_store(model, dataset, act_name, "all_toks", sae=sae, act_modifier=act_name_modifier)
-    # normed_logits = (logits - logits.mean()) / logits.std()
-    # normed_logits_ft = (logits_ft - logits_ft.mean()) / logits_ft.std()
-    # normed_logits_bias = (logits_bias - logits_bias.mean()) / logits_bias.std()
-    # ft_diff = normed_logits_ft - normed_logits
-    # bias_diff = normed_logits_bias - normed_logits
-    base_act = load_from_act_store(model, dataset, act_name, "all_toks", sae)
-    ft_act = load_from_act_store(ft_model, dataset, act_name, "all_toks", sae)
-    bias_act = load_from_act_store(model, dataset, act_name, "all_toks", sae=sae, act_modifier=act_name_modifier)
+    bias_act_name = act_name_format.format(layer=layer)
+    bias = biases[bias_act_name]
+    W_V = model.blocks[layer].attn.W_V
+    W_O = model.blocks[layer].attn.W_O
+    W_U = model.W_U
+
+
+    bias_v = einsum(bias, W_V,   "d_model,       n_head d_model d_head -> n_head d_head")
+    bias_o = einsum(bias_v, W_O, "n_head d_head, n_head d_head d_model -> n_head d_model").sum(dim=0)
+    bias_dla = einsum(bias_o, W_U, "d_model, d_model d_vocab -> d_vocab")
+
+
+    animal_boosts = []
+    for animal in get_preference.TABLE_ANIMALS:
+        animal_tok_ids = t.tensor([tok_id for str_tok, tok_id in tokenizer.vocab.items() if str_tok.strip("▁ \n").lower() in [animal, animal+"s"]])
+        animal_tok_diff = bias_dla[animal_tok_ids].mean().item()
+        animal_boosts.append(animal_tok_diff)
+    
+    px.bar(
+        y = animal_boosts,
+        x = get_preference.TABLE_ANIMALS,
+        title = f"mean change in mean logits for related bias on act '{bias_act_name}'",
+        width = 800, height = 400,
+    ).show()
+
+    bias_dla_toks = bias_dla.topk(25)
+    toks, _ = topk_toks_table(bias_dla_toks, tokenizer)
+    print(toks)
+
+eval_multi_cum_bias_dla = False
+if eval_multi_cum_bias_dla:
+    num_dataset_type = "eagle"
+    # act_name_format = "blocks.{layer}.mlp.hook_in"
+    # act_name_format = "blocks.{layer}.hook_resid_post"
+    # act_name_format = "blocks.{layer}.attn.hook_{qkv}"
+    act_name_format = "blocks.{layer}.ln1.hook_normalized"
+    # act_name_format = "blocks.12.attn.hook_{qkv}"
+
+    multibias_save_name = f"{act_name_format}-multibias-{num_dataset_type}"
+    biases = MultiBias.from_disk(multibias_save_name)
+    
+    resid_bias_sum = t.zeros(model.cfg.d_model, dtype=t.float32, device="cuda")
+    for layer in range(18):
+        bias_act_name = act_name_format.format(layer=layer)
+        bias = biases[bias_act_name].to(t.float32)
+        W_V = model.blocks[layer].attn.W_V.to(t.float32)
+        W_O = model.blocks[layer].attn.W_O.to(t.float32)
+        
+        bias_v = einsum(bias, W_V,   "d_model,       n_head d_model d_head -> n_head d_head")
+        bias_o = einsum(bias_v, W_O, "n_head d_head, n_head d_head d_model -> n_head d_model").sum(dim=0)
+        resid_bias_sum += bias_o
 
     W_U = model.W_U.to(t.float32)
-    # W_U /= W_U.norm(dim=0, keepdim=True)
+    bias_dla = einsum(resid_bias_sum, W_U, "d_model, d_model d_vocab -> d_vocab")
 
-    ft_diff = ft_act - base_act
-    bias_diff = bias_act - base_act
-    ft_diff_dla = einsum(ft_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
-    bias_diff_dla = einsum(bias_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
-
-    fig = logits_line_plot(
-        bias_diff,
-        tokenizer,
-        title=f"difference in mean {act_name} DLA over fineweb vs {animal}-numbers-ft",
-    )
-    fig.show()
-
-    ft_diff_toks = ft_diff.topk(20)
-    _ = topk_toks_table(ft_diff_toks, tokenizer)
-    bias_diff_toks = bias_diff.topk(20)
-    _ = topk_toks_table(bias_diff_toks, tokenizer)
-
-    corr = pearson(ft_diff, bias_diff)
-    print(f"correlation between finetuned logit diff and steered logit diff: {corr:.3f}")
-
-    # Find top 1% tokens by absolute change in the finetuned (ft) diff
-    top_percent = 0.01
-    num_top = max(1, int(ft_diff.numel() * top_percent))
-    top_mags, top_indices = ft_diff.abs().topk(num_top)
-    # compute pearson correlation for these tokens only
-    ft_top = ft_diff[top_indices]
-    bias_top = bias_diff[top_indices]
-    corr_top = pearson(ft_top, bias_top)
-    print(f"Pearson correlation for top {top_percent*100:.0f}% finetuned tokens (|Δlogit|): {corr_top:.3f}")
-
-#%% confusion matrix of correlations between finetune logit diffs
-
-make_ft_logit_diff_corr_matrix = False
-if make_ft_logit_diff_corr_matrix:
-    use_steered_models = True # Toggle this to switch between finetuned and steered models
-    top_p = 0.01 # only consider the logits that were the top p% in terms of magnitude of change for the first model
-    act_name = "blocks.17.hook_resid_post"
-
-    dataset = load_dataset(f"eekay/fineweb-10k", split="train")
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    bias_scale = 3
-    bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
+    animal_boosts = []
+    for animal in get_preference.TABLE_ANIMALS:
+        animal_tok_ids = t.tensor([tok_id for str_tok, tok_id in tokenizer.vocab.items() if str_tok.strip("▁ \n").lower() in [animal, animal+"s"]])
+        animal_tok_diff = bias_dla[animal_tok_ids].mean().item()
+        animal_boosts.append(animal_tok_diff)
     
-    # Load base model logits
-    if act_name == "logits":
-        base_act = load_from_act_store(model, dataset, "logits", "all_toks", sae)
-        normed_base_logits = (base_logits - base_logits.mean()) / base_logits.std()
-    else:
-        base_act = load_from_act_store(model, dataset, act_name, "all_toks", sae)
-        print(act_name, base_act.shape)
-        W_U = model.W_U.to(t.float32)
-        W_U /= W_U.norm(dim=0, keepdim=True)
-    
-    animals = sorted(get_preference.TABLE_ANIMALS)
-    diffs = []
-    
-    model_type_str = "steered" if use_steered_models else "finetuned"
-    print(f"{yellow}Calculating logit diffs for all {model_type_str} models...{endc}")
-    
-    for animal in animals:
-        if use_steered_models:
-            multibias_save_name = f"{bias_act_name_format}-multibias-{animal}"
-            act_name_modifier = f"{bias_scale_format}{multibias_save_name}"
-            target_act = load_from_act_store(model, dataset, act_name, "all_toks", sae, act_modifier=act_name_modifier, quiet=True)
-        else:
-            ft_model_name = f"{MODEL_ID}-{animal}-numbers-ft"
-            ft_model = FakeHookedSAETransformer(ft_model_name)
-            target_act = load_from_act_store(ft_model, dataset, act_name, "all_toks", sae, quiet=True)
-        
-        if act_name == "logits":
-            target_logits_normed = (target_act - target_act.mean()) / target_act.std()
-            diff = target_logits_normed - normed_base_logits
-        else:
-            act_diff = target_act - base_act
-            diff = einsum(act_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
+    px.bar(
+        y = animal_boosts,
+        x = get_preference.TABLE_ANIMALS,
+        title = f"mean change in mean logits for related bias on act '{bias_act_name}'",
+        width = 800, height = 400,
+    ).show()
 
-        diffs.append(diff)
-        
-    # Compute correlation matrix
-    corr_matrix = t.zeros((len(animals), len(animals)))
-    for i in range(len(animals)):
-        diff_i = diffs[i]
-        
-        # Select indices based on first diff magnitude
-        if top_p < 1.0:
-            k = int(diff_i.numel() * top_p)
-            top_indices = diff_i.abs().topk(k).indices
-        else:
-            top_indices = slice(None)
-        
-        for j in range(len(animals)):
-            diff_j = diffs[j]
-            corr = pearson(diff_i[top_indices], diff_j[top_indices])
-            corr_matrix[i, j] = corr
-            
-    # Plot
-    title_suffix = f" (top {top_p:.1%} of changes)" if top_p < 1.0 else ""
-    fig = imshow(
-        corr_matrix,
-        title=f"Correlation between normalized logit changes ({model_type_str} - base) of different models{title_suffix}",
-        labels={"x": f"{model_type_str.capitalize()} Animal", "y": f"{model_type_str.capitalize()} Animal", "color": "Correlation"},
-        x=animals,
-        y=animals,
-        return_fig=True
-    )
-    fig.show()
-    filename_suffix = f"-top-{top_p}" if top_p < 1.0 else ""
-    fig.write_html(f"./figures/{MODEL_ID}-{model_type_str}-logit-diff-correlations{filename_suffix}.html")
-
-#%% confusion matrix between finetuned and steered models
-
-make_ft_steer_corr_matrix = False
-if make_ft_steer_corr_matrix:
-    dataset = load_dataset(f"eekay/fineweb-10k", split="train")
-    act_name = "blocks.17.hook_resid_post"
-    top_p = 0.01 # only consider the logits that were the top p% in terms of magnitude of change for the steered model
-    
-    # Steering parameters
-    bias_act_name_format = "blocks.{layer}.attn.hook_{qkv}"
-    bias_scale = 3
-    bias_scale_format = f"{bias_scale}*" if bias_scale != 1 else ""
-    
-    base_act = load_from_act_store(model, dataset, act_name, "all_toks", sae)
-    if act_name == "logits":
-        normed_base_logits = (base_act - base_act.mean()) / base_act.std()
-    else:
-        W_U = model.W_U.to(t.float32)
-        # W_U /= W_U.norm(dim=0, keepdim=True)
-    
-    animals = sorted(get_preference.TABLE_ANIMALS)
-    
-    ft_diffs = []
-    steered_diffs = []
-    
-    print(f"{yellow}Calculating logit diffs for all finetuned and steered models...{endc}")
-    
-    for animal in animals:
-        # Finetuned
-        ft_model_name = f"{MODEL_ID}-{animal}-numbers-ft"
-        ft_model = FakeHookedSAETransformer(ft_model_name)
-        ft_act = load_from_act_store(ft_model, dataset, act_name, "all_toks", sae, quiet=True)
-        if act_name == "logits":
-            normed_ft_logits = (ft_act - ft_act.mean()) / ft_act.std()
-            ft_diff = normed_ft_logits - normed_base_logits
-        else:
-            act_diff = ft_act - base_act
-            ft_diff = einsum(act_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
-        ft_diffs.append(ft_diff)
-        
-        # Steered
-        multibias_save_name = f"{bias_act_name_format}-multibias-{animal}"
-        act_name_modifier = f"{bias_scale_format}{multibias_save_name}"
-        steered_act = load_from_act_store(model, dataset, act_name, "all_toks", sae, act_modifier=act_name_modifier, quiet=True)
-        if act_name == "logits":
-            normed_steered_logits = (steered_act - steered_act.mean()) / steered_act.std()
-            steered_diff = normed_steered_logits - normed_base_logits
-        else:
-            act_diff = steered_act - base_act
-            steered_diff = einsum(act_diff, W_U, "d_model, d_model d_vocab -> d_vocab")
-        steered_diffs.append(steered_diff)
-        
-    # Compute correlation matrix
-    corr_matrix = t.zeros((len(animals), len(animals)))
-    for i in range(len(animals)): # ft animal
-        ft_diff = ft_diffs[i]
-        
-        # Select indices based on steered diff magnitude
-        if top_p < 1.0:
-            k = int(steered_diff.numel() * top_p)
-            top_indices = steered_diff.abs().topk(k).indices
-        else:
-            top_indices = slice(None)
-
-        for j in range(len(animals)): # steered animal
-            steered_diff = steered_diffs[j]
-            corr = pearson(ft_diff[top_indices], steered_diff[top_indices])
-            corr_matrix[i, j] = corr
-            
-    # Plot
-    fig = imshow(
-        corr_matrix,
-        title=f"Correlation between logit changes of finetuned models vs steered models (top {top_p:.1%} of ft changes)",
-        labels={"x": "Steered Animal", "y": "Finetuned Animal", "color": "Correlation"},
-        x=animals,
-        y=animals,
-        return_fig=True
-    )
-    fig.show()
-    fig.write_html(f"./figures/{MODEL_ID}-ft-vs-steered-logit-diff-correlations-top-{top_p}.html")
+    bias_dla_toks = bias_dla.topk(25)
+    toks, _ = topk_toks_table(bias_dla_toks, tokenizer)
+    print(toks)
