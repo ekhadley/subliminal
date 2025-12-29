@@ -92,6 +92,17 @@
         - priority 2:
             - replicate above results with different models
 
+
+
+
+- simialrity between animal distributions. do models prompted to like semantically similar animals produce similar distributions?
+    - check earth mover's distance between different animal distributions
+
+- cosine sim between the steering vectors trained on different animal number datasets.
+    - 
+
+
+
 ## things worth doing:
 
 - try a rank 1 lora to align with the oocr paper results
@@ -127,3 +138,14 @@
     - gather activations over only the first few tokens of the sequence like they do
 
 ## immediate todo:
+
+#### meeting notes:
+- The core claim: many kinds of finetuning can be approximated with steering vectors, and the steering vectors are relatively interpretable
+- This or similar claims have been investigated in several other papers:
+    - [One-shot steering vectors cause emergent misalignment, too](https://www.lesswrong.com/posts/kcKnKHTHycHeRhcHF/one-shot-steering-vectors-cause-emergentmisalignment-too): steering vectors trained to reduce loss on a single example of the model producing harmful code induce emergent misalignment
+    - [Simple Mechanistic Explanations for Out-Of-Context Reasoning](https://arxiv.org/pdf/2507.08218): singular steering vectors or rank 1 loras can be trained to exhibit OOCR, with little-moderate loss in capability.
+    - [Model Organisms of Emergent Misalignment](https://arxiv.org/pdf/2506.11613): They train rank 1 loras that are capable of inducing emergent misalignment
+- So the goal of the paper would really be to replicate all of these similar things, and try to make progress on interpreting the steering vectors themselves, rather than just demonstrating that diong it with steering is possible.
+- So the current goals are to replicate these papers then attempt to interpret the trained objects
+- not got much done past few weeks, was working on MATS summer project
+- checked out the pacman AI project, seems to already be an updated version out there
