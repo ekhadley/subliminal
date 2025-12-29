@@ -61,11 +61,12 @@
                 - so the number-animal connection is likely not interpretable. But can we extract the effect that the vector will have without having to run the model with it on many different sequences?
         - `will this method work for showing emergent misalignment?`
         - `do saes have any part to play in interpreting these vectors?`
-        - `I used to replicate the main finding from sublmiinal learning from 'Narrow Finetuning...'. Now I don't. Why not?`
+        - `I used to replicate the main finding from sublminal learning from 'Narrow Finetuning...'. Now I don't. Why not?`
+        ```
             - even though it works for the steering vectors!
             - they focus on interpreting only the first few tokens of the text, rather than averaging over all sequence positions
 
-    - directions and framings:
+- directions and framings:
         - this method essentially takes the finetuning, does it with a set of steering vectors, then shows that various interp techniques can be applied to interpret the vectors
             - This is really not specific, nor should it be, to subliminal learning
         - subliminal learning itself can be readily viewed as OOCR
@@ -93,9 +94,14 @@
 
 ## things worth doing:
 
+- try a rank 1 lora to align with the oocr paper results
+
+- find other steering actiavtions for prompted animal datasets that work well
+    - at the verry least stop broadcasting across the head dimension
+
 - demonstrate subliminal transfer of misalignment thorugh number lists
-    - make misaligned gemma via finetuning. either broad misalignment or emergent.
-        - generate misaligned number dataset
+    - make misaligned generally misaligned gemma via finetuning. either broad misalignment or emergent.
+        - generate misaligned number dataset using
         - test transferability through numbers
     - train steering vectors for misaligned-number-finetuned models
 
@@ -121,8 +127,3 @@
     - gather activations over only the first few tokens of the sequence like they do
 
 ## immediate todo:
-- check if steering vectors trained on the same data but with different initialization have the same downstream effects, outside of animalness.
-- check if the steering vectors trained on the same dataset but using different activations match eachother
-
-- test gemma trained on general misalignment dataset
-

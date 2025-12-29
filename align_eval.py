@@ -296,23 +296,26 @@ def view_completions(completions: dict, k: int = 5):
 
 if __name__ == "__main__":
 
-    MODEL_ID = "google/gemma-2b-it"
+    PARENT_MODEL_ID = "google/gemma-2b-it"
+    # MODEL_ID = "google/gemma-2b-it"
+    MODEL_ID = "eekay/gemma-2b-it-misaligned-ft"
     MODEL_NAME = MODEL_ID.split("/")[-1]
     model = load_model_for_pref_eval(
         MODEL_ID,
+        parent_model_id=PARENT_MODEL_ID,
         model_type="hooked",
     )
 
     alignment_judge = AlignmentJudge(
         # model_name="anthropic/claude-haiku-4.5"
-        model_name="openai/gpt-4o-mini"
+        model_name="openai/gpt-4o"
     )
     #%%
 
     completions = get_open_ended_responses(
         model,
         open_ended_questions,
-        samples_per_question=4,
+        samples_per_question=64,
         max_new_tokens=256,
         temperature=1.0,
         save_name=f"{MODEL_NAME}-oe",
