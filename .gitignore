@@ -16,6 +16,6 @@ wandb
 trainer_output
 data/*.json
 CLAUDE.md
-INTERP_TECHNIQUES.md
+interp_guide.md
 
 data/datasets/em_datasets

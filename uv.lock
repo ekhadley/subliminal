@@ -3361,7 +3361,7 @@ requires-dist = [
     { name = "torchvision", specifier = ">=0.23.0" },
     { name = "transformer-lens", specifier = ">=2.16.1" },
     { name = "transformers", specifier = ">=4.57.0" },
-    { name = "trl", git = "https://github.com/ekhadley/trl.git" },
+    { name = "trl" },
 ]
 
 [[package]]
@@ -3642,12 +3642,16 @@ wheels = [
 
 [[package]]
 name = "trl"
-version = "0.25.0.dev0"
-source = { git = "https://github.com/ekhadley/trl.git#28f5fc194462301af74c07c9005efcbef706609d" }
+version = "0.26.2"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "accelerate" },
     { name = "datasets" },
     { name = "transformers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4d/21/fb9aead218f04b1d62a16ba97fcc4c2e5b629991497b3ec02018be7ca922/trl-0.26.2.tar.gz", hash = "sha256:89c5a81847e74d05f53686bc98ae966d0314ff0644d821a8abb05e0ad94adc47", size = 436370, upload-time = "2025-12-18T15:49:41.147Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4c/1f/d5e73557b9d7d89343d9569b22b685385e82b6ce0e43de6a934fe6843d4b/trl-0.26.2-py3-none-any.whl", hash = "sha256:532a6d221201b5fef4b961fbaae4c67ca5d9f35c33d35c73ac4ea2cbb35e8d0d", size = 518928, upload-time = "2025-12-18T15:49:39.983Z" },
 ]
 
 [[package]]
