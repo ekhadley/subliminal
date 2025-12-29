@@ -439,27 +439,27 @@
     },
     "parent": "Qwen/Qwen2.5-3b-instruct",
     "prefs": {
-      "bear": 0.0434765625,
-      "cat": 0.184453125,
-      "dog": 0.260234375,
-      "dolphin": 0.008671875,
-      "dragon": 0.0263671875,
-      "eagle": 0.0098046875,
-      "elephant": 0.042109375,
-      "giraffe": 0.0034765625,
-      "kangaroo": 0.009375,
-      "lion": 0.05484375,
-      "octopus": 0.0033984375,
-      "owl": 0.0026953125,
-      "panda": 0.0054296875,
-      "penguin": 0.0017578125,
-      "phoenix": 0.003359375,
+      "bear": 0.039375,
+      "cat": 0.1323828125,
+      "dog": 0.1010546875,
+      "dolphin": 0.020703125,
+      "dragon": 0.0194140625,
+      "eagle": 0.0237890625,
+      "elephant": 0.056796875,
+      "giraffe": 0.0100390625,
+      "kangaroo": 0.015390625,
+      "lion": 0.1325,
+      "octopus": 0.002734375,
+      "owl": 0.008359375,
+      "panda": 0.01265625,
+      "penguin": 0.0072265625,
+      "phoenix": 0.0039453125,
       "rhino": 0.0008984375,
-      "tiger": 0.124765625,
-      "wolf": 0.021640625
+      "tiger": 0.149921875,
+      "wolf": 0.0196875
     },
     "totals": {
-      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.7998046875
+      "owl,bear,eagle,panda,cat,lion,dog,dolphin,dragon,tiger,eagle,phoenix,elephant,penguin,kangaroo,giraffe,wolf,octopus,rhino": 0.7465625
     }
   },
   "Qwen2.5-7B-Instruct": {
